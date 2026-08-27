@@ -91,16 +91,17 @@ class MacIndicator(DictationIndicator):
         """
         self._level = max(0.0, min(1.0, level))
         if self._view is not None:
-            # Dispatch to main thread for AppKit safety.
+            # Dispatch to main thread for AppKit safety. performSelectorOnMainThread
+            # requires a one-argument selector (trailing colon in ObjC). pyobjc maps
+            # Python trailing underscores to ObjC colons, but ONLY unambiguously when
+            # the name has no internal underscores — otherwise each underscore becomes
+            # a colon (e.g. _whiz_update_display_ -> _whiz:update:display:, 3 args).
+            # So we use CamelCase names: whizUpdateDisplay_ -> whizUpdateDisplay:.
             try:
-                from Foundation import NSMutableArray
-                # performSelectorOnMainThread_ is the simplest safe path.
                 self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
-                    "_whiz_update_display", None, False
+                    "whizUpdateDisplay:", None, False
                 )
             except Exception:  # noqa: BLE001
-                # If dispatch fails, the view just won't update this frame —
-                # not worth crashing dictation over.
                 pass
 
     def set_state(self, state: str) -> None:
@@ -109,7 +110,7 @@ class MacIndicator(DictationIndicator):
         if self._view is not None:
             try:
                 self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
-                    "_whiz_set_state", None, False
+                    "whizSetState:", None, False
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -169,37 +170,17 @@ class MacIndicator(DictationIndicator):
 
 
 class WhizIndicatorView:
-    """Custom NSView drawing the mic badge + animated volume curve.
+    """Pure-Python holder for the NSView draw method.
 
-    Defined as a Python class; we attach it to an NSView subclass at
-    runtime via objc. This avoids requiring a compiled PyObjC subclass
-    at import time and keeps the module importable without AppKit.
+    The real ObjC ``_WhizIndicatorViewImpl`` subclass (created at import
+    time on macOS via ``_create_objc_view_class``) delegates ``drawRect_``
+    here. Keeping the draw logic in a plain Python class avoids requiring a
+    compiled PyObjC subclass at import time and keeps this module importable
+    without AppKit (the draw method is simply never called on non-macOS).
     """
 
-    # These attributes are set after alloc().initWithFrame_ by the runtime
-    # glue; declared here for type checkers.
+    # Set by the ObjC subclass after alloc().initWithFrame_().
     _indicator: "MacIndicator"
-
-    def initWithFrame_(self, frame):
-        """NSView initializer. ``self`` is the ObjC instance."""
-        self = _objc_super_init(self, frame)
-        if self is not None:
-            self._indicator = None
-        return self
-
-    def _whiz_update_display(self) -> None:
-        """Trigger a redraw on the main thread (called via performSelector)."""
-        try:
-            self.setNeedsDisplay_(True)
-        except Exception:  # noqa: BLE001
-            pass
-
-    def _whiz_set_state(self) -> None:
-        """State changed — redraw."""
-        try:
-            self.setNeedsDisplay_(True)
-        except Exception:  # noqa: BLE001
-            pass
 
     def drawRect_(self, rect) -> None:
         """NSView draw — paints the circular badge + volume curve."""
@@ -319,10 +300,16 @@ def _create_objc_view_class():
         def drawRect_(self, rect):
             WhizIndicatorView.drawRect_(self, rect)
 
-        def _whiz_update_display(self):
+        # performSelectorOnMainThread:withObject: requires a one-argument
+        # selector (trailing colon in ObjC). pyobjc maps Python trailing
+        # underscores to ObjC colons, but internal underscores also map to
+        # colons — so we use CamelCase names (no internal underscores) to keep
+        # the mapping unambiguous: whizUpdateDisplay_ -> whizUpdateDisplay:.
+        # `sender` is the object argument (ignored — we just trigger a redraw).
+        def whizUpdateDisplay_(self, sender):
             self.setNeedsDisplay_(True)
 
-        def _whiz_set_state(self):
+        def whizSetState_(self, sender):
             self.setNeedsDisplay_(True)
 
     _OBJC_VIEW_CLASS = _WhizIndicatorViewImpl

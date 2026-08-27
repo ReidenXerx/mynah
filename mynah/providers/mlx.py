@@ -109,7 +109,22 @@ class MlxWhisperProvider(STTProvider):
             path_or_hf_repo=self._model_ref,
             language=language or "ru",
             initial_prompt=initial_prompt or None,
-            condition_on_previous_text=True,
+            # False: don't carry prior utterances as context. With True, one
+            # hallucinated phrase biases the next utterance toward similar
+            # content, compounding hallucinations across utterances.
+            condition_on_previous_text=False,
+            # Anti-hallucination tuning (all stricter than Whisper defaults):
+            # Lower no_speech_threshold (0.6→0.35): skip segments the model
+            # is even moderately confident are silence, instead of emitting
+            # training-data boilerplate on near-silent audio.
+            no_speech_threshold=0.35,
+            # Raise logprob_threshold (-1.0→-0.5): reject low-confidence segments
+            # (hallucinations on noise typically have poor log probabilities).
+            logprob_threshold=-0.5,
+            # Enable Whisper's built-in hallucination detector: when the model
+            # loops/repeats in a silent region, skip forward by this many
+            # seconds instead of transcribing the repetition.
+            hallucination_silence_threshold=2.0,
             verbose=None,  # suppress mlx-whisper's tqdm/segment prints
         )
         text = (result.get("text") or "").strip()

@@ -113,6 +113,17 @@ sys.modules.setdefault("numpy", _FakeNumpy("numpy"))
 sys.modules.setdefault("sounddevice", _FakeSoundDevice("sounddevice"))
 
 
+def _loud_pcm(seconds: float, amp: int = 20000) -> bytes:
+    """Generate audible-energy int16 PCM (square wave) for tests.
+
+    The engine's energy gate skips near-silent audio, so tests that expect
+    transcription to proceed need realistic-energy audio, not zeros.
+    ``amp`` defaults to 20000/32767 ≈ 0.61 — well above the _MIN_ENERGY floor.
+    """
+    n = int(WHISPER_SAMPLE_RATE * seconds)
+    return array("h", (amp if i % 2 else -amp for i in range(n))).tobytes()
+
+
 # ---------------------------------------------------------------------------
 # Fakes — minimal stand-ins for the heavy deps.
 # ---------------------------------------------------------------------------
@@ -413,7 +424,7 @@ def test_end_session_flushes_remaining_utterance():
     engine = _make_engine(stt=stt, injector=injector)
     engine._start_session()
     # Simulate a buffered utterance that never got flushed by VAD.
-    engine._utterance_buffer.append(b"\x00" * (WHISPER_SAMPLE_RATE * 2))
+    engine._utterance_buffer.append(_loud_pcm(2.0))
     engine._end_session()
     # The remaining utterance should have been transcribed + injected.
     assert "остаток" in injector.typed
@@ -455,7 +466,7 @@ def test_transcribe_and_inject_types_text():
     injector = FakeInjector()
     indicator = FakeIndicator()
     engine = _make_engine(stt=stt, injector=injector, indicator=indicator)
-    pcm = (np.zeros(WHISPER_SAMPLE_RATE, dtype=np.int16)).tobytes()
+    pcm = _loud_pcm(1.0)
     engine._transcribe_and_inject(pcm, np)
     assert injector.typed == ["привет"]
     assert "transcribing" in indicator.states
@@ -468,8 +479,8 @@ def test_transcribe_and_inject_skips_too_short():
     stt = FakeSTT(text="x")
     injector = FakeInjector()
     engine = _make_engine(stt=stt, injector=injector)
-    # 0.05s — below the 0.1s minimum.
-    pcm = (np.zeros(int(WHISPER_SAMPLE_RATE * 0.05), dtype=np.int16)).tobytes()
+    # 0.05s — below the 0.35s minimum.
+    pcm = _loud_pcm(0.05)
     engine._transcribe_and_inject(pcm, np)
     assert injector.typed == []
     assert stt.last_audio is None
@@ -480,7 +491,7 @@ def test_transcribe_and_inject_passes_language_and_prompt():
 
     stt = FakeSTT(text="hi")
     engine = _make_engine(stt=stt)
-    pcm = (np.zeros(WHISPER_SAMPLE_RATE, dtype=np.int16)).tobytes()
+    pcm = _loud_pcm(1.0)
     engine._transcribe_and_inject(pcm, np)
     assert stt.last_kwargs["language"] == "ru"
     assert stt.last_kwargs["initial_prompt"] == eng.DEFAULT_RUSSIAN_PROMPT
@@ -492,7 +503,7 @@ def test_transcribe_and_inject_skips_empty_text():
     stt = FakeSTT(text="   ")  # whitespace only
     injector = FakeInjector()
     engine = _make_engine(stt=stt, injector=injector)
-    pcm = (np.zeros(WHISPER_SAMPLE_RATE, dtype=np.int16)).tobytes()
+    pcm = _loud_pcm(1.0)
     engine._transcribe_and_inject(pcm, np)
     assert injector.typed == []
 
@@ -504,10 +515,47 @@ def test_transcribe_and_inject_swallows_stt_error():
     stt.transcribe = mock.Mock(side_effect=RuntimeError("boom"))
     indicator = FakeIndicator()
     engine = _make_engine(stt=stt, indicator=indicator)
-    pcm = (np.zeros(WHISPER_SAMPLE_RATE, dtype=np.int16)).tobytes()
+    pcm = _loud_pcm(1.0)
     engine._transcribe_and_inject(pcm, np)  # should not raise
     # Indicator should return to listening after the error.
     assert indicator.states[-1] == "listening"
+
+
+def test_transcribe_and_inject_skips_silence_energy_gate():
+    """All-silent audio is skipped by the energy gate (no hallucination)."""
+    import numpy as np
+
+    stt = FakeSTT(text="спасибо за субтитры")  # would-be hallucination
+    injector = FakeInjector()
+    engine = _make_engine(stt=stt, injector=injector)
+    pcm = (np.zeros(WHISPER_SAMPLE_RATE, dtype=np.int16)).tobytes()
+    engine._transcribe_and_inject(pcm, np)
+    assert injector.typed == []
+    assert stt.last_audio is None
+
+
+def test_transcribe_and_inject_suppresses_hallucination_phrase():
+    """Known hallucination phrases are suppressed even if audio passes energy gate."""
+    import numpy as np
+
+    stt = FakeSTT(text="Спасибо за субтитры Алексею Дубровскому!")
+    injector = FakeInjector()
+    engine = _make_engine(stt=stt, injector=injector)
+    pcm = _loud_pcm(1.0)
+    engine._transcribe_and_inject(pcm, np)
+    assert injector.typed == []
+
+
+def test_transcribe_and_inject_suppresses_to_be_continued():
+    """'Продолжение следует…' hallucination is suppressed."""
+    import numpy as np
+
+    stt = FakeSTT(text="Продолжение следует...")
+    injector = FakeInjector()
+    engine = _make_engine(stt=stt, injector=injector)
+    pcm = _loud_pcm(1.0)
+    engine._transcribe_and_inject(pcm, np)
+    assert injector.typed == []
 
 
 # ---------------------------------------------------------------------------
@@ -856,7 +904,7 @@ def test_end_session_flushes_buffer_after_capture_stops():
     injector = FakeInjector()
     engine = _make_engine(stt=stt, injector=injector)
     engine._start_session()
-    engine._utterance_buffer.append(b"\x00" * (WHISPER_SAMPLE_RATE * 2))
+    engine._utterance_buffer.append(_loud_pcm(2.0))
     engine._end_session()
     assert "хвост" in injector.typed
     assert engine._utterance_buffer == []

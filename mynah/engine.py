@@ -80,15 +80,66 @@ DEFAULT_RUSSIAN_PROMPT = (
 # longer = more natural but adds latency before text appears.
 _UTTERANCE_SILENCE = 0.8
 
+# Per-frame energy floor (normalized 0.0–1.0). Frames below this amplitude
+# are treated as silence BEFORE VAD even sees them — webrtcvad can classify
+# steady low-level noise (fan, keyboard, HVAC) as speech, which produces
+# utterances that pass the whole-buffer RMS gate but are still garbage.
+# This floor short-circuits those frames so they never start/extend an
+# utterance.
+_VAD_FRAME_ENERGY = 0.015
+
 # How often (seconds) the run loops poll the stop event.
 _TICK = 0.05
 
-# Minimum utterance length (seconds) to bother transcribing — sub-0.1s
-# blips are noise/clicks, not speech.
-_MIN_UTTERANCE_SECONDS = 0.1
+# Minimum utterance length (seconds) to bother transcribing — sub-0.35s
+# blips are noise/clicks/breaths, not speech.
+_MIN_UTTERANCE_SECONDS = 0.35
+
+# Minimum RMS energy (0.0–1.0, normalized int16) for an utterance to be
+# transcribed. Below this the audio is silence or noise — Whisper is known
+# to hallucinate training-data boilerplate ("субтитры создавал…",
+# "продолжение следует…") on near-silent input, so we skip it entirely.
+_MIN_ENERGY = 0.01
+
+# Known Whisper hallucination phrases (lowercased). When the model is fed
+# silence/noise it emits these training-data artifacts; we suppress them as
+# a safety net even if the energy gate misses (e.g. low-but-audible fan
+# noise that VAD misclassifies as speech).
+_HALLUCINATION_PHRASES = frozenset(
+    p.lower()
+    for p in (
+        "спасибо за субтитры",
+        "субтитры создавал",
+        "субтитры выполнил",
+        "субтитры делал",
+        "субтитры подготовил",
+        "продолжение следует",
+        "спасибо за просмотр",
+        "спасибо за внимание",
+        "подписывайтесь на канал",
+        "by follows",
+        "by following",
+    )
+)
 
 # Sentinel enqueued to tell the transcribe worker to exit its loop.
 _FLUSH_SENTINEL = object()
+
+
+def _rms_int16(pcm_bytes: bytes) -> float:
+    """RMS amplitude of 16-bit PCM, normalized to 0.0–1.0.
+
+    Uses the stdlib ``array`` module (not numpy) so it works identically in
+    the test environment where numpy is faked out.
+    """
+    import array
+
+    raw = array.array("h")
+    raw.frombytes(pcm_bytes)
+    if not len(raw):
+        return 0.0
+    total = sum(v * v for v in raw)
+    return (total / len(raw)) ** 0.5 / 32768.0
 
 
 @dataclass
@@ -443,7 +494,13 @@ class DictationEngine:
         while offset + frame_bytes <= len(pcm):
             chunk = pcm[offset : offset + frame_bytes]
             offset += frame_bytes
-            is_speech = vad.is_speech(chunk)
+            # Energy pre-filter: reject frames below the amplitude floor as
+            # silence before VAD — webrtcvad misclassifies steady low-level
+            # noise as speech, which seeds hallucination-prone utterances.
+            if _rms_int16(chunk) < _VAD_FRAME_ENERGY:
+                is_speech = False
+            else:
+                is_speech = vad.is_speech(chunk)
             if is_speech:
                 self._utterance_buffer.append(chunk)
                 self._in_speech = True
@@ -496,10 +553,16 @@ class DictationEngine:
 
     def _transcribe_and_inject(self, pcm_bytes: bytes, np) -> None:
         """Transcribe a PCM utterance and inject the text into the focused app."""
-        samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-        if len(samples) < WHISPER_SAMPLE_RATE * _MIN_UTTERANCE_SECONDS:
+        if len(pcm_bytes) < 2 * WHISPER_SAMPLE_RATE * _MIN_UTTERANCE_SECONDS:
             # Too short to be meaningful speech — skip.
             return
+        # Energy gate: Whisper hallucinates training-data boilerplate on
+        # near-silent / noise-only audio. Skip utterances below the RMS floor
+        # before spending a transcription on them.
+        if _rms_int16(pcm_bytes) < _MIN_ENERGY:
+            logger.debug("Skipping low-energy utterance (silence/noise)")
+            return
+        samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
         self.indicator.set_state("transcribing")
         try:
             text = self.stt.transcribe(
@@ -513,6 +576,14 @@ class DictationEngine:
             self.indicator.set_state("listening")
             return
         if text.strip():
+            # Hallucination safety net: suppress known Whisper training-data
+            # artifacts that slip through when the audio is just above the
+            # energy floor (e.g. steady fan/keyboard noise).
+            text_lower = text.lower()
+            if any(marker in text_lower for marker in _HALLUCINATION_PHRASES):
+                logger.debug("Suppressing hallucination: %s", text)
+                self.indicator.set_state("listening")
+                return
             self.injector.type_text(text)
         self.indicator.set_state("listening")
 

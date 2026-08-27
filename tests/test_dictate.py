@@ -217,6 +217,7 @@ def _make_engine(
             trigger="toggle",
             vad_enabled=True,
             show_indicator=True,
+            idle_visible=False,
             model="",
         )
     return eng.DictationEngine(
@@ -1194,3 +1195,296 @@ def test_mic_error_path_ends_session(monkeypatch):
     assert engine._stop_event.is_set()
     assert engine._session_active is False
     assert indicator.hidden is True
+
+
+# ---------------------------------------------------------------------------
+# Idle-visible indicator + login LaunchAgent service
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_settings_idle_visible_default_true():
+    config = cfg.Config()
+    s = eng.resolve_settings(config)
+    assert s.idle_visible is True
+
+
+def test_resolve_settings_idle_visible_override():
+    config = cfg.Config()
+    config.dictate_idle_visible = False
+    s = eng.resolve_settings(config)
+    assert s.idle_visible is False
+    s = eng.resolve_settings(config, idle_visible=True)
+    assert s.idle_visible is True
+
+
+def test_run_shows_idle_indicator_when_idle_visible(monkeypatch):
+    """run() must show the dimmed idle badge as soon as the service starts
+    when idle_visible is on, so the user can see dictation is armed."""
+    indicator = FakeIndicator()
+    settings = eng.DictateSettings(
+        language="ru", initial_prompt="x", idle_timeout=0,
+        auto_stop_silence=0, hotkey="x", trigger="toggle",
+        vad_enabled=False, show_indicator=True, idle_visible=True,
+    )
+    engine = _make_engine(indicator=indicator, settings=settings)
+    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+    engine._stop_event.set()
+    engine.run()
+    assert indicator.setup_called is True
+    assert indicator.shown is True
+    assert "idle" in indicator.states
+
+
+def test_run_hides_indicator_when_idle_visible_false(monkeypatch):
+    """When idle_visible is off, run() must NOT show the indicator at idle —
+    only setup() runs (the original hide-until-session behavior)."""
+    indicator = FakeIndicator()
+    settings = eng.DictateSettings(
+        language="ru", initial_prompt="x", idle_timeout=0,
+        auto_stop_silence=0, hotkey="x", trigger="toggle",
+        vad_enabled=False, show_indicator=True, idle_visible=False,
+    )
+    engine = _make_engine(indicator=indicator, settings=settings)
+    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+    engine._stop_event.set()
+    engine.run()
+    assert indicator.setup_called is True
+    assert indicator.shown is False
+
+
+def test_end_session_shows_idle_badge_when_idle_visible():
+    """After a session ends with idle_visible, the indicator returns to the
+    dimmed idle badge (show), not hidden."""
+    indicator = FakeIndicator()
+    settings = eng.DictateSettings(
+        language="ru", initial_prompt="x", idle_timeout=0,
+        auto_stop_silence=0, hotkey="x", trigger="toggle",
+        vad_enabled=False, show_indicator=True, idle_visible=True,
+    )
+    engine = _make_engine(indicator=indicator, settings=settings)
+    engine._start_session()
+    indicator.shown = False  # reset to observe the end-of-session show
+    engine._end_session()
+    assert indicator.states[-1] == "idle"
+    assert indicator.shown is True
+    assert indicator.hidden is False
+
+
+def test_end_session_hides_when_idle_visible_false():
+    """Without idle_visible, _end_session hides the indicator (legacy behavior)."""
+    indicator = FakeIndicator()
+    engine = _make_engine(indicator=indicator)
+    assert engine.s.idle_visible is False
+    engine._start_session()
+    engine._end_session()
+    assert indicator.hidden is True
+
+
+def test_dictate_set_idle_visible(tmp_path, monkeypatch):
+    """`whiz dictate set idle_visible=false` persists dictate_idle_visible."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="idle_visible=false")
+    rc = cli.cmd_dictate_set(args)
+    assert rc == 0
+    assert cfg.load().dictate_idle_visible is False
+
+
+def test_dictate_set_idle_badge_alias(tmp_path, monkeypatch):
+    """The 'idle_badge' alias maps to dictate_idle_visible."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="idle_badge=true")
+    rc = cli.cmd_dictate_set(args)
+    assert rc == 0
+    assert cfg.load().dictate_idle_visible is True
+
+
+# --- LaunchAgent service module ---
+
+
+def test_service_build_plist_contains_required_keys(monkeypatch):
+    from whiz.dictate import service
+
+    # Force a deterministic whiz binary resolution.
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    xml = service.build_plist()
+    assert service.LABEL in xml
+    assert "<key>RunAtLoad</key>" in xml
+    assert "<true/>" in xml
+    assert "<key>KeepAlive</key>" in xml
+    assert "<key>ThrottleInterval</key>" in xml
+    assert "<key>ProcessType</key>" in xml
+    assert "Interactive" in xml
+    assert "/usr/local/bin/whiz" in xml
+    assert "dictate" in xml  # ProgramArguments includes the subcommand
+    assert "whiz-dictate.log" in xml
+
+
+def test_service_build_plist_falls_back_to_python_m(monkeypatch):
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service.shutil, "which", lambda _name: None)
+    xml = service.build_plist()
+    assert "-m" in xml
+    assert "whiz" in xml
+    assert "dictate" in xml
+
+
+def test_service_install_writes_plist_and_loads(monkeypatch, tmp_path):
+    from whiz.dictate import service
+
+    plist = tmp_path / f"{service.LABEL}.plist"
+    log = tmp_path / "whiz-dictate.log"
+    monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
+    monkeypatch.setattr(service, "_LOG_PATH", log)
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(service.subprocess, "run", fake_run)
+    monkeypatch.setattr(service, "_run", fake_run)
+
+    rc = service.install()
+    assert rc == 0
+    assert plist.exists()
+    assert plist.read_text().startswith("<?xml")
+    # Must have attempted to load the plist.
+    assert any(c[:2] == ["launchctl", "load"] for c in calls), calls
+
+
+def test_service_unload_on_reinstall(monkeypatch, tmp_path):
+    """install() unloads an existing plist before loading the new one."""
+    from whiz.dictate import service
+
+    plist = tmp_path / f"{service.LABEL}.plist"
+    log = tmp_path / "whiz-dictate.log"
+    plist.write_text("<old/>")
+    monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
+    monkeypatch.setattr(service, "_LOG_PATH", log)
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(service.subprocess, "run", fake_run)
+    monkeypatch.setattr(service, "_run", fake_run)
+
+    service.install()
+    assert any(c[:2] == ["launchctl", "unload"] for c in calls), calls
+
+
+def test_service_uninstall_removes_plist(monkeypatch, tmp_path):
+    from whiz.dictate import service
+
+    plist = tmp_path / f"{service.LABEL}.plist"
+    plist.write_text("<old/>")
+    monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(service.subprocess, "run", fake_run)
+    monkeypatch.setattr(service, "_run", fake_run)
+
+    rc = service.uninstall()
+    assert rc == 0
+    assert not plist.exists()
+    assert any(c[:2] == ["launchctl", "unload"] for c in calls), calls
+
+
+def test_service_uninstall_when_not_installed(monkeypatch, tmp_path):
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
+
+    def fake_run(cmd, **kwargs):
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(service.subprocess, "run", fake_run)
+    monkeypatch.setattr(service, "_run", fake_run)
+    rc = service.uninstall()
+    assert rc == 0
+
+
+def test_service_status_not_loaded(monkeypatch, tmp_path):
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
+
+    def fake_run(cmd, **kwargs):
+        return mock.Mock(returncode=1, stdout="", stderr="not loaded")
+
+    monkeypatch.setattr(service.subprocess, "run", fake_run)
+    monkeypatch.setattr(service, "_run", fake_run)
+    rc = service.status()
+    assert rc == 0  # not-loaded is not an error
+
+
+def test_service_status_loaded_parses_pid(monkeypatch, tmp_path):
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
+    sample = '{\n    "PID" = 4242;\n    "LastExitStatus" = 0;\n}'
+
+    def fake_run(cmd, **kwargs):
+        return mock.Mock(returncode=0, stdout=sample, stderr="")
+
+    monkeypatch.setattr(service.subprocess, "run", fake_run)
+    monkeypatch.setattr(service, "_run", fake_run)
+    rc = service.status()
+    assert rc == 0
+
+
+def test_dictate_parser_service_subcommands():
+    from whiz import cli
+
+    parser = cli.build_parser()
+    for action in ("install", "uninstall", "status"):
+        args = parser.parse_args(["dictate", "service", action])
+        assert args.func is cli.cmd_dictate_service
+        assert args.service_action == action
+
+
+def test_dictate_parser_service_remove_alias():
+    from whiz import cli
+
+    parser = cli.build_parser()
+    args = parser.parse_args(["dictate", "service", "remove"])
+    assert args.service_action == "uninstall"
+
+
+def test_cmd_dictate_service_install_refuses_without_extra(monkeypatch, capsys):
+    """install must refuse (rc=1) when the dictate extra isn't installed,
+    rather than writing a LaunchAgent that would crash-loop on startup."""
+    import builtins
+    from whiz import cli
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name in {"sounddevice", "pynput"}:
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    args = mock.Mock(service_action="install")
+    rc = cli.cmd_dictate_service(args)
+    assert rc == 1
+    out = capsys.readouterr()
+    assert "dictate' extra is not installed" in out.err
+    assert "crash-loop" in out.err

@@ -161,6 +161,7 @@ class DictateSettings:
     trigger: str
     vad_enabled: bool
     show_indicator: bool
+    idle_visible: bool = True
     model: str = ""
 
 
@@ -180,6 +181,7 @@ def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
         trigger=(overrides.get("trigger") or config.dictate_trigger or "toggle").strip().lower(),
         vad_enabled=bool(overrides.get("vad", config.dictate_vad)),
         show_indicator=bool(overrides.get("show_indicator", config.dictate_show_indicator)),
+        idle_visible=bool(overrides.get("idle_visible", config.dictate_idle_visible)),
         model=(overrides.get("model") or config.dictate_model or ""),
     )
 
@@ -247,6 +249,16 @@ class DictationEngine:
         # main-thread-only APIs (macOS NSWindow) create their UI here. run()
         # is called from the main thread, so this is always safe.
         self.indicator.setup()
+
+        # Show the indicator in its dimmed idle state as soon as the service
+        # starts, so the user can see dictation is armed. Without this the
+        # NSPanel exists (created above) but is never ordered to the front
+        # until a session begins — which is why the indicator was invisible
+        # at idle. When idle_visible is off, keep the original behavior (hide
+        # until a session starts).
+        if self.s.show_indicator and self.s.idle_visible:
+            self.indicator.set_state("idle")
+            self.indicator.show()
 
         # On macOS with an indicator, run the AppKit event loop on the main
         # thread. Otherwise, run a plain blocking loop.
@@ -321,7 +333,10 @@ class DictationEngine:
             if not self._session_active:
                 # A stop/end raced in while we were loading — abort cleanly.
                 self.indicator.set_state("idle")
-                self.indicator.hide()
+                if self.s.idle_visible:
+                    self.indicator.show()
+                else:
+                    self.indicator.hide()
                 self._schedule_idle_unload()
                 return
             # Reset utterance state.
@@ -393,7 +408,14 @@ class DictationEngine:
         with self._state_lock:
             self._transcribe_thread = None
         self.indicator.set_state("idle")
-        self.indicator.hide()
+        # When the idle badge is visible, keep the dimmed indicator on screen
+        # after a session ends instead of hiding it — so the service always
+        # shows an "armed" state. hide() reverts to the original behavior
+        # when idle_visible is off.
+        if self.s.idle_visible:
+            self.indicator.show()
+        else:
+            self.indicator.hide()
         # Schedule idle unload.
         self._schedule_idle_unload()
         print("■ Dictation off.", file=sys.stderr)

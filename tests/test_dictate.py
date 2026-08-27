@@ -1488,3 +1488,187 @@ def test_cmd_dictate_service_install_refuses_without_extra(monkeypatch, capsys):
     out = capsys.readouterr()
     assert "dictate' extra is not installed" in out.err
     assert "crash-loop" in out.err
+
+
+# ---------------------------------------------------------------------------
+# Guided first-time setup / doctor (whiz dictate setup)
+# ---------------------------------------------------------------------------
+
+
+def test_setup_check_extra_passes_when_importable(monkeypatch):
+    """_check_extra reports ok when the dictate extra deps import cleanly."""
+    from whiz.dictate import setup as setup_mod
+
+    # The test env injects fake sounddevice; force the rest to import ok.
+    monkeypatch.setitem(sys.modules, "pynput", types.ModuleType("pynput"))
+    monkeypatch.setitem(sys.modules, "webrtcvad", types.ModuleType("webrtcvad"))
+    monkeypatch.setitem(sys.modules, "AppKit", types.ModuleType("AppKit"))
+    monkeypatch.setitem(sys.modules, "Quartz", types.ModuleType("Quartz"))
+    monkeypatch.setitem(sys.modules, "ApplicationServices", types.ModuleType("ApplicationServices"))
+    r = setup_mod._check_extra()
+    assert r.ok is True
+    assert r.title == "Dictate extra"
+
+
+def test_setup_check_extra_fails_when_missing(monkeypatch):
+    """_check_extra reports not-ok and an inject hint when deps are missing."""
+    from whiz.dictate import setup as setup_mod
+
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "pynput":
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    r = setup_mod._check_extra()
+    assert r.ok is False
+    assert "pynput" in r.detail
+    assert "pipx inject" in r.hint
+
+
+def test_setup_check_accessibility_passes_when_trusted(monkeypatch):
+    from whiz.dictate import setup as setup_mod
+
+    fake_appsvc = types.ModuleType("ApplicationServices")
+    fake_appsvc.AXIsProcessTrustedWithOptions = lambda opts: True
+    fake_cf = types.ModuleType("CoreFoundation")
+    fake_cf.kCFBooleanTrue = True
+    fake_foundation = types.ModuleType("Foundation")
+    fake_foundation.NSDictionary = mock.Mock()
+    monkeypatch.setitem(sys.modules, "ApplicationServices", fake_appsvc)
+    monkeypatch.setitem(sys.modules, "CoreFoundation", fake_cf)
+    monkeypatch.setitem(sys.modules, "Foundation", fake_foundation)
+    r = setup_mod._check_accessibility()
+    assert r.ok is True
+    assert r.title == "Accessibility"
+
+
+def test_setup_check_accessibility_fails_when_not_trusted(monkeypatch):
+    from whiz.dictate import setup as setup_mod
+
+    fake_appsvc = types.ModuleType("ApplicationServices")
+    fake_appsvc.AXIsProcessTrustedWithOptions = lambda opts: False
+    fake_cf = types.ModuleType("CoreFoundation")
+    fake_cf.kCFBooleanTrue = True
+    fake_foundation = types.ModuleType("Foundation")
+    fake_foundation.NSDictionary = mock.Mock()
+    monkeypatch.setitem(sys.modules, "ApplicationServices", fake_appsvc)
+    monkeypatch.setitem(sys.modules, "CoreFoundation", fake_cf)
+    monkeypatch.setitem(sys.modules, "Foundation", fake_foundation)
+    r = setup_mod._check_accessibility()
+    assert r.ok is False
+    assert "Accessibility" in r.hint
+
+
+def test_setup_check_microphone_passes(monkeypatch):
+    """_check_microphone reports ok when an InputStream opens cleanly."""
+    from whiz.dictate import setup as setup_mod
+
+    class _OkStream:
+        def __init__(self, **kw):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+
+    import sounddevice as sd
+    monkeypatch.setattr(sd, "InputStream", _OkStream)
+    r = setup_mod._check_microphone()
+    assert r.ok is True
+    assert r.title == "Microphone"
+
+
+def test_setup_check_microphone_fails_on_denial(monkeypatch):
+    """_check_microphone reports not-ok with a grant hint when the stream
+    raises an input/device error (the macOS permission-denied shape)."""
+    from whiz.dictate import setup as setup_mod
+
+    class _DenyStream:
+        def __init__(self, **kw):
+            raise RuntimeError("No input device available")
+
+    import sounddevice as sd
+    monkeypatch.setattr(sd, "InputStream", _DenyStream)
+    r = setup_mod._check_microphone()
+    assert r.ok is False
+    assert "Microphone" in r.hint
+
+
+def test_setup_run_checks_returns_three_results():
+    from whiz.dictate import setup as setup_mod
+
+    results = setup_mod.run_checks()
+    assert len(results) == 3
+    titles = [r.title for r in results]
+    assert titles == ["Dictate extra", "Accessibility", "Microphone"]
+
+
+def test_setup_all_pass_points_at_service(monkeypatch, capsys):
+    """When all checks pass and the service isn't loaded, setup points the
+    user at `whiz dictate service install` (doesn't auto-install)."""
+    from whiz.dictate import setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "run_checks", lambda: [
+        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
+    ])
+    monkeypatch.setattr(setup_mod, "_service_loaded", lambda: False)
+    rc = setup_mod.setup()
+    assert rc == 0
+    out = capsys.readouterr()
+    assert "All checks passed" in out.err
+    assert "whiz dictate service install" in out.err
+
+
+def test_setup_all_pass_notes_running_service(monkeypatch, capsys):
+    """When all checks pass and the service is already loaded, note that."""
+    from whiz.dictate import setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "run_checks", lambda: [
+        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
+    ])
+    monkeypatch.setattr(setup_mod, "_service_loaded", lambda: True)
+    rc = setup_mod.setup()
+    assert rc == 0
+    out = capsys.readouterr()
+    assert "already installed and running" in out.err
+
+
+def test_setup_failure_returns_one_and_recheck_hint(monkeypatch, capsys):
+    """A failing check returns rc=1 and tells the user to re-run setup."""
+    from whiz.dictate import setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "run_checks", lambda: [
+        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=False, title="Accessibility", detail="no", hint="grant it"),
+        setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
+    ])
+    rc = setup_mod.setup()
+    assert rc == 1
+    out = capsys.readouterr()
+    assert "Some checks failed" in out.err
+    assert "whiz dictate setup" in out.err
+
+
+def test_dictate_parser_setup_subcommand():
+    from whiz import cli
+
+    parser = cli.build_parser()
+    args = parser.parse_args(["dictate", "setup"])
+    assert args.func is cli.cmd_dictate_setup
+
+
+def test_dictate_parser_doctor_alias():
+    from whiz import cli
+
+    parser = cli.build_parser()
+    args = parser.parse_args(["dictate", "doctor"])
+    assert args.func is cli.cmd_dictate_setup

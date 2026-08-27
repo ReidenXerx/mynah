@@ -301,9 +301,13 @@ class DictationEngine:
         # pyobjc is unavailable.
         self._setup_menu_bar()
 
-        # On macOS with an indicator, run the AppKit event loop on the main
-        # thread. Otherwise, run a plain blocking loop.
-        if self.s.show_indicator and _is_macos():
+        # On macOS, run the AppKit event loop on the main thread whenever
+        # ANY AppKit UI is live — the indicator OR the menu bar. The menu
+        # bar's NSStatusItem needs the run loop to pump events for clicks +
+        # menu display; without it (show_indicator=False + menu_bar=True)
+        # the status item appears but is dead. Falls back to the plain loop
+        # only when no AppKit UI is in use.
+        if (self.s.show_indicator or self.s.menu_bar) and _is_macos():
             return self._run_with_appkit()
         return self._run_plain()
 

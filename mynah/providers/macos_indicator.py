@@ -79,12 +79,17 @@ class MacIndicator(DictationIndicator):
         The panel is created eagerly in ``setup()``. Ordering it to the
         front is an AppKit UI op; dispatch it to the main thread so a call
         from the hotkey/transcribe threads is safe.
+
+        The ``whizFadeIn:``/``whizFadeOut:`` selectors live on the indicator
+        view (``_WhizIndicatorViewImpl``), not on ``NSPanel`` — so dispatch
+        to ``self._view`` (matching ``update_level``/``set_state``). The
+        view's ``window()`` resolves the panel at run time.
         """
-        if self._panel is None:
+        if self._view is None:
             return
         self._visible = True
         try:
-            self._panel.performSelectorOnMainThread_withObject_waitUntilDone_(
+            self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
                 "whizFadeIn:", None, False
             )
         except Exception:  # noqa: BLE001
@@ -92,11 +97,11 @@ class MacIndicator(DictationIndicator):
 
     def hide(self) -> None:
         """Dismiss the overlay with an opacity fade (main-thread-safe)."""
-        if self._panel is None:
+        if self._view is None:
             return
         self._visible = False
         try:
-            self._panel.performSelectorOnMainThread_withObject_waitUntilDone_(
+            self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
                 "whizFadeOut:", None, False
             )
         except Exception:  # noqa: BLE001
@@ -399,6 +404,14 @@ def _create_objc_view_class():
             panel = self.window()
             if panel is None:
                 return
+            # Cancel any pending hide-side ``orderOut:`` scheduled by a prior
+            # ``_fade_panel(False)``. Without this, a rapid hide→show
+            # (toggle double-tap / session restart) re-fronts the panel and
+            # fades alpha to 1, only for the deferred ``orderOut:`` to fire
+            # ~0.2s later and rip the now-visible panel off-screen.
+            panel.cancelPreviousPerformRequestsWithTarget_selector_object_(
+                panel, "orderOut:", None
+            )
             if fade_in:
                 # Order front first (alpha 0), then animate to 1.
                 panel.orderFrontRegardless()

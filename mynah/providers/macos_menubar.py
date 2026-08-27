@@ -201,8 +201,21 @@ class MacMenuBar:
     # ---------- menu actions (called from the ObjC controller) ----------
 
     def do_toggle(self) -> None:
-        """Start/Stop Dictation menu action → engine.toggle_session()."""
-        self._engine.toggle_session()
+        """Start/Stop Dictation menu action → engine.toggle_session().
+
+        Dispatched to a background thread so the ``whizToggle:`` selector
+        returns immediately and the AppKit run loop stays responsive. The
+        first session loads the STT model (a multi-second mlx-whisper
+        download/load); running that synchronously on the main thread would
+        freeze the menu bar icon, the menu, and the indicator's fade
+        animation for the whole load. The hotkey path already runs
+        off-main (pynput listener thread), so this mirrors it.
+        """
+        import threading
+
+        threading.Thread(
+            target=self._engine.toggle_session, daemon=True
+        ).start()
 
     def do_open_config(self) -> None:
         """Open Config File → reveal ~/.config/whiz/config.toml in Finder."""
@@ -238,8 +251,20 @@ class MacMenuBar:
             logger.debug("about failed", exc_info=True)
 
     def do_quit(self) -> None:
-        """Quit whiz dictate → engine.stop() (process exits; launchd restarts it)."""
-        self._engine.stop()
+        """Quit whiz dictate → engine.stop() off-main so the selector returns
+        immediately and the AppKit run loop isn't blocked.
+
+        ``engine.stop()`` joins the capture (5s) and transcribe (30s) threads;
+        running it on the main thread inside ``whizQuit:`` would beach-ball
+        the menu bar for up to ~35s on an active session. Under a KeepAlive
+        LaunchAgent launchd restarts the process anyway, so a fast stop is
+        preferable to a frozen clean shutdown.
+        """
+        import threading
+
+        threading.Thread(
+            target=self._engine.stop, daemon=True
+        ).start()
 
 
 def _tint_image(image: Any, color: Any) -> Any:

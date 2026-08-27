@@ -113,6 +113,24 @@ sys.modules.setdefault("numpy", _FakeNumpy("numpy"))
 sys.modules.setdefault("sounddevice", _FakeSoundDevice("sounddevice"))
 
 
+def _wait_until(predicate, msg: str = "condition not met", timeout: float = 2.0) -> None:
+    """Poll ``predicate`` until it returns truthy or ``timeout`` seconds pass.
+
+    Used for assertions about background-thread work (menu bar do_toggle /
+    do_quit dispatch to a daemon thread), where a synchronous assert would
+    race. Raises AssertionError on timeout — never sleeps the full timeout
+    when the predicate becomes true early.
+    """
+    import time as _t
+
+    deadline = _t.monotonic() + timeout
+    while _t.monotonic() < deadline:
+        if predicate():
+            return
+        _t.sleep(0.005)
+    raise AssertionError(f"{msg} within {timeout}s")
+
+
 def _loud_pcm(seconds: float, amp: int = 20000) -> bytes:
     """Generate audible-energy int16 PCM (square wave) for tests.
 
@@ -2116,28 +2134,64 @@ def test_indicator_pill_starts_transparent_and_fades(monkeypatch):
 
 def test_menubar_toggle_action_calls_engine_toggle():
     """MacMenuBar.do_toggle drives engine.toggle_session — the same path as
-    the hotkey — so the menu bar can start/stop a real session."""
+    the hotkey — so the menu bar can start/stop a real session. do_toggle
+    dispatches to a background thread so the AppKit run loop isn't blocked,
+    so we poll until the session flips (bounded wait)."""
     from whiz.dictate.providers.macos_menubar import MacMenuBar
 
     engine = _make_engine()
     mb = MacMenuBar(engine=engine)
     assert engine._session_active is False
     mb.do_toggle()
+    _wait_until(lambda: engine._session_active, "session did not start")
     assert engine._session_active is True
     mb.do_toggle()
+    _wait_until(lambda: not engine._session_active, "session did not stop")
     assert engine._session_active is False
 
 
 def test_menubar_quit_action_calls_engine_stop():
-    """MacMenuBar.do_quit calls engine.stop() (idempotent, ends any session)."""
+    """MacMenuBar.do_quit calls engine.stop() (idempotent, ends any session).
+    do_quit dispatches to a background thread, so we poll for the stop
+    event + session-end rather than asserting synchronously."""
     from whiz.dictate.providers.macos_menubar import MacMenuBar
 
     engine = _make_engine()
     engine._start_session()
     mb = MacMenuBar(engine=engine)
     mb.do_quit()
+    _wait_until(lambda: engine._stop_event.is_set(), "stop event not set")
+    _wait_until(lambda: not engine._session_active, "session did not end")
     assert engine._stop_event.is_set()
     assert engine._session_active is False
+
+
+def test_menubar_toggle_does_not_block_calling_thread():
+    """do_toggle returns immediately even when toggle_session would block —
+    the whole point of the background dispatch is that the AppKit run loop
+    (the calling thread) stays responsive during a multi-second model load.
+    We patch toggle_session to sleep and check do_toggle returned fast."""
+    import time as _time
+
+    from whiz.dictate.providers.macos_menubar import MacMenuBar
+
+    engine = _make_engine()
+    mb = MacMenuBar(engine=engine)
+    slept = {"value": False}
+
+    def _slow_toggle():
+        _time.sleep(0.2)
+        slept["value"] = True
+
+    engine.toggle_session = _slow_toggle
+    t0 = _time.monotonic()
+    mb.do_toggle()
+    elapsed = _time.monotonic() - t0
+    # do_toggle must return in well under the 0.2s toggle_session sleeps —
+    # if it blocked the calling thread, elapsed would be >= 0.2s.
+    assert elapsed < 0.15, f"do_toggle blocked for {elapsed:.3f}s"
+    # Let the background thread finish so it doesn't bleed into other tests.
+    _wait_until(lambda: slept["value"], "background toggle never ran")
 
 
 def test_menubar_on_state_updates_internal_state():
@@ -2172,3 +2226,92 @@ def test_menubar_setup_noop_if_already_setup(monkeypatch):
     mb._status_item = object()  # pretend setup already ran
     mb.setup()  # must be a no-op, not raise
     assert mb._status_item is not None
+
+
+def test_indicator_show_dispatches_fade_to_view_not_panel():
+    """show()/hide() must dispatch whizFadeIn:/whizFadeOut: to ``self._view``
+    (where those selectors are defined), not to ``self._panel`` (NSPanel,
+    which doesn't implement them). Dispatching to the panel silently failed
+    under the bare except, leaving the indicator invisible for the whole
+    session because the panel started at alpha 0 and was never ordered front.
+    """
+    import whiz.dictate.providers.macos_indicator as mi
+
+    ind = mi.MacIndicator()
+    view = mock.Mock()
+    panel = mock.Mock()
+    ind._view = view
+    ind._panel = panel
+
+    ind.show()
+    view.performSelectorOnMainThread_withObject_waitUntilDone_.assert_called_once_with(
+        "whizFadeIn:", None, False
+    )
+    # The panel must NOT be the dispatch target — it doesn't implement the selector.
+    panel.performSelectorOnMainThread_withObject_waitUntilDone_.assert_not_called()
+
+    ind.hide()
+    view.performSelectorOnMainThread_withObject_waitUntilDone_.assert_called_with(
+        "whizFadeOut:", None, False
+    )
+    panel.performSelectorOnMainThread_withObject_waitUntilDone_.assert_not_called()
+
+
+def test_indicator_show_noop_when_view_not_created():
+    """show()/hide() must be a no-op (not raise) when the view isn't set up
+    yet — the engine may call show() before setup() on a non-macOS box."""
+    import whiz.dictate.providers.macos_indicator as mi
+
+    ind = mi.MacIndicator()
+    ind._view = None
+    ind._panel = None
+    ind.show()  # must not raise
+    ind.hide()  # must not raise
+
+
+def test_run_uses_appkit_loop_when_indicator_off_but_menu_bar_on(monkeypatch):
+    """run() must start the AppKit loop when the indicator is off but the
+    menu bar is on — the NSStatusItem needs the run loop to pump events.
+    Previously the gate was `show_indicator and _is_macos()`, so
+    show_indicator=False + menu_bar=True fell to the plain sleep loop and
+    the menu bar item was dead (clicks did nothing).
+    """
+    indicator = FakeIndicator()
+    engine = _make_engine(
+        indicator=indicator,
+        settings=eng.DictateSettings(
+            language="ru", initial_prompt="x", idle_timeout=0,
+            auto_stop_silence=0, hotkey="x", trigger="toggle",
+            vad_enabled=False, show_indicator=False, menu_bar=True,
+        ),
+    )
+    monkeypatch.setattr(eng, "_is_macos", lambda: True)
+    monkeypatch.setattr(engine, "_setup_menu_bar", lambda: None)
+    monkeypatch.setattr(engine, "_run_with_appkit", lambda: 0)
+    called = {"plain": False}
+    monkeypatch.setattr(engine, "_run_plain", lambda: called.__setitem__("plain", True) or 0)
+    rc = engine.run()
+    assert rc == 0
+    assert not called["plain"], "plain loop used instead of AppKit loop"
+
+
+def test_run_uses_plain_loop_when_both_indicator_and_menu_bar_off(monkeypatch):
+    """When neither AppKit UI is in use, run() uses the plain loop (no
+    AppKit dependency needed)."""
+    indicator = FakeIndicator()
+    engine = _make_engine(
+        indicator=indicator,
+        settings=eng.DictateSettings(
+            language="ru", initial_prompt="x", idle_timeout=0,
+            auto_stop_silence=0, hotkey="x", trigger="toggle",
+            vad_enabled=False, show_indicator=False, menu_bar=False,
+        ),
+    )
+    monkeypatch.setattr(eng, "_is_macos", lambda: True)
+    monkeypatch.setattr(engine, "_setup_menu_bar", lambda: None)
+    called = {"appkit": False}
+    monkeypatch.setattr(engine, "_run_with_appkit", lambda: called.__setitem__("appkit", True) or 0)
+    monkeypatch.setattr(engine, "_run_plain", lambda: 0)
+    rc = engine.run()
+    assert rc == 0
+    assert not called["appkit"], "AppKit loop used when no AppKit UI is live"

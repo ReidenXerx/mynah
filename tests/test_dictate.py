@@ -1236,17 +1236,19 @@ def test_mic_error_path_ends_session(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_settings_idle_visible_default_true():
+def test_resolve_settings_idle_visible_default_false():
+    """The default is now False — the indicator only shows during an active
+    dictation session, not as a persistent dimmed badge at idle."""
     config = cfg.Config()
     s = eng.resolve_settings(config)
-    assert s.idle_visible is True
+    assert s.idle_visible is False
 
 
 def test_resolve_settings_idle_visible_override():
     config = cfg.Config()
-    config.dictate_idle_visible = False
+    config.dictate_idle_visible = True
     s = eng.resolve_settings(config)
-    assert s.idle_visible is False
+    assert s.idle_visible is True
     s = eng.resolve_settings(config, idle_visible=True)
     assert s.idle_visible is True
 

@@ -398,8 +398,34 @@ def _create_objc_view_class():
             self._fade_panel(False)
 
         def _fade_panel(self, fade_in: bool) -> None:
+            # Any exception raised inside an AppKit run-loop callback is
+            # FATAL — it tears down the whole process (and under a KeepAlive
+            # LaunchAgent, crash-loops). So the entire fade is wrapped in a
+            # try/except with a non-animated fallback that still shows/hides
+            # the panel. The indicator may pop instead of fading, but the
+            # process survives and the hotkey + menu bar keep working.
+            try:
+                self._fade_panel_impl(fade_in)
+            except Exception:  # noqa: BLE001
+                logger.debug("indicator fade failed; using instant fallback", exc_info=True)
+                try:
+                    panel = self.window()
+                    if panel is None:
+                        return
+                    if fade_in:
+                        panel.orderFrontRegardless()
+                        panel.setAlphaValue_(1.0)
+                    else:
+                        panel.setAlphaValue_(0.0)
+                        panel.orderOut_(None)
+                except Exception:  # noqa: BLE001
+                    pass
+
+        def _fade_panel_impl(self, fade_in: bool) -> None:
             import AppKit
-            from CoreAnimation import NSAnimationContext
+            # NSAnimationContext lives in AppKit (Quartz/CoreAnimation is a
+            # separate framework not installed by pyobjc's default extra).
+            from AppKit import NSAnimationContext
 
             panel = self.window()
             if panel is None:

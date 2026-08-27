@@ -78,12 +78,18 @@ class MacMenuBar:
         Called inline from the engine's ``_set_state`` on whatever thread
         initiated the change. AppKit UI mutations must run on the main
         thread, so dispatch the actual update there.
+
+        ``whizUpdateMenuState:`` is defined on ``_WhizMenuBarController``
+        (the ObjC NSObject), NOT on ``NSStatusBarButton`` — so dispatch to
+        ``self._controller``, not ``self._button``. Dispatching to the
+        button raises ``NSInvalidArgumentException`` (unrecognized selector)
+        and crashes the process on the first state change.
         """
         self._state = state
-        if self._button is None:
+        if self._controller is None:
             return
         try:
-            self._button.performSelectorOnMainThread_withObject_waitUntilDone_(
+            self._controller.performSelectorOnMainThread_withObject_waitUntilDone_(
                 "whizUpdateMenuState:", None, False
             )
         except Exception:  # noqa: BLE001

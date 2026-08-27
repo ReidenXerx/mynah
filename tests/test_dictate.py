@@ -2207,6 +2207,30 @@ def test_menubar_on_state_updates_internal_state():
     assert mb._state == "transcribing"
 
 
+def test_menubar_on_state_dispatches_to_controller_not_button():
+    """on_state must dispatch whizUpdateMenuState: to ``self._controller``
+    (where the selector is defined), not to ``self._button`` (NSStatusBarButton,
+    which doesn't implement it). Dispatching to the button raised
+    NSInvalidArgumentException and crashed the process on the first state
+    change, causing a launchd KeepAlive crash-loop — neither the menu bar
+    nor the hotkey worked because the process never stayed up.
+    """
+    from whiz.dictate.providers.macos_menubar import MacMenuBar
+
+    mb = MacMenuBar(engine=_make_engine())
+    controller = mock.Mock()
+    button = mock.Mock()
+    mb._controller = controller
+    mb._button = button
+
+    mb.on_state("listening")
+    controller.performSelectorOnMainThread_withObject_waitUntilDone_.assert_called_once_with(
+        "whizUpdateMenuState:", None, False
+    )
+    # The button must NOT be the dispatch target — it doesn't implement the selector.
+    button.performSelectorOnMainThread_withObject_waitUntilDone_.assert_not_called()
+
+
 def test_menubar_on_state_safe_when_no_button():
     """on_state must not raise when setup() hasn't created the button yet —
     the engine may fire state changes before the menu bar is wired."""

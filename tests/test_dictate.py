@@ -198,7 +198,7 @@ def _make_engine(
             initial_prompt=eng.DEFAULT_RUSSIAN_PROMPT,
             idle_timeout=45,
             auto_stop_silence=10,
-            hotkey="<ctrl>+<space>",
+            hotkey="<cmd>+<shift>+d",
             trigger="toggle",
             vad_enabled=True,
             show_indicator=True,
@@ -308,7 +308,7 @@ def test_resolve_settings_defaults():
     assert s.language == "ru"
     assert s.idle_timeout == 45
     assert s.auto_stop_silence == 10
-    assert s.hotkey == "<ctrl>+<space>"
+    assert s.hotkey == "<cmd>+<shift>+d"
     assert s.vad_enabled is True
     assert s.show_indicator is True
 

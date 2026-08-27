@@ -118,7 +118,7 @@ def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
         auto_stop_silence=float(
             overrides.get("auto_stop_silence", config.dictate_auto_stop_silence)
         ),
-        hotkey=(overrides.get("hotkey") or config.dictate_hotkey or "<ctrl>+<space>"),
+        hotkey=(overrides.get("hotkey") or config.dictate_hotkey or "<cmd>+<shift>+d"),
         trigger=(overrides.get("trigger") or config.dictate_trigger or "toggle").strip().lower(),
         vad_enabled=bool(overrides.get("vad", config.dictate_vad)),
         show_indicator=bool(overrides.get("show_indicator", config.dictate_show_indicator)),

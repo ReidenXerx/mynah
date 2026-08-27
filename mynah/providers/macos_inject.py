@@ -134,7 +134,7 @@ class MacTextInjector(TextInjector):
     def _paste(self, text: str) -> None:
         """Set the clipboard to ``text`` and simulate a ⌘V paste via CGEvent."""
         # Set the clipboard via NSPasteboard.
-        from AppKit import NSPasteboard, NSString, NSGeneralPboardType
+        from AppKit import NSPasteboard
         from Quartz import (
             CGEventCreateKeyboardEvent,
             CGEventSetFlags,
@@ -142,9 +142,18 @@ class MacTextInjector(TextInjector):
             kCGHIDEventTap,
         )
 
+        # NSGeneralPboardType was removed in macOS 14+ / modern pyobjc.
+        # The canonical replacement is NSPasteboardTypeString.
+        try:
+            from AppKit import NSPasteboardTypeString
+            paste_type = NSPasteboardTypeString
+        except ImportError:
+            from AppKit import NSString
+            paste_type = NSString
+
         pb = NSPasteboard.generalPasteboard()
         pb.clearContents()
-        pb.setString_forType_(text, NSGeneralPboardType)
+        pb.setString_forType_(text, paste_type)
 
         # Small delay so the clipboard write settles before the paste.
         time.sleep(0.01)

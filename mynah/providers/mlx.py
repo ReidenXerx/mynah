@@ -5,7 +5,7 @@ mlx-whisper is Apple's MLX-framework Whisper port. Unlike faster-whisper
 mlx-whisper runs inference on the Apple Silicon GPU via MLX — roughly 7×
 faster for the same model on M-series chips.
 
-The model (default ``mlx-community/whisper-large-v3-turbo-q4``) is
+The model (default ``mlx-community/whisper-large-v3-turbo``) is
 auto-downloaded from HuggingFace on first use and cached under
 ``~/.cache/huggingface``. This is a separate format (MLX weights) from
 whiz's batch-mode ggml ``.bin`` models, so dictate maintains its own
@@ -28,17 +28,20 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 logger = logging.getLogger(__name__)
 
-# Default model: large-v3-turbo, 4-bit quantized. On Metal, turbo is faster
-# than medium AND near-large accuracy — ideal for Russian jargon/obscenity.
-# 4-bit quant keeps RAM ~0.5 GB, fitting 16 GB M1 Pro with headroom.
+# Default model: large-v3-turbo, full precision (unquantized, 1.61 GB).
+# On Metal, turbo is faster than medium AND near-large accuracy — ideal
+# for Russian jargon/obscenity. Full precision (not q4) is important: the
+# 4-bit quantized turbo (whisper-large-v3-turbo-q4, 464 MB) severely
+# degrades recognition quality, producing garbled mixed-language output
+# on real speech. The full-precision model ships ``weights.safetensors``,
+# which mlx_whisper.load_model loads (it checks safetensors first, then
+# falls back to weights.npz).
 #
-# NOTE: this is the mlx-whisper-format repo (ships ``weights.npz`` + a
-# ``quantization`` block in config.json that ``mlx_whisper.load_model``
-# understands). Do NOT confuse it with the ``-4bit`` repos (e.g.
-# mlx-community/whisper-large-v3-turbo-4bit) which target the separate
-# mlx-audio-plus library and ship ``model.safetensors`` — mlx-whisper
+# NOTE: Do NOT use the ``-4bit`` repos (e.g. mlx-community/whisper-large-
+# v3-turbo-4bit) which target the separate mlx-audio-plus library and ship
+# ``model.safetensors`` (note: ``model.``, not ``weights.``) — mlx-whisper
 # cannot load those.
-DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo-q4"
+DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 
 # Whisper's native sample rate. The engine must deliver audio at this rate.
 WHISPER_SAMPLE_RATE = 16000

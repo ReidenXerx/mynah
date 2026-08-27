@@ -615,12 +615,15 @@ def test_null_indicator_is_inert():
 # ---------------------------------------------------------------------------
 
 
-def test_mlx_default_model_is_turbo_4bit():
-    # The default is the mlx-whisper-format 4-bit turbo repo (suffix -q4).
-    # Do NOT confuse with the -4bit mlx-audio-plus repos (see mlx.py note).
+def test_mlx_default_model_is_turbo_full_precision():
+    # The default is the full-precision mlx-whisper turbo repo. q4 quant-
+    # ization degrades recognition (garbled output), so we use the unquant-
+    # ized model. Do NOT confuse with the -4bit mlx-audio-plus repos.
     assert "large-v3-turbo" in DEFAULT_MODEL
-    assert DEFAULT_MODEL.endswith("-q4")
     assert "mlx-community" in DEFAULT_MODEL
+    # Must NOT be a quantized variant (q4, q8, 4bit, 8bit).
+    for suffix in ("-q4", "-q8", "-4bit", "-8bit"):
+        assert not DEFAULT_MODEL.endswith(suffix), f"{DEFAULT_MODEL} is quantized"
 
 
 def test_whisper_sample_rate_is_16k():

@@ -213,7 +213,7 @@ def _make_engine(
             initial_prompt=eng.DEFAULT_RUSSIAN_PROMPT,
             idle_timeout=45,
             auto_stop_silence=10,
-            hotkey="<cmd>+<shift>+d",
+            hotkey="<cmd>+<shift>+<period>",
             trigger="toggle",
             vad_enabled=True,
             show_indicator=True,
@@ -323,7 +323,7 @@ def test_resolve_settings_defaults():
     assert s.language == "ru"
     assert s.idle_timeout == 45
     assert s.auto_stop_silence == 10
-    assert s.hotkey == "<cmd>+<shift>+d"
+    assert s.hotkey == "<cmd>+<shift>+<period>"
     assert s.vad_enabled is True
     assert s.show_indicator is True
 
@@ -1094,13 +1094,13 @@ def test_toggle_listener_uses_global_hot_keys(monkeypatch):
     kb = _install_fake_pynput(monkeypatch, lambda s: [])
     engine = _make_engine(settings=eng.DictateSettings(
         language="ru", initial_prompt="x", idle_timeout=0,
-        auto_stop_silence=0, hotkey="<cmd>+<shift>+d", trigger="toggle",
+        auto_stop_silence=0, hotkey="<cmd>+<shift>+<period>", trigger="toggle",
         vad_enabled=False, show_indicator=False,
     ))
     listener = engine._start_hotkey_listener()
     assert listener is not None
     assert hasattr(listener, "activations")
-    assert "<cmd>+<shift>+d" in listener.activations
+    assert "<cmd>+<shift>+<period>" in listener.activations
 
 
 def test_auto_stop_ends_session_from_capture_loop(monkeypatch):

@@ -85,8 +85,9 @@ _UTTERANCE_SILENCE = 0.8
 # steady low-level noise (fan, keyboard, HVAC) as speech, which produces
 # utterances that pass the whole-buffer RMS gate but are still garbage.
 # This floor short-circuits those frames so they never start/extend an
-# utterance.
-_VAD_FRAME_ENERGY = 0.015
+# utterance. 0.025 ≈ -32dB — above typical Mac mic room noise, below quiet
+# speech.
+_VAD_FRAME_ENERGY = 0.025
 
 # How often (seconds) the run loops poll the stop event.
 _TICK = 0.05
@@ -99,7 +100,8 @@ _MIN_UTTERANCE_SECONDS = 0.35
 # transcribed. Below this the audio is silence or noise — Whisper is known
 # to hallucinate training-data boilerplate ("субтитры создавал…",
 # "продолжение следует…") on near-silent input, so we skip it entirely.
-_MIN_ENERGY = 0.01
+# 0.02 ≈ -34dB — above typical Mac mic room noise floor.
+_MIN_ENERGY = 0.02
 
 # Known Whisper hallucination phrases (lowercased). When the model is fed
 # silence/noise it emits these training-data artifacts; we suppress them as
@@ -113,12 +115,17 @@ _HALLUCINATION_PHRASES = frozenset(
         "субтитры выполнил",
         "субтитры делал",
         "субтитры подготовил",
+        "редактор субтитров",
+        "корректор",
+        "перевод",
         "продолжение следует",
         "спасибо за просмотр",
         "спасибо за внимание",
         "подписывайтесь на канал",
         "by follows",
         "by following",
+        "amara.org",
+        "расскажите о себе",
     )
 )
 
@@ -559,10 +566,13 @@ class DictationEngine:
         # Energy gate: Whisper hallucinates training-data boilerplate on
         # near-silent / noise-only audio. Skip utterances below the RMS floor
         # before spending a transcription on them.
-        if _rms_int16(pcm_bytes) < _MIN_ENERGY:
-            logger.debug("Skipping low-energy utterance (silence/noise)")
+        energy = _rms_int16(pcm_bytes)
+        if energy < _MIN_ENERGY:
+            logger.debug("Skipping low-energy utterance (%.4f < %.4f)", energy, _MIN_ENERGY)
             return
         samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+        duration = len(samples) / WHISPER_SAMPLE_RATE
+        logger.debug("Transcribing utterance: %.2fs, energy=%.4f", duration, energy)
         self.indicator.set_state("transcribing")
         try:
             text = self.stt.transcribe(
@@ -584,6 +594,7 @@ class DictationEngine:
                 logger.debug("Suppressing hallucination: %s", text)
                 self.indicator.set_state("listening")
                 return
+            logger.debug("Injecting text: %s", text)
             self.injector.type_text(text)
         self.indicator.set_state("listening")
 

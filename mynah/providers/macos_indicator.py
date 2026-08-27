@@ -158,8 +158,12 @@ class MacIndicator(DictationIndicator):
         # Don't activate the app when the panel shows.
         self._panel.setBecomesKeyOnlyIfNeeded_(True)
 
-        # Custom view that draws the badge + volume curve.
-        self._view = WhizIndicatorView.alloc().initWithFrame_(frame)
+        # Custom view that draws the badge + volume curve. Use the real
+        # ObjC NSView subclass (created at import time on macOS) — only
+        # ObjC classes have .alloc(); the plain Python WhizIndicatorView
+        # is just the methods holder the subclass delegates to.
+        view_cls = _get_objc_view_class()
+        self._view = view_cls.alloc().initWithFrame_(frame)
         self._view._indicator = self  # back-reference for state/level reads
         self._panel.setContentView_(self._view)
 
@@ -284,27 +288,15 @@ class WhizIndicatorView:
 # AppKit exists) so drawRect_ etc. are callable from the ObjC runtime.
 # On non-macOS, the class stays a plain Python class and _ensure_panel
 # catches the ImportError.
-
-def _objc_super_init(view, frame):
-    """Call NSView's initWithFrame: via the ObjC runtime, if available."""
-    try:
-        import objc
-        from AppKit import NSView
-        from Foundation import NSRect
-
-        # Dynamically create the subclass if not already created.
-        global WhizIndicatorView
-        if not isinstance(WhizIndicatorView, type) or not hasattr(WhizIndicatorView, "_objc_class"):
-            cls = _create_objc_view_class()
-            WhizIndicatorView = cls
-
-        # Allocate + init via the ObjC subclass.
-        instance = WhizIndicatorView.alloc().initWithFrame_(frame)
-        return instance
-    except Exception:  # noqa: BLE001
-        logger.debug("objc view init failed; returning plain instance", exc_info=True)
-        return view
-
+#
+# Design:
+# - WhizIndicatorView (above) holds the pure-Python draw/state methods.
+# - _WhizIndicatorViewImpl is a real NSView (ObjC) subclass whose methods
+#   delegate to WhizIndicatorView.* (drawRect, _whiz_update_display, ...).
+# - _get_objc_view_class() returns the ObjC subclass, creating it once
+#   (idempotent). _create_panel calls .alloc().initWithFrame_() on it.
+# - On non-macOS / no pyobjc, _get_objc_view_class() raises ImportError,
+#   which _ensure_panel catches and degrades to no indicator.
 
 _OBJC_VIEW_CLASS = None
 
@@ -316,13 +308,8 @@ def _create_objc_view_class():
         return _OBJC_VIEW_CLASS
     import objc
     from AppKit import NSView
-    from Foundation import NSObject
 
-    # We define a thin ObjC subclass that forwards drawRect: and init to
-    # the Python methods on WhizIndicatorView. Using objc's Python-to-ObjC
-    # bridge, the methods below become the ObjC implementations.
     class _WhizIndicatorViewImpl(NSView):
-        # ObjC sees these as the class's methods.
         def initWithFrame_(self, frame):
             self = objc.super(_WhizIndicatorViewImpl, self).initWithFrame_(frame)
             if self is not None:
@@ -340,3 +327,26 @@ def _create_objc_view_class():
 
     _OBJC_VIEW_CLASS = _WhizIndicatorViewImpl
     return _OBJC_VIEW_CLASS
+
+
+def _get_objc_view_class():
+    """Return the ObjC NSView subclass for the indicator view.
+
+    Creates it on first call (idempotent). Raises ImportError on non-macOS
+    or when pyobjc/AppKit is unavailable, so _ensure_panel can degrade.
+    """
+    cls = _create_objc_view_class()
+    if cls is None:
+        raise ImportError("ObjC NSView subclass unavailable")
+    return cls
+
+
+# Eagerly create the ObjC subclass at import time on macOS so .alloc() is
+# available before _create_panel runs. On non-macOS the import fails and
+# _OBJC_VIEW_CLASS stays None; _get_objc_view_class() raises ImportError.
+try:
+    _create_objc_view_class()
+except ImportError:
+    pass
+except Exception:  # noqa: BLE001 - never fail import on a pyobjc quirk
+    logger.debug("indicator ObjC view class not created", exc_info=True)

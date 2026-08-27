@@ -5,7 +5,7 @@ mlx-whisper is Apple's MLX-framework Whisper port. Unlike faster-whisper
 mlx-whisper runs inference on the Apple Silicon GPU via MLX — roughly 7×
 faster for the same model on M-series chips.
 
-The model (default ``mlx-community/whisper-large-v3-turbo-mlx-4bit``) is
+The model (default ``mlx-community/whisper-large-v3-turbo-q4``) is
 auto-downloaded from HuggingFace on first use and cached under
 ``~/.cache/huggingface``. This is a separate format (MLX weights) from
 whiz's batch-mode ggml ``.bin`` models, so dictate maintains its own
@@ -13,7 +13,7 @@ cache — no sharing with ``whiz transcribe``.
 
 mlx_whisper.transcribe uses a module-level ``ModelHolder`` singleton that
 caches the loaded model. ``unload()`` nulls those class variables so the
-model can be garbage-collected, dropping ~2 GB of RAM at idle.
+model can be garbage-collected, freeing its RAM at idle.
 """
 
 from __future__ import annotations
@@ -30,8 +30,15 @@ logger = logging.getLogger(__name__)
 
 # Default model: large-v3-turbo, 4-bit quantized. On Metal, turbo is faster
 # than medium AND near-large accuracy — ideal for Russian jargon/obscenity.
-# 4-bit quant keeps RAM ~2 GB, fitting 16 GB M1 Pro with headroom.
-DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo-mlx-4bit"
+# 4-bit quant keeps RAM ~0.5 GB, fitting 16 GB M1 Pro with headroom.
+#
+# NOTE: this is the mlx-whisper-format repo (ships ``weights.npz`` + a
+# ``quantization`` block in config.json that ``mlx_whisper.load_model``
+# understands). Do NOT confuse it with the ``-4bit`` repos (e.g.
+# mlx-community/whisper-large-v3-turbo-4bit) which target the separate
+# mlx-audio-plus library and ship ``model.safetensors`` — mlx-whisper
+# cannot load those.
+DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo-q4"
 
 # Whisper's native sample rate. The engine must deliver audio at this rate.
 WHISPER_SAMPLE_RATE = 16000
@@ -113,7 +120,7 @@ class MlxWhisperProvider(STTProvider):
 
         mlx_whisper caches the model in a module-level ``ModelHolder``
         singleton. Nulling its class variables lets the GC reclaim the
-        ~2 GB of MLX weights.
+        MLX weights.
         """
         if not self._loaded:
             return

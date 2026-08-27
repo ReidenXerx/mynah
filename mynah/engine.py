@@ -185,6 +185,11 @@ class DictationEngine:
             print(hint, file=sys.stderr)
             return 1
 
+        # Main-thread indicator setup: platforms whose indicator needs
+        # main-thread-only APIs (macOS NSWindow) create their UI here. run()
+        # is called from the main thread, so this is always safe.
+        self.indicator.setup()
+
         # On macOS with an indicator, run the AppKit event loop on the main
         # thread. Otherwise, run a plain blocking loop.
         if self.s.show_indicator and _is_macos():

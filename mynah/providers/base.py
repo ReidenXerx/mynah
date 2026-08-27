@@ -74,6 +74,15 @@ class DictationIndicator(ABC):
     transcribing → idle).
     """
 
+    def setup(self) -> None:
+        """Perform any main-thread setup before the run loop starts.
+
+        Called once on the main thread from the engine's ``run()`` before
+        the hotkey listener starts. Platforms whose indicator needs
+        main-thread-only APIs (e.g. macOS ``NSWindow`` instantiation) create
+        their UI here; the default is a no-op.
+        """
+
     @abstractmethod
     def show(self) -> None:
         """Display the overlay."""
@@ -99,6 +108,9 @@ class DictationIndicator(ABC):
 # check on every engine → indicator call.
 class NullIndicator(DictationIndicator):
     """A no-op indicator for headless/quiet use — all methods are inert."""
+
+    def setup(self) -> None:
+        pass
 
     def show(self) -> None:
         pass

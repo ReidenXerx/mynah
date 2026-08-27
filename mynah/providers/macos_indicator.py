@@ -46,16 +46,43 @@ class MacIndicator(DictationIndicator):
         self._level: float = 0.0
         self._state: str = "idle"
 
-    def show(self) -> None:
-        """Display the overlay. Must be called on the main thread."""
+    def setup(self) -> None:
+        """Create the NSPanel on the main thread before the run loop starts.
+
+        AppKit requires ``NSWindow``/``NSPanel`` to be instantiated on the
+        main thread; calling ``_create_panel()`` from the hotkey listener
+        thread raises ``NSInternalInconsistencyException``. The engine calls
+        this once on the main thread (inside ``_run_with_appkit``) so the
+        panel exists before any ``show()``.
+        """
         self._ensure_panel()
-        if self._panel is not None:
-            self._panel.orderFrontRegardless()
+
+    def show(self) -> None:
+        """Display the overlay (main-thread-safe).
+
+        The panel is created eagerly in ``setup()``. Ordering it to the
+        front is an AppKit UI op; dispatch it to the main thread so a call
+        from the hotkey/transcribe threads is safe.
+        """
+        if self._panel is None:
+            return
+        try:
+            self._panel.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "orderFrontRegardless", None, False
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     def hide(self) -> None:
-        """Dismiss the overlay."""
-        if self._panel is not None:
-            self._panel.orderOut_(None)
+        """Dismiss the overlay (main-thread-safe)."""
+        if self._panel is None:
+            return
+        try:
+            self._panel.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "orderOut:", None, False
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     def update_level(self, level: float) -> None:
         """Feed a live mic amplitude in [0.0, 1.0] to animate the volume curve.

@@ -171,6 +171,10 @@ class FakeIndicator(base.DictationIndicator):
         self.hidden = False
         self.levels: list[float] = []
         self.states: list[str] = []
+        self.setup_called = False
+
+    def setup(self) -> None:
+        self.setup_called = True
 
     def show(self) -> None:
         self.shown = True
@@ -530,6 +534,20 @@ def test_indicator_update_level_records_values():
     assert indicator.levels == [0.3, 0.8]
 
 
+def test_run_calls_indicator_setup_before_loop(monkeypatch):
+    """run() must call indicator.setup() once on the main thread before the
+    run loop starts, so macOS can create its NSPanel off the hotkey thread.
+    """
+    indicator = FakeIndicator()
+    engine = _make_engine(indicator=indicator)
+    # Force the plain loop path so we don't need AppKit; setup() still runs.
+    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+    # Make _run_plain exit immediately by pre-setting the stop event.
+    engine._stop_event.set()
+    engine.run()
+    assert indicator.setup_called is True
+
+
 # ---------------------------------------------------------------------------
 # NullIndicator
 # ---------------------------------------------------------------------------
@@ -550,8 +568,11 @@ def test_null_indicator_is_inert():
 
 
 def test_mlx_default_model_is_turbo_4bit():
+    # The default is the mlx-whisper-format 4-bit turbo repo (suffix -q4).
+    # Do NOT confuse with the -4bit mlx-audio-plus repos (see mlx.py note).
     assert "large-v3-turbo" in DEFAULT_MODEL
-    assert "4bit" in DEFAULT_MODEL
+    assert DEFAULT_MODEL.endswith("-q4")
+    assert "mlx-community" in DEFAULT_MODEL
 
 
 def test_whisper_sample_rate_is_16k():

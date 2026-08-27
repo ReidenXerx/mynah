@@ -576,8 +576,8 @@ class DictationEngine:
     def _start_hotkey_listener(self):
         """Start the pynput global hotkey listener. Returns the listener or None.
 
-        In toggle mode, the hotkey is registered via ``GlobalHotKeyListener``
-        (a combo like ``<ctrl>+<space>``); pressing it flips the session on/off.
+        In toggle mode, the hotkey is registered via ``GlobalHotKeys``
+        (a combo like ``<cmd>+<shift>+d``); pressing it flips the session on/off.
         In PTT mode, we use a low-level ``Listener`` that watches the parsed
         key go down (start) and up (stop), so holding = dictating, release =
         stop. PTT works best with a single key (e.g. ``<f8>``) or a simple
@@ -602,18 +602,15 @@ class DictationEngine:
     def _start_toggle_listener(self, keyboard):
         """Toggle mode: register the combo and flip the session on each press."""
         try:
-            hotkey = keyboard.HotKey(
-                keyboard.HotKey.parse(self.s.hotkey),
-                self.toggle_session,
-            )
+            keyboard.HotKey.parse(self.s.hotkey)  # validate early
         except Exception as e:  # noqa: BLE001
             print(f"Invalid hotkey '{self.s.hotkey}': {e}", file=sys.stderr)
             return None
 
         def on_activate():
-            hotkey.activate()
+            self.toggle_session()
 
-        listener = keyboard.GlobalHotKeyListener({self.s.hotkey: on_activate})
+        listener = keyboard.GlobalHotKeys({self.s.hotkey: on_activate})
         listener.start()
         return listener
 
@@ -626,7 +623,7 @@ class DictationEngine:
         Space — hijacking the spacebar.
 
         PTT uses a low-level ``Listener`` (press/release events) rather
-        than ``GlobalHotKeyListener`` because hold-to-talk needs key-up as
+        than ``GlobalHotKeys`` because hold-to-talk needs key-up as
         well as key-down. Works with a single key (e.g. ``<f8>``) or a
         modifier+key combo (e.g. ``<ctrl>+<space>``).
         """

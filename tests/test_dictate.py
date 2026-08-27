@@ -937,12 +937,21 @@ def _install_fake_pynput(monkeypatch, hotkey_parse):
         def stop(self):
             pass
 
+    class FakeGlobalHotKeys:
+        def __init__(self, activations):
+            self.activations = activations
+        def start(self):
+            pass
+        def stop(self):
+            pass
+
     class FakeHotKey:
         parse = staticmethod(hotkey_parse)
 
     kb = _types.ModuleType("pynput.keyboard")
     kb.HotKey = FakeHotKey
     kb.Listener = FakeListener
+    kb.GlobalHotKeys = FakeGlobalHotKeys
     kb.Key = FakeKey
     monkeypatch.setitem(sys.modules, "pynput", _types.ModuleType("pynput"))
     monkeypatch.setitem(sys.modules, "pynput.keyboard", kb)
@@ -1005,6 +1014,21 @@ def test_ptt_listener_single_key_no_modifiers(monkeypatch):
     assert engine._session_active is True
     listener.on_release(K("f8"))
     assert engine._session_active is False
+
+
+def test_toggle_listener_uses_global_hot_keys(monkeypatch):
+    """Toggle mode must use GlobalHotKeys (not the nonexistent GlobalHotKeyListener)
+    and register the hotkey combo with an activate callback."""
+    kb = _install_fake_pynput(monkeypatch, lambda s: [])
+    engine = _make_engine(settings=eng.DictateSettings(
+        language="ru", initial_prompt="x", idle_timeout=0,
+        auto_stop_silence=0, hotkey="<cmd>+<shift>+d", trigger="toggle",
+        vad_enabled=False, show_indicator=False,
+    ))
+    listener = engine._start_hotkey_listener()
+    assert listener is not None
+    assert hasattr(listener, "activations")
+    assert "<cmd>+<shift>+d" in listener.activations
 
 
 def test_auto_stop_ends_session_from_capture_loop(monkeypatch):

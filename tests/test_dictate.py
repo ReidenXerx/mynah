@@ -1802,6 +1802,8 @@ def test_indicator_panel_disables_hides_on_deactivate(monkeypatch):
             calls["hides_on_deactivate_set"] = v
         def setContentView_(self, v):
             pass
+        def setAlphaValue_(self, v):
+            calls["alpha_set"] = v
 
     class _FakeView:
         def __init__(self):
@@ -1919,3 +1921,254 @@ def test_upgrade_aborts_when_pipx_install_fails(monkeypatch):
 
     rc = cli.cmd_upgrade(mock.Mock())
     assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# Menu bar item (variant D) + state listeners + pill redesign (variant A)
+# ---------------------------------------------------------------------------
+
+
+def test_config_menu_bar_default_true():
+    """dictate_menu_bar defaults to True so the menu bar item is on by default."""
+    config = cfg.Config()
+    assert config.dictate_menu_bar is True
+
+
+def test_resolve_settings_menu_bar_default_true():
+    config = cfg.Config()
+    s = eng.resolve_settings(config)
+    assert s.menu_bar is True
+
+
+def test_resolve_settings_menu_bar_override():
+    config = cfg.Config()
+    config.dictate_menu_bar = False
+    s = eng.resolve_settings(config)
+    assert s.menu_bar is False
+    s = eng.resolve_settings(config, menu_bar=True)
+    assert s.menu_bar is True
+    config.dictate_menu_bar = True
+    s = eng.resolve_settings(config, menu_bar=False)
+    assert s.menu_bar is False
+
+
+def test_dictate_set_menu_bar_persists(tmp_path, monkeypatch):
+    """`whiz dictate set menu_bar=false` persists dictate_menu_bar."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="menu_bar=false")
+    rc = cli.cmd_dictate_set(args)
+    assert rc == 0
+    assert cfg.load().dictate_menu_bar is False
+
+
+def test_dictate_set_menubar_alias(tmp_path, monkeypatch):
+    """The 'menubar' alias maps to dictate_menu_bar."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="menubar=true")
+    rc = cli.cmd_dictate_set(args)
+    assert rc == 0
+    assert cfg.load().dictate_menu_bar is True
+
+
+def test_menu_bar_friendly_key_and_config_table_covered():
+    """dictate_menu_bar is reachable via friendly keys AND the config table
+    — the existing coverage tests assert EVERY dictate_* field is mapped, so
+    this guards against a future field being added without a friendly name."""
+    from whiz import cli
+
+    assert "dictate_menu_bar" in cli._DICTATE_FRIENDLY_KEYS.values()
+    field_keys = {k for k, _, _ in cli._DICTATE_CONFIG_FIELDS}
+    assert "dictate_menu_bar" in field_keys
+
+
+def test_set_state_notifies_listeners():
+    """_set_state updates the indicator AND fires registered state listeners."""
+    indicator = FakeIndicator()
+    engine = _make_engine(indicator=indicator)
+    seen: list[str] = []
+    engine.add_state_listener(lambda state: seen.append(state))
+    engine._set_state("listening")
+    assert engine._indicator_state == "listening"
+    assert indicator.states[-1] == "listening"
+    assert seen == ["listening"]
+    engine._set_state("transcribing")
+    assert seen == ["listening", "transcribing"]
+
+
+def test_set_state_listener_exception_does_not_break_indicator():
+    """A listener that raises must not prevent the indicator update or other
+    listeners — _set_state swallows listener errors so one bad listener can't
+    break the whole state fan-out."""
+    indicator = FakeIndicator()
+    engine = _make_engine(indicator=indicator)
+    good: list[str] = []
+    engine.add_state_listener(lambda s: (_ for _ in ()).throw(RuntimeError("boom")))
+    engine.add_state_listener(lambda s: good.append(s))
+    engine._set_state("listening")
+    assert indicator.states[-1] == "listening"
+    assert good == ["listening"]
+
+
+def test_start_session_fires_state_listener():
+    """A real session lifecycle drives state listeners (not just the indicator)."""
+    indicator = FakeIndicator()
+    engine = _make_engine(indicator=indicator)
+    seen: list[str] = []
+    engine.add_state_listener(lambda s: seen.append(s))
+    engine._start_session()
+    assert "listening" in seen
+    engine._end_session()
+    assert "idle" in seen
+
+
+def test_run_setup_menu_bar_noop_when_disabled(monkeypatch):
+    """_setup_menu_bar must be a no-op when settings.menu_bar is False — it
+    must not attempt to import the menu bar provider or create anything."""
+    engine = _make_engine(settings=eng.DictateSettings(
+        language="ru", initial_prompt="x", idle_timeout=0,
+        auto_stop_silence=0, hotkey="x", trigger="toggle",
+        vad_enabled=False, show_indicator=False, menu_bar=False,
+    ))
+    engine._setup_menu_bar()
+    assert engine._menu_bar is None
+    assert engine._state_listeners == []
+
+
+def test_run_setup_menu_bar_noop_off_macos(monkeypatch):
+    """_setup_menu_bar is a no-op off macOS even when menu_bar is enabled."""
+    engine = _make_engine()
+    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+    engine._setup_menu_bar()
+    assert engine._menu_bar is None
+
+
+def test_indicator_pill_starts_transparent_and_fades(monkeypatch):
+    """The redesigned pill panel starts at alpha 0 (so show() can fade it in)
+    and still calls setHidesOnDeactivate_(False) for the LaunchAgent fix."""
+    import whiz.dictate.providers.macos_indicator as mi
+
+    calls: dict[str, object] = {"hides_on_deactivate_set": None, "alpha_set": None}
+
+    class _FakeNSRect:
+        def __init__(self, origin, size):
+            self.origin = origin
+            self.size = size
+
+    class _FakeNSPoint:
+        def __init__(self, x, y):
+            self.x = x
+            self.y = y
+
+    class _FakeNSSize:
+        def __init__(self, w, h):
+            self.width = w
+            self.height = h
+
+    class _FakePanel:
+        def initWithContentRect_styleMask_backing_defer_(self, *a):
+            return self
+        def setLevel_(self, v): pass
+        def setOpaque_(self, v): pass
+        def setBackgroundColor_(self, c): pass
+        def setHasShadow_(self, v): pass
+        def setIgnoresMouseEvents_(self, v): pass
+        def setBecomesKeyOnlyIfNeeded_(self, v): pass
+        def setHidesOnDeactivate_(self, v):
+            calls["hides_on_deactivate_set"] = v
+        def setAlphaValue_(self, v):
+            calls["alpha_set"] = v
+        def setContentView_(self, v): pass
+
+    class _FakeView:
+        def alloc(self): return self
+        def initWithFrame_(self, frame): return self
+
+    fake_appkit = types.ModuleType("AppKit")
+    fake_appkit.NSWindowStyleMaskBorderless = 0
+    fake_appkit.NSBackingStoreBuffered = 0
+    fake_appkit.NSFloatingWindowLevel = 3
+    fake_appkit.NSPanel = mock.Mock()
+    fake_appkit.NSPanel.alloc.return_value = _FakePanel()
+    fake_appkit.NSScreen = mock.Mock()
+    fake_appkit.NSScreen.mainScreen.return_value.frame.return_value = _FakeNSRect(
+        _FakeNSPoint(0, 0), _FakeNSSize(1440, 900)
+    )
+    fake_appkit.NSColor = mock.Mock()
+    fake_foundation = types.ModuleType("Foundation")
+    fake_foundation.NSRect = _FakeNSRect
+    fake_foundation.NSPoint = _FakeNSPoint
+    fake_foundation.NSSize = _FakeNSSize
+    monkeypatch.setitem(sys.modules, "AppKit", fake_appkit)
+    monkeypatch.setitem(sys.modules, "Foundation", fake_foundation)
+    monkeypatch.setattr(mi, "_get_objc_view_class", lambda: _FakeView())
+
+    ind = mi.MacIndicator()
+    ind._create_panel()
+    assert calls["hides_on_deactivate_set"] is False
+    assert calls["alpha_set"] == 0.0  # starts transparent for the fade-in
+
+
+def test_menubar_toggle_action_calls_engine_toggle():
+    """MacMenuBar.do_toggle drives engine.toggle_session — the same path as
+    the hotkey — so the menu bar can start/stop a real session."""
+    from whiz.dictate.providers.macos_menubar import MacMenuBar
+
+    engine = _make_engine()
+    mb = MacMenuBar(engine=engine)
+    assert engine._session_active is False
+    mb.do_toggle()
+    assert engine._session_active is True
+    mb.do_toggle()
+    assert engine._session_active is False
+
+
+def test_menubar_quit_action_calls_engine_stop():
+    """MacMenuBar.do_quit calls engine.stop() (idempotent, ends any session)."""
+    from whiz.dictate.providers.macos_menubar import MacMenuBar
+
+    engine = _make_engine()
+    engine._start_session()
+    mb = MacMenuBar(engine=engine)
+    mb.do_quit()
+    assert engine._stop_event.is_set()
+    assert engine._session_active is False
+
+
+def test_menubar_on_state_updates_internal_state():
+    """on_state (the engine state-listener callback) records the state so
+    _update_labels can sync the menu — and is safe before setup() runs."""
+    from whiz.dictate.providers.macos_menubar import MacMenuBar
+
+    engine = _make_engine()
+    mb = MacMenuBar(engine=engine)
+    mb.on_state("listening")
+    assert mb._state == "listening"
+    mb.on_state("transcribing")
+    assert mb._state == "transcribing"
+
+
+def test_menubar_on_state_safe_when_no_button():
+    """on_state must not raise when setup() hasn't created the button yet —
+    the engine may fire state changes before the menu bar is wired."""
+    from whiz.dictate.providers.macos_menubar import MacMenuBar
+
+    mb = MacMenuBar(engine=_make_engine())
+    mb.on_state("listening")  # no button set — must not raise
+    assert mb._state == "listening"
+
+
+def test_menubar_setup_noop_if_already_setup(monkeypatch):
+    """setup() is idempotent — a second call does nothing (guard against
+    double-creating NSStatusItems)."""
+    from whiz.dictate.providers.macos_menubar import MacMenuBar
+
+    mb = MacMenuBar(engine=_make_engine())
+    mb._status_item = object()  # pretend setup already ran
+    mb.setup()  # must be a no-op, not raise
+    assert mb._status_item is not None

@@ -1,0 +1,352 @@
+"""MacMenuBar — a menu bar status item for dictation control (macOS).
+
+An ``NSStatusItem`` in the system menu bar with a template SF Symbols ``mic``
+icon whose tint reflects the current state (gray idle / cyan listening /
+amber transcribing). A click opens an ``NSMenu`` with:
+
+- **Start Dictation / Stop Dictation** — toggles the session (same path as the
+  hotkey) via ``engine.toggle_session()``.
+- a disabled state line showing the current status.
+- **Open Config File** — reveals ``~/.config/whiz/config.toml`` in Finder /
+  opens it in the default editor via ``NSWorkspace``.
+- **About whiz** — version, model, hotkey.
+- **Quit whiz dictate** — ``engine.stop()`` (the process exits; under a
+  KeepAlive LaunchAgent launchd restarts it).
+
+The menu bar item lives inside the same LaunchAgent process as the engine
+and indicator, so it drives the engine directly — no IPC. The engine
+registers ``MacMenuBar.on_state`` as a state listener so the icon + menu
+labels track the indicator without the menu bar knowing about the indicator.
+
+Requires pyobjc/AppKit; on non-macOS or without pyobjc the engine's
+``_setup_menu_bar`` catches the ImportError and degrades to no menu bar.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from whiz.dictate.engine import DictationEngine
+
+logger = logging.getLogger(__name__)
+
+# State → SF Symbols icon name + tint color (RGBA floats 0–1).
+_STATE_ICON = {
+    "idle": "mic",
+    "listening": "mic.fill",
+    "transcribing": "waveform",
+}
+_STATE_COLOR = {
+    "idle": (0.6, 0.6, 0.65, 1.0),       # gray
+    "listening": (0.2, 0.8, 0.95, 1.0),  # cyan
+    "transcribing": (0.95, 0.7, 0.2, 1.0),  # amber
+}
+
+
+class MacMenuBar:
+    """A macOS menu bar status item that controls the dictation engine."""
+
+    def __init__(self, engine: "DictationEngine") -> None:
+        self._engine = engine
+        self._status_item: Any = None
+        self._button: Any = None
+        self._menu: Any = None
+        self._controller: Any = None  # the ObjC controller (holds strong refs)
+        self._toggle_item: Any = None
+        self._state_item: Any = None
+        self._state: str = "idle"
+
+    def setup(self) -> None:
+        """Create the status item + menu on the main thread (idempotent)."""
+        if self._status_item is not None:
+            return
+        try:
+            self._create_status_item()
+        except ImportError:
+            logger.warning(
+                "PyObjC not available — dictation menu bar item disabled. "
+                "Install: pipx inject whiz 'whiz[dictate]'"
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not create dictation menu bar item", exc_info=True)
+
+    def on_state(self, state: str) -> None:
+        """State-listener callback: update icon tint + menu labels.
+
+        Called inline from the engine's ``_set_state`` on whatever thread
+        initiated the change. AppKit UI mutations must run on the main
+        thread, so dispatch the actual update there.
+        """
+        self._state = state
+        if self._button is None:
+            return
+        try:
+            self._button.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "whizUpdateMenuState:", None, False
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    # ---------- setup ----------
+
+    def _create_status_item(self) -> None:
+        """Build the NSStatusItem + NSMenu + ObjC controller. Imports pyobjc lazily."""
+        import AppKit
+
+        controller_cls = _get_objc_controller_class()
+        self._controller = controller_cls.alloc().init()
+        self._controller._menubar = self  # back-reference for action dispatch
+
+        bar = AppKit.NSStatusBar.systemStatusBar()
+        self._status_item = bar.statusItemWithLength_(
+            AppKit.NSVariableStatusItemLength
+        )
+        self._button = self._status_item.button()
+        self._button.setTarget_(self._controller)
+        self._button.setAction_("whizMenuClicked:")
+        # Apply the initial (idle) icon.
+        self._apply_icon("idle")
+
+        # Build the menu.
+        menu = AppKit.NSMenu.alloc().init()
+        menu.setAutoenablesItems_(False)
+
+        # Start/Stop toggle.
+        self._toggle_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Start Dictation", "whizToggle:", ""
+        )
+        self._toggle_item.setTarget_(self._controller)
+        self._toggle_item.setEnabled_(True)
+        menu.addItem_(self._toggle_item)
+
+        # Disabled state line.
+        self._state_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "○ Idle", None, ""
+        )
+        self._state_item.setEnabled_(False)
+        menu.addItem_(self._state_item)
+
+        menu.addItem_(AppKit.NSMenuItem.separatorItem())
+
+        # Open Config File.
+        open_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Open Config File", "whizOpenConfig:", ""
+        )
+        open_item.setTarget_(self._controller)
+        open_item.setEnabled_(True)
+        menu.addItem_(open_item)
+
+        menu.addItem_(AppKit.NSMenuItem.separatorItem())
+
+        # About.
+        about_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "About whiz", "whizAbout:", ""
+        )
+        about_item.setTarget_(self._controller)
+        about_item.setEnabled_(True)
+        menu.addItem_(about_item)
+
+        # Quit.
+        quit_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Quit whiz dictate", "whizQuit:", "q"
+        )
+        quit_item.setTarget_(self._controller)
+        quit_item.setEnabled_(True)
+        menu.addItem_(quit_item)
+
+        self._menu = menu
+        self._status_item.setMenu_(menu)
+
+        # Initial label sync.
+        self._update_labels()
+
+    # ---------- state application (main thread) ----------
+
+    def _apply_icon(self, state: str) -> None:
+        """Set the template SF Symbols mic icon + tint for ``state``."""
+        import AppKit
+
+        name = _STATE_ICON.get(state, "mic")
+        image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+            name, "whiz dictation"
+        )
+        if image is None:
+            # Fallback: a tiny default AppKit image so the slot isn't empty.
+            image = AppKit.NSImage.alloc().init()
+        image.setTemplate_(False)  # we tint ourselves for color states
+        color = _STATE_COLOR.get(state, _STATE_COLOR["idle"])
+        tint = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color)
+        tinted = _tint_image(image, tint)
+        self._button.setImage_(tinted)
+
+    def _update_labels(self) -> None:
+        """Sync the toggle + state-line labels with the current state."""
+        state = self._state
+        active = state in ("listening", "transcribing")
+        if self._toggle_item is not None:
+            self._toggle_item.setTitle_(
+                "Stop Dictation" if active else "Start Dictation"
+            )
+        if self._state_item is not None:
+            label = {
+                "listening": "● Listening",
+                "transcribing": "● Transcribing…",
+            }.get(state, "○ Idle")
+            self._state_item.setTitle_(label)
+        # Re-apply the icon so the tint tracks the state.
+        self._apply_icon(state)
+
+    # ---------- menu actions (called from the ObjC controller) ----------
+
+    def do_toggle(self) -> None:
+        """Start/Stop Dictation menu action → engine.toggle_session()."""
+        self._engine.toggle_session()
+
+    def do_open_config(self) -> None:
+        """Open Config File → reveal ~/.config/whiz/config.toml in Finder."""
+        try:
+            import AppKit
+            from Foundation import NSURL
+            from whiz.config import CONFIG_PATH
+
+            path = str(CONFIG_PATH)
+            url = NSURL.fileURLWithPath_(path)
+            # activateFileViewerSelecting: reveals the file in a Finder window;
+            # if the user has a default editor for .toml, open: launches it.
+            ws = AppKit.NSWorkspace.sharedWorkspace()
+            ws.activateFileViewerSelecting_([url])
+        except Exception:  # noqa: BLE001
+            logger.debug("open config failed", exc_info=True)
+
+    def do_about(self) -> None:
+        """About whiz → print version/model/hotkey to stderr (no modal in a bg app)."""
+        try:
+            from whiz import __version__
+
+            engine = self._engine
+            model = getattr(engine.stt, "_model_ref", "?")
+            print(
+                f"whiz {__version__} — dictate\n"
+                f"  model:  {model}\n"
+                f"  hotkey: {engine.s.hotkey}\n"
+                f"  mode:   {engine.s.trigger}",
+                file=__import__("sys").stderr,
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("about failed", exc_info=True)
+
+    def do_quit(self) -> None:
+        """Quit whiz dictate → engine.stop() (process exits; launchd restarts it)."""
+        self._engine.stop()
+
+
+def _tint_image(image: Any, color: Any) -> Any:
+    """Return a copy of ``image`` drawn solidly in ``color`` (template-style)."""
+    try:
+        import AppKit
+        from Foundation import NSSize
+
+        size = image.size()
+        tinted = AppKit.NSImage.alloc().initWithSize_(size)
+        tinted.lockFocus()
+        try:
+            image.drawInRect_fromRect_operation_fraction_(
+                AppKit.NSRect((0, 0), (size.width, size.height)),
+                AppKit.NSZeroRect,
+                AppKit.NSCompositeSourceOver,
+                1.0,
+            )
+            color.set()
+            AppKit.NSRectFillUsingOperation(
+                AppKit.NSRect((0, 0), (size.width, size.height)),
+                AppKit.NSCompositeSourceAtop,
+            )
+        finally:
+            tinted.unlockFocus()
+        return tinted
+    except Exception:  # noqa: BLE001
+        return image
+
+
+# ---------- ObjC runtime glue ----------
+# A real NSObject subclass receives the menu action callbacks (target/action)
+# and the button click, and dispatches them back to the Python MacMenuBar.
+# Created once at import time on macOS; on non-macOS it stays None and
+# _get_objc_controller_class raises ImportError (caught by setup()).
+
+_OBJC_CONTROLLER_CLASS = None
+
+
+def _create_objc_controller_class():
+    """Create (once) an NSObject subclass that dispatches menu actions to MacMenuBar."""
+    global _OBJC_CONTROLLER_CLASS
+    if _OBJC_CONTROLLER_CLASS is not None:
+        return _OBJC_CONTROLLER_CLASS
+    import objc
+    from Foundation import NSObject
+
+    class _WhizMenuBarController(NSObject):
+        def init(self):
+            self = objc.super(_WhizMenuBarController, self).init()
+            if self is not None:
+                self._menubar = None
+            return self
+
+        # Menu bar icon click → show the menu (NSStatusItem.menu handles this
+        # automatically, but keep an action so the button isn't a no-op).
+        def whizMenuClicked_(self, sender):  # noqa: ARG002
+            pass
+
+        def whizToggle_(self, sender):  # noqa: ARG002
+            mb = getattr(self, "_menubar", None)
+            if mb is not None:
+                mb.do_toggle()
+
+        def whizOpenConfig_(self, sender):  # noqa: ARG002
+            mb = getattr(self, "_menubar", None)
+            if mb is not None:
+                mb.do_open_config()
+
+        def whizAbout_(self, sender):  # noqa: ARG002
+            mb = getattr(self, "_menubar", None)
+            if mb is not None:
+                mb.do_about()
+
+        def whizQuit_(self, sender):  # noqa: ARG002
+            mb = getattr(self, "_menubar", None)
+            if mb is not None:
+                mb.do_quit()
+
+        # Called via performSelectorOnMainThread from on_state to update the
+        # icon tint + menu labels on the main thread.
+        def whizUpdateMenuState_(self, sender):  # noqa: ARG002
+            mb = getattr(self, "_menubar", None)
+            if mb is not None:
+                mb._update_labels()
+
+    _OBJC_CONTROLLER_CLASS = _WhizMenuBarController
+    return _OBJC_CONTROLLER_CLASS
+
+
+def _get_objc_controller_class():
+    """Return the ObjC NSObject controller subclass (creates it once).
+
+    Raises ImportError on non-macOS or when pyobjc/Foundation is unavailable.
+    """
+    cls = _create_objc_controller_class()
+    if cls is None:
+        raise ImportError("ObjC menu bar controller unavailable")
+    return cls
+
+
+# Eagerly create the ObjC subclass at import time on macOS so .alloc().init()
+# is available before setup() runs. On non-macOS the import fails and the class
+# stays None; _get_objc_controller_class() raises ImportError.
+try:
+    _create_objc_controller_class()
+except ImportError:
+    pass
+except Exception:  # noqa: BLE001 - never fail import on a pyobjc quirk
+    logger.debug("menu bar ObjC controller class not created", exc_info=True)

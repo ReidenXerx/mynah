@@ -1,50 +1,66 @@
-"""MacIndicator — a floating "listening" overlay for macOS dictation.
+"""MacIndicator — a floating "listening" pill overlay for macOS dictation.
 
-A small, borderless, always-on-top, click-through ``NSPanel`` with a
-custom ``NSView`` that draws:
-- a circular mic badge (filled, with a subtle ring)
-- a live volume curve that responds to mic amplitude
+A compact, borderless, always-on-top, click-through ``NSPanel`` containing
+an ``NSVisualEffectView`` (HUD-window vibrancy material) so the overlay
+blurs the content behind it — the native macOS HUD look — instead of an
+opaque dark box. Inside the pill:
+
+- an SF Symbols ``mic.fill`` template glyph, tinted by state (cyan listening
+  / amber transcribing / gray idle)
+- 5 live waveform bars whose heights track the mic amplitude
 
 The indicator runs on the main thread inside the AppKit event loop
-(NSApplication). The engine feeds it per-chunk RMS amplitude (0.0–1.0)
-from the audio thread via ``update_level()``, which is thread-safe
-through AppKit's main-thread dispatch.
+(``NSApplication``). The engine feeds it per-chunk RMS amplitude (0.0–1.0)
+from the audio thread via ``update_level()``, which is thread-safe through
+AppKit's main-thread dispatch. Show/hide animate via an opacity fade
+(``alphaValue``) so the pill eases in/out rather than popping.
 
-States change the badge color:
-- "listening"    → pulsing cyan
-- "transcribing" → amber (steady)
+States change the glyph tint:
+- "listening"    → cyan
+- "transcribing" → amber
 - "idle"         → dimmed gray
 """
 
 from __future__ import annotations
 
 import logging
-import math
 from typing import Any
 
 from whiz.dictate.providers.base import DictationIndicator
 
 logger = logging.getLogger(__name__)
 
-# Overlay dimensions.
-_PANEL_WIDTH = 120
-_PANEL_HEIGHT = 120
-_PANEL_CORNER_RADIUS = 20.0
+# Overlay dimensions — a short horizontal pill.
+_PANEL_WIDTH = 168
+_PANEL_HEIGHT = 44
+_PANEL_CORNER_RADIUS = _PANEL_HEIGHT / 2  # fully rounded ends
 
 # Colors (RGBA floats 0–1).
 _COLOR_LISTENING = (0.2, 0.8, 0.95, 1.0)       # cyan
-_COLOR_TRANSCRIBING = (0.95, 0.7, 0.2, 1.0)    # amber
-_COLOR_IDLE = (0.5, 0.5, 0.55, 0.6)            # dimmed gray
+_COLOR_TRANSCRIBING = (0.95, 0.7, 0.2, 1.0)   # amber
+_COLOR_IDLE = (0.5, 0.5, 0.55, 0.85)          # dimmed gray
+
+# Waveform bars.
+_BAR_COUNT = 5
+_BAR_WIDTH = 4
+_BAR_GAP = 6
+_BAR_MAX_HEIGHT = 22
+_BAR_MIN_HEIGHT = 4
+_BAR_CORNER = _BAR_WIDTH / 2
+
+# Fade animation duration (seconds).
+_FADE_SECONDS = 0.18
 
 
 class MacIndicator(DictationIndicator):
-    """A floating dictation indicator overlay (macOS NSPanel + custom NSView)."""
+    """A floating dictation indicator overlay (macOS NSPanel + vibrancy pill)."""
 
     def __init__(self) -> None:
         self._panel: Any = None
         self._view: Any = None
         self._level: float = 0.0
         self._state: str = "idle"
+        self._visible: bool = False
 
     def setup(self) -> None:
         """Create the NSPanel on the main thread before the run loop starts.
@@ -58,7 +74,7 @@ class MacIndicator(DictationIndicator):
         self._ensure_panel()
 
     def show(self) -> None:
-        """Display the overlay (main-thread-safe).
+        """Display the overlay with an opacity fade (main-thread-safe).
 
         The panel is created eagerly in ``setup()``. Ordering it to the
         front is an AppKit UI op; dispatch it to the main thread so a call
@@ -66,37 +82,33 @@ class MacIndicator(DictationIndicator):
         """
         if self._panel is None:
             return
+        self._visible = True
         try:
             self._panel.performSelectorOnMainThread_withObject_waitUntilDone_(
-                "orderFrontRegardless", None, False
+                "whizFadeIn:", None, False
             )
         except Exception:  # noqa: BLE001
             pass
 
     def hide(self) -> None:
-        """Dismiss the overlay (main-thread-safe)."""
+        """Dismiss the overlay with an opacity fade (main-thread-safe)."""
         if self._panel is None:
             return
+        self._visible = False
         try:
             self._panel.performSelectorOnMainThread_withObject_waitUntilDone_(
-                "orderOut:", None, False
+                "whizFadeOut:", None, False
             )
         except Exception:  # noqa: BLE001
             pass
 
     def update_level(self, level: float) -> None:
-        """Feed a live mic amplitude in [0.0, 1.0] to animate the volume curve.
+        """Feed a live mic amplitude in [0.0, 1.0] to animate the waveform.
 
         Thread-safe: dispatches the actual view update to the main thread.
         """
         self._level = max(0.0, min(1.0, level))
         if self._view is not None:
-            # Dispatch to main thread for AppKit safety. performSelectorOnMainThread
-            # requires a one-argument selector (trailing colon in ObjC). pyobjc maps
-            # Python trailing underscores to ObjC colons, but ONLY unambiguously when
-            # the name has no internal underscores — otherwise each underscore becomes
-            # a colon (e.g. _whiz_update_display_ -> _whiz:update:display:, 3 args).
-            # So we use CamelCase names: whizUpdateDisplay_ -> whizUpdateDisplay:.
             try:
                 self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
                     "whizUpdateDisplay:", None, False
@@ -164,11 +176,10 @@ class MacIndicator(DictationIndicator):
         # panel hides itself and the indicator is invisible. Disabling
         # this keeps the overlay on screen regardless of activation state.
         self._panel.setHidesOnDeactivate_(False)
+        # Start fully transparent — show() fades the alpha up.
+        self._panel.setAlphaValue_(0.0)
 
-        # Custom view that draws the badge + volume curve. Use the real
-        # ObjC NSView subclass (created at import time on macOS) — only
-        # ObjC classes have .alloc(); the plain Python WhizIndicatorView
-        # is just the methods holder the subclass delegates to.
+        # Custom view that draws the vibrancy background + glyph + waveform.
         view_cls = _get_objc_view_class()
         self._view = view_cls.alloc().initWithFrame_(frame)
         self._view._indicator = self  # back-reference for state/level reads
@@ -188,19 +199,16 @@ class WhizIndicatorView:
     # Set by the ObjC subclass after alloc().initWithFrame_().
     _indicator: "MacIndicator"
 
-    def drawRect_(self, rect) -> None:
-        """NSView draw — paints the circular badge + volume curve."""
+    def drawRect_(self, rect) -> None:  # noqa: ARG002
+        """NSView draw — paints the vibrancy pill + glyph + waveform bars."""
         try:
             import AppKit
-            from Foundation import NSRect, NSBezierPath
+            from Foundation import NSRect
 
             bounds = self.bounds()
             w = bounds.size.width
             h = bounds.size.height
-            cx = w / 2
-            cy = h / 2
 
-            # Pick the color for the current state.
             ind = getattr(self, "_indicator", None)
             state = ind._state if ind else "idle"
             level = ind._level if ind else 0.0
@@ -213,61 +221,119 @@ class WhizIndicatorView:
             AppKit.NSColor.clearColor().set()
             AppKit.NSRectFill(NSRect((0, 0), (w, h)))
 
-            # Draw the rounded panel background (subtle dark blur look).
+            # 1. Vibrancy background: an NSVisualEffectView with the HUD-window
+            # material gives a real native blur. We add it as a subview once
+            # (lazy) rather than recreating it every draw. If it's already
+            # installed, this is a no-op.
+            self._ensure_vibrancy(AppKit)
+
+            # 2. A subtle rounded outline so the pill reads against light
+            # backgrounds (the vibrancy alone can wash out on bright walls).
             bg_path = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
                 NSRect((0, 0), (w, h)), _PANEL_CORNER_RADIUS, _PANEL_CORNER_RADIUS
             )
-            AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(
-                0.1, 0.1, 0.12, 0.85
-            ).set()
-            bg_path.fill()
-
-            # Draw the circular mic badge.
-            badge_radius = 22
-            badge = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-                NSRect((cx - badge_radius, cy - badge_radius),
-                       (badge_radius * 2, badge_radius * 2)),
-                badge_radius, badge_radius
+            outline = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(
+                1.0, 1.0, 1.0, 0.08
             )
-            AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color).set()
-            badge.fill()
+            outline.set()
+            bg_path.setLineWidth_(0.5)
+            bg_path.stroke()
 
-            # Draw the volume curve: an arc whose sweep grows with `level`.
-            # The arc is drawn around the badge, like a ring that fills up.
-            if level > 0.01:
-                ring_radius = badge_radius + 8
-                # Arc from -90° (top) sweeping clockwise proportional to level.
-                start = -math.pi / 2
-                sweep = level * 2 * math.pi
-                # Draw as a series of short line segments (simple, no CGPath).
-                segments = max(4, int(sweep / 0.1))
-                ring = AppKit.NSBezierPath.bezierPath()
-                for i in range(segments + 1):
-                    angle = start + sweep * (i / segments)
-                    px = cx + ring_radius * math.cos(angle)
-                    py = cy + ring_radius * math.sin(angle)
-                    if i == 0:
-                        ring.moveToPoint_((px, py))
-                    else:
-                        ring.lineToPoint_((px, py))
-                ring.setLineWidth_(3.0)
+            # 3. SF Symbols mic glyph on the left, tinted by state.
+            glyph_size = 20
+            glyph_x = 14
+            glyph_y = (h - glyph_size) / 2
+            glyph = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+                "mic.fill", "whiz dictation"
+            )
+            if glyph is not None:
+                glyph.setTemplate_(True)
+                tint = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color)
+                config = AppKit.NSImageSymbolConfiguration.configurationWithScale_(
+                    AppKit.NSImageSymbolScaleMedium
+                )
+                sized = glyph.imageWithSymbolConfiguration_(config) or glyph
+                tinted = _tint_template(sized, tint, glyph_size)
+                tinted.drawInRect_(
+                    NSRect((glyph_x, glyph_y), (glyph_size, glyph_size)),
+                    NSRect((0, 0), (tinted.size().width, tinted.size().height)),
+                    AppKit.NSCompositeSourceOver,
+                    1.0,
+                )
+
+            # 4. Waveform bars to the right of the glyph, heights tracking level.
+            bars_x = glyph_x + glyph_size + 12
+            cy = h / 2
+            # Each bar's height is a slightly different function of level so
+            # they don't all jump in unison — looks like a real waveform.
+            for i in range(_BAR_COUNT):
+                # Per-bar phase so adjacent bars differ.
+                phase = (i - (_BAR_COUNT - 1) / 2) * 0.35
+                amp = max(0.0, min(1.0, level + phase * 0.15))
+                bar_h = _BAR_MIN_HEIGHT + amp * (_BAR_MAX_HEIGHT - _BAR_MIN_HEIGHT)
+                bx = bars_x + i * (_BAR_WIDTH + _BAR_GAP)
+                by = cy - bar_h / 2
+                bar = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                    NSRect((bx, by), (_BAR_WIDTH, bar_h)), _BAR_CORNER, _BAR_CORNER
+                )
                 AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color).set()
-                ring.stroke()
-
-            # Draw a simple mic glyph (a rounded rectangle "stem" + a base line).
-            stem = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-                NSRect((cx - 5, cy - 6), (10, 16)), 5, 5
-            )
-            AppKit.NSColor.whiteColor().set()
-            stem.fill()
-            # Mic base arc.
-            base = AppKit.NSBezierPath.bezierPath()
-            base.moveToPoint_((cx - 10, cy - 4))
-            base.lineToPoint_((cx + 10, cy - 4))
-            base.setLineWidth_(2.0)
-            base.stroke()
+                bar.fill()
         except Exception:  # noqa: BLE001
             logger.debug("indicator draw failed", exc_info=True)
+
+    def _ensure_vibrancy(self, AppKit) -> None:
+        """Add an NSVisualEffectView (HUD material) as a subview once."""
+        try:
+            existing = getattr(self, "_vfx_view", None)
+            if existing is not None:
+                return
+            from Foundation import NSRect
+
+            frame = self.bounds()
+            vfx = AppKit.NSVisualEffectView.alloc().initWithFrame_(
+                NSRect((0, 0), (frame.size.width, frame.size.height))
+            )
+            vfx.setMaterial_(AppKit.NSVisualEffectMaterialHUDWindow)
+            vfx.setBlendingMode_(AppKit.NSVisualEffectBlendingModeBehindWindow)
+            vfx.setState_(AppKit.NSVisualEffectStateActive)
+            vfx.setWantsLayer_(True)
+            # Rounded corners via layer cornerRadius.
+            try:
+                vfx.layer().setCornerRadius_(_PANEL_CORNER_RADIUS)
+                vfx.layer().setMasksToBounds_(True)
+            except Exception:  # noqa: BLE001
+                pass
+            self.addSubview_(vfx)
+            self._vfx_view = vfx
+        except Exception:  # noqa: BLE001
+            logger.debug("vibrancy view setup failed", exc_info=True)
+
+
+def _tint_template(image: Any, color: Any, target_size: float) -> Any:
+    """Return ``image`` scaled to ``target_size``² and tinted solidly in ``color``."""
+    try:
+        import AppKit
+        from Foundation import NSSize, NSRect
+
+        sized = AppKit.NSImage.alloc().initWithSize_(NSSize(target_size, target_size))
+        sized.lockFocus()
+        try:
+            image.drawInRect_fromRect_operation_fraction_(
+                NSRect((0, 0), (target_size, target_size)),
+                NSRect((0, 0), (image.size().width, image.size().height)),
+                AppKit.NSCompositeSourceOver,
+                1.0,
+            )
+            color.set()
+            AppKit.NSRectFillUsingOperation(
+                NSRect((0, 0), (target_size, target_size)),
+                AppKit.NSCompositeSourceAtop,
+            )
+        finally:
+            sized.unlockFocus()
+        return sized
+    except Exception:  # noqa: BLE001
+        return image
 
 
 # ---------- ObjC runtime glue ----------
@@ -301,6 +367,7 @@ def _create_objc_view_class():
             self = objc.super(_WhizIndicatorViewImpl, self).initWithFrame_(frame)
             if self is not None:
                 self._indicator = None
+                self._vfx_view = None
             return self
 
         def drawRect_(self, rect):
@@ -311,12 +378,43 @@ def _create_objc_view_class():
         # underscores to ObjC colons, but internal underscores also map to
         # colons — so we use CamelCase names (no internal underscores) to keep
         # the mapping unambiguous: whizUpdateDisplay_ -> whizUpdateDisplay:.
-        # `sender` is the object argument (ignored — we just trigger a redraw).
-        def whizUpdateDisplay_(self, sender):
+        def whizUpdateDisplay_(self, sender):  # noqa: ARG002
             self.setNeedsDisplay_(True)
 
-        def whizSetState_(self, sender):
+        def whizSetState_(self, sender):  # noqa: ARG002
             self.setNeedsDisplay_(True)
+
+        # Panel fade in/out: drive the panel's alphaValue toward the target.
+        # Using a short NSAnimationContext implicit animation eases the alpha.
+        def whizFadeIn_(self, sender):  # noqa: ARG002
+            self._fade_panel(True)
+
+        def whizFadeOut_(self, sender):  # noqa: ARG002
+            self._fade_panel(False)
+
+        def _fade_panel(self, fade_in: bool) -> None:
+            import AppKit
+            from CoreAnimation import NSAnimationContext
+
+            panel = self.window()
+            if panel is None:
+                return
+            if fade_in:
+                # Order front first (alpha 0), then animate to 1.
+                panel.orderFrontRegardless()
+            ctx = NSAnimationContext.beginGrouping()
+            ctx.setDuration_(_FADE_SECONDS)
+            try:
+                panel.animator().setAlphaValue_(1.0 if fade_in else 0.0)
+            finally:
+                NSAnimationContext.endGrouping()
+            if not fade_in:
+                # After the fade, hide the panel so it stops receiving draws.
+                import Foundation
+
+                Foundation.NSObject.performSelector_withObject_afterDelay_(
+                    panel, "orderOut:", None, _FADE_SECONDS + 0.02
+                )
 
     _OBJC_VIEW_CLASS = _WhizIndicatorViewImpl
     return _OBJC_VIEW_CLASS

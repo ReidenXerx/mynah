@@ -46,7 +46,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from whiz.dictate.providers import (
     DictationIndicator,
@@ -163,6 +163,7 @@ class DictateSettings:
     show_indicator: bool
     idle_visible: bool = True
     model: str = ""
+    menu_bar: bool = True
 
 
 def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
@@ -183,6 +184,7 @@ def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
         show_indicator=bool(overrides.get("show_indicator", config.dictate_show_indicator)),
         idle_visible=bool(overrides.get("idle_visible", config.dictate_idle_visible)),
         model=(overrides.get("model") or config.dictate_model or ""),
+        menu_bar=bool(overrides.get("menu_bar", config.dictate_menu_bar)),
     )
 
 
@@ -231,8 +233,40 @@ class DictationEngine:
         self._transcribe_thread: threading.Thread | None = None
         # VAD
         self._vad = VoiceActivityDetector() if settings.vad_enabled else None
+        # State listeners (e.g. the menu bar) notified on each state change.
+        self._indicator_state: str = "idle"
+        self._state_listeners: list[Callable[[str], None]] = []
+        # Optional menu bar controller; kept here so it isn't GC'd while the
+        # AppKit run loop owns the only other reference.
+        self._menu_bar: Any = None
 
     # ---------- public API ----------
+
+    def add_state_listener(self, fn: Callable[[str], None]) -> None:
+        """Register a callback notified on every indicator state change.
+
+        Listeners (e.g. the menu bar) receive the new state string
+        (``"listening"``/``"transcribing"``/``"idle"``) after the indicator has
+        been notified. Called inline from ``_set_state`` on whatever thread
+        initiated the state change, so listeners must be thread-safe.
+        """
+        self._state_listeners.append(fn)
+
+    def _set_state(self, state: str) -> None:
+        """Update the indicator state and notify registered listeners.
+
+        Centralizes the ~7 direct ``self.indicator.set_state(...)`` call sites
+        so a single place fans the state out to the indicator AND any
+        listeners (menu bar, future HUD surfaces). Behavior is identical to
+        the direct call when there are no listeners.
+        """
+        self._indicator_state = state
+        self.indicator.set_state(state)
+        for fn in self._state_listeners:
+            try:
+                fn(state)
+            except Exception:  # noqa: BLE001
+                logger.debug("state listener raised", exc_info=True)
 
     def run(self) -> int:
         """Start the engine and block until the user quits.
@@ -257,8 +291,15 @@ class DictationEngine:
         # at idle. When idle_visible is off, keep the original behavior (hide
         # until a session starts).
         if self.s.show_indicator and self.s.idle_visible:
-            self.indicator.set_state("idle")
+            self._set_state("idle")
             self.indicator.show()
+
+        # On macOS, optionally create the menu bar status item (NSStatusItem)
+        # on the main thread before the run loop starts. It drives the engine
+        # through the same toggle_session()/stop() the hotkey uses, and mirrors
+        # the indicator state via a state listener. Degrades to no-op when
+        # pyobjc is unavailable.
+        self._setup_menu_bar()
 
         # On macOS with an indicator, run the AppKit event loop on the main
         # thread. Otherwise, run a plain blocking loop.
@@ -324,15 +365,15 @@ class DictationEngine:
         # Outside the lock: a multi-second download/load must not block the
         # hotkey thread or a concurrent stop().
         if need_load:
-            self.indicator.set_state("transcribing")
+            self._set_state("transcribing")
             self.indicator.show()
             self.stt.load()
-        self.indicator.set_state("listening")
+        self._set_state("listening")
         self.indicator.show()
         with self._state_lock:
             if not self._session_active:
                 # A stop/end raced in while we were loading — abort cleanly.
-                self.indicator.set_state("idle")
+                self._set_state("idle")
                 if self.s.idle_visible:
                     self.indicator.show()
                 else:
@@ -407,7 +448,7 @@ class DictationEngine:
             transcribe_thread.join(timeout=30.0)
         with self._state_lock:
             self._transcribe_thread = None
-        self.indicator.set_state("idle")
+        self._set_state("idle")
         # When the idle badge is visible, keep the dimmed indicator on screen
         # after a session ends instead of hiding it — so the service always
         # shows an "armed" state. hide() reverts to the original behavior
@@ -595,7 +636,7 @@ class DictationEngine:
         samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
         duration = len(samples) / WHISPER_SAMPLE_RATE
         logger.debug("Transcribing utterance: %.2fs, energy=%.4f", duration, energy)
-        self.indicator.set_state("transcribing")
+        self._set_state("transcribing")
         try:
             text = self.stt.transcribe(
                 samples,
@@ -605,7 +646,7 @@ class DictationEngine:
             )
         except Exception as e:  # noqa: BLE001
             logger.warning("Transcription failed: %s", e)
-            self.indicator.set_state("listening")
+            self._set_state("listening")
             return
         if text.strip():
             # Hallucination safety net: suppress known Whisper training-data
@@ -614,13 +655,37 @@ class DictationEngine:
             text_lower = text.lower()
             if any(marker in text_lower for marker in _HALLUCINATION_PHRASES):
                 logger.debug("Suppressing hallucination: %s", text)
-                self.indicator.set_state("listening")
+                self._set_state("listening")
                 return
             logger.debug("Injecting text: %s", text)
             self.injector.type_text(text)
-        self.indicator.set_state("listening")
+        self._set_state("listening")
 
     # ---------- run loops ----------
+
+    def _setup_menu_bar(self) -> None:
+        """Create the macOS menu bar status item, if enabled and available.
+
+        Must be called on the main thread (run() calls it before the AppKit
+        loop). Degrades to a no-op when ``settings.menu_bar`` is off or
+        pyobjc/AppKit is unavailable, so a non-macOS or headless run is
+        unaffected. Keeps a strong reference on ``self._menu_bar`` so the
+        status item survives for the lifetime of the engine.
+        """
+        if not self.s.menu_bar or not _is_macos():
+            return
+        try:
+            from whiz.dictate.providers.macos_menubar import MacMenuBar
+        except ImportError:
+            logger.debug("menu bar provider unavailable (pyobjc?)", exc_info=True)
+            return
+        try:
+            mb = MacMenuBar(engine=self)
+            mb.setup()
+            self.add_state_listener(mb.on_state)
+            self._menu_bar = mb
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not create dictation menu bar item", exc_info=True)
 
     def _run_plain(self) -> int:
         """Run without AppKit — a blocking loop driving the hotkey listener."""

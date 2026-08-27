@@ -224,20 +224,46 @@ class MacMenuBar:
         ).start()
 
     def do_open_config(self) -> None:
-        """Open Config File → reveal ~/.config/whiz/config.toml in Finder."""
-        try:
-            import AppKit
-            from Foundation import NSURL
-            from whiz.config import CONFIG_PATH
+        """Open Config File → reveal ~/.config/whiz/config.toml in Finder.
 
-            path = str(CONFIG_PATH)
-            url = NSURL.fileURLWithPath_(path)
-            # activateFileViewerSelecting: reveals the file in a Finder window;
-            # if the user has a default editor for .toml, open: launches it.
-            ws = AppKit.NSWorkspace.sharedWorkspace()
-            ws.activateFileViewerSelecting_([url])
-        except Exception:  # noqa: BLE001
-            logger.debug("open config failed", exc_info=True)
+        Runs off the main thread (dispatched by ``do_open_config`` via a
+        worker) so the ``whizOpenConfig:`` selector returns immediately and
+        the AppKit run loop isn't blocked. The LaunchAgent runs as an
+        accessory (background) app, so ``activateFileViewerSelecting:`` alone
+        can fail silently — Finder needs an explicit activation nudge first.
+        If the config file doesn't exist yet (fresh install, never saved),
+        we create it with current defaults so the user always sees something.
+        """
+        import subprocess
+        import threading
+
+        def _open() -> None:
+            try:
+                from whiz.config import CONFIG_PATH, Config, save
+
+                path = CONFIG_PATH
+                # Ensure the file exists — a fresh install may never have
+                # written it, and activateFileViewerSelecting: on a missing
+                # path silently does nothing (the menu item appears dead).
+                if not path.exists():
+                    try:
+                        save(Config())
+                    except Exception:  # noqa: BLE001
+                        logger.debug("could not create config file", exc_info=True)
+
+                # `open` launches the file in the user's default app for .toml
+                # (TextEdit, VS Code, etc.) and brings it to the foreground.
+                # This is more useful than a Finder reveal for a config file
+                # the user wants to *edit*, and it works from a background app.
+                subprocess.run(
+                    ["/usr/bin/open", str(path)],
+                    check=False,
+                    timeout=5,
+                )
+            except Exception:  # noqa: BLE001
+                logger.debug("open config failed", exc_info=True)
+
+        threading.Thread(target=_open, daemon=True).start()
 
     def do_about(self) -> None:
         """About whiz → print version/model/hotkey to stderr (no modal in a bg app)."""
@@ -328,34 +354,52 @@ def _create_objc_controller_class():
         # Menu bar icon click → show the menu (NSStatusItem.menu handles this
         # automatically, but keep an action so the button isn't a no-op).
         def whizMenuClicked_(self, sender):  # noqa: ARG002
-            pass
+            try:
+                pass
+            except Exception:  # noqa: BLE001
+                logger.debug("whizMenuClicked failed", exc_info=True)
 
         def whizToggle_(self, sender):  # noqa: ARG002
-            mb = getattr(self, "_menubar", None)
-            if mb is not None:
-                mb.do_toggle()
+            try:
+                mb = getattr(self, "_menubar", None)
+                if mb is not None:
+                    mb.do_toggle()
+            except Exception:  # noqa: BLE001
+                logger.debug("whizToggle failed", exc_info=True)
 
         def whizOpenConfig_(self, sender):  # noqa: ARG002
-            mb = getattr(self, "_menubar", None)
-            if mb is not None:
-                mb.do_open_config()
+            try:
+                mb = getattr(self, "_menubar", None)
+                if mb is not None:
+                    mb.do_open_config()
+            except Exception:  # noqa: BLE001
+                logger.debug("whizOpenConfig failed", exc_info=True)
 
         def whizAbout_(self, sender):  # noqa: ARG002
-            mb = getattr(self, "_menubar", None)
-            if mb is not None:
-                mb.do_about()
+            try:
+                mb = getattr(self, "_menubar", None)
+                if mb is not None:
+                    mb.do_about()
+            except Exception:  # noqa: BLE001
+                logger.debug("whizAbout failed", exc_info=True)
 
         def whizQuit_(self, sender):  # noqa: ARG002
-            mb = getattr(self, "_menubar", None)
-            if mb is not None:
-                mb.do_quit()
+            try:
+                mb = getattr(self, "_menubar", None)
+                if mb is not None:
+                    mb.do_quit()
+            except Exception:  # noqa: BLE001
+                logger.debug("whizQuit failed", exc_info=True)
 
         # Called via performSelectorOnMainThread from on_state to update the
         # icon tint + menu labels on the main thread.
         def whizUpdateMenuState_(self, sender):  # noqa: ARG002
-            mb = getattr(self, "_menubar", None)
-            if mb is not None:
-                mb._update_labels()
+            try:
+                mb = getattr(self, "_menubar", None)
+                if mb is not None:
+                    mb._update_labels()
+            except Exception:  # noqa: BLE001
+                logger.debug("whizUpdateMenuState failed", exc_info=True)
 
     _OBJC_CONTROLLER_CLASS = _WhizMenuBarController
     return _OBJC_CONTROLLER_CLASS

@@ -376,7 +376,10 @@ def _create_objc_view_class():
             return self
 
         def drawRect_(self, rect):
-            WhizIndicatorView.drawRect_(self, rect)
+            try:
+                WhizIndicatorView.drawRect_(self, rect)
+            except Exception:  # noqa: BLE001
+                logger.debug("drawRect failed", exc_info=True)
 
         # performSelectorOnMainThread:withObject: requires a one-argument
         # selector (trailing colon in ObjC). pyobjc maps Python trailing
@@ -384,10 +387,16 @@ def _create_objc_view_class():
         # colons — so we use CamelCase names (no internal underscores) to keep
         # the mapping unambiguous: whizUpdateDisplay_ -> whizUpdateDisplay:.
         def whizUpdateDisplay_(self, sender):  # noqa: ARG002
-            self.setNeedsDisplay_(True)
+            try:
+                self.setNeedsDisplay_(True)
+            except Exception:  # noqa: BLE001
+                logger.debug("whizUpdateDisplay failed", exc_info=True)
 
         def whizSetState_(self, sender):  # noqa: ARG002
-            self.setNeedsDisplay_(True)
+            try:
+                self.setNeedsDisplay_(True)
+            except Exception:  # noqa: BLE001
+                logger.debug("whizSetState failed", exc_info=True)
 
         # Panel fade in/out: drive the panel's alphaValue toward the target.
         # Using a short NSAnimationContext implicit animation eases the alpha.

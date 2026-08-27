@@ -158,6 +158,12 @@ class MacIndicator(DictationIndicator):
         self._panel.setIgnoresMouseEvents_(True)
         # Don't activate the app when the panel shows.
         self._panel.setBecomesKeyOnlyIfNeeded_(True)
+        # CRITICAL for background agents: NSPanel defaults to
+        # hidesOnDeactivate=True, so when whiz runs as a LaunchAgent
+        # (accessory app, always "deactivated" — no Dock presence) the
+        # panel hides itself and the indicator is invisible. Disabling
+        # this keeps the overlay on screen regardless of activation state.
+        self._panel.setHidesOnDeactivate_(False)
 
         # Custom view that draws the badge + volume curve. Use the real
         # ObjC NSView subclass (created at import time on macOS) — only

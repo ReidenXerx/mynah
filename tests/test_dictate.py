@@ -1747,3 +1747,173 @@ def test_dictate_parser_doctor_alias():
     parser = cli.build_parser()
     args = parser.parse_args(["dictate", "doctor"])
     assert args.func is cli.cmd_dictate_setup
+
+
+# ---------------------------------------------------------------------------
+# Indicator panel: hidesOnDeactivate fix (invisible under LaunchAgent)
+# ---------------------------------------------------------------------------
+
+
+def test_indicator_panel_disables_hides_on_deactivate(monkeypatch):
+    """_create_panel must call setHidesOnDeactivate_(False) — NSPanel defaults
+    to True, which makes the overlay invisible when whiz runs as a background
+    LaunchAgent (always 'deactivated'). This is the root cause of the missing
+    indicator under the login service.
+    """
+    import whiz.dictate.providers.macos_indicator as mi
+
+    calls: dict[str, bool] = {"hides_on_deactivate_set": False}
+
+    class _FakeNSRect:
+        def __init__(self, origin, size):
+            self.origin = origin
+            self.size = size
+
+    class _FakeNSPoint:
+        def __init__(self, x, y):
+            self.x = x
+            self.y = y
+
+    class _FakeNSSize:
+        def __init__(self, w, h):
+            self.width = w
+            self.height = h
+
+    class _FakePanel:
+        def __init__(self):
+            self._level = 0
+        def initWithContentRect_styleMask_backing_defer_(self, *a):
+            return self
+        def setLevel_(self, lvl):
+            self._level = lvl
+        def setOpaque_(self, v):
+            pass
+        def setBackgroundColor_(self, c):
+            pass
+        def setHasShadow_(self, v):
+            pass
+        def setIgnoresMouseEvents_(self, v):
+            pass
+        def setBecomesKeyOnlyIfNeeded_(self, v):
+            pass
+        def setHidesOnDeactivate_(self, v):
+            calls["hides_on_deactivate_set"] = v
+        def setContentView_(self, v):
+            pass
+
+    class _FakeView:
+        def __init__(self):
+            pass
+        def alloc(self):
+            return self
+        def initWithFrame_(self, frame):
+            return self
+
+    fake_appkit = types.ModuleType("AppKit")
+    fake_appkit.NSWindowStyleMaskBorderless = 0
+    fake_appkit.NSBackingStoreBuffered = 0
+    fake_appkit.NSFloatingWindowLevel = 3
+    fake_appkit.NSPanel = mock.Mock()
+    fake_appkit.NSPanel.alloc.return_value = _FakePanel()
+    fake_appkit.NSScreen = mock.Mock()
+    fake_appkit.NSScreen.mainScreen.return_value.frame.return_value = _FakeNSRect(
+        _FakeNSPoint(0, 0), _FakeNSSize(1440, 900)
+    )
+    fake_appkit.NSColor = mock.Mock()
+    fake_foundation = types.ModuleType("Foundation")
+    fake_foundation.NSRect = _FakeNSRect
+    fake_foundation.NSPoint = _FakeNSPoint
+    fake_foundation.NSSize = _FakeNSSize
+    monkeypatch.setitem(sys.modules, "AppKit", fake_appkit)
+    monkeypatch.setitem(sys.modules, "Foundation", fake_foundation)
+    # Stub the ObjC view class getter so _create_panel doesn't need objc.
+    monkeypatch.setattr(mi, "_get_objc_view_class", lambda: _FakeView())
+
+    ind = mi.MacIndicator()
+    ind._create_panel()
+    assert calls["hides_on_deactivate_set"] is False, (
+        "setHidesOnDeactivate_(False) must be called so the indicator stays "
+        "visible under a background LaunchAgent"
+    )
+
+
+# ---------------------------------------------------------------------------
+# whiz upgrade — one-command update flow
+# ---------------------------------------------------------------------------
+
+
+def test_upgrade_parser_registered():
+    """`whiz upgrade` and alias `whiz up` resolve to cmd_upgrade."""
+    from whiz import cli
+
+    parser = cli.build_parser()
+    args = parser.parse_args(["upgrade"])
+    assert args.func is cli.cmd_upgrade
+    args = parser.parse_args(["up"])
+    assert args.func is cli.cmd_upgrade
+
+
+def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
+    """cmd_upgrade re-runs pipx install, re-injects the extra if present,
+    restarts the service if installed, and re-verifies — the full dance."""
+    from whiz import cli
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd):
+        calls.append(cmd)
+        return 0
+    monkeypatch.setattr(cli, "_run_live", fake_run)
+    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(cli, "_service_plist_exists", lambda: True)
+
+    # Stub the service module so uninstall/install don't touch launchd.
+    from whiz.dictate import service as service_mod
+
+    monkeypatch.setattr(service_mod, "uninstall", lambda: 0)
+    monkeypatch.setattr(service_mod, "install", lambda: 0)
+
+    # Stub setup to return ok.
+    from whiz.dictate import setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+
+    args = mock.Mock()
+    rc = cli.cmd_upgrade(args)
+    assert rc == 0
+    # pipx install --force + pipx inject were both called.
+    assert any("install" in c and "--force" in c for c in calls), calls
+    assert any("inject" in c and "whiz[dictate]" in c for c in calls), calls
+
+
+def test_upgrade_skips_extra_when_not_installed(monkeypatch):
+    """If the dictate extra was never installed, upgrade skips the inject step
+    so a transcription-only user isn't surprised by a 1.6 GB mlx download."""
+    from whiz import cli
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(cli, "_run_live", lambda cmd: calls.append(cmd) or 0)
+    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: False)
+    monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
+    from whiz.dictate import setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+
+    rc = cli.cmd_upgrade(mock.Mock())
+    assert rc == 0
+    # pipx install happened, but NO inject call.
+    assert any("install" in c for c in calls)
+    assert not any("inject" in c for c in calls), calls
+
+
+def test_upgrade_aborts_when_pipx_install_fails(monkeypatch):
+    """If the pipx reinstall fails, upgrade aborts early (rc=1) — no point
+    restarting the service with stale code or re-injecting a broken extra."""
+    from whiz import cli
+
+    monkeypatch.setattr(cli, "_run_live", lambda cmd: mock.Mock(returncode=1))
+    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(cli, "_service_plist_exists", lambda: True)
+
+    rc = cli.cmd_upgrade(mock.Mock())
+    assert rc == 1

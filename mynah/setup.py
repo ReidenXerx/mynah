@@ -67,7 +67,15 @@ def _check_extra() -> CheckResult:
 
 
 def _check_accessibility() -> CheckResult:
-    """Verify macOS Accessibility permission (for CGEvent + global hotkey)."""
+    """Verify macOS Accessibility permission (for CGEvent + global hotkey).
+
+    NOTE: this checks the process running ``whiz dictate setup`` — typically
+    a terminal or Python interpreter. The always-on LaunchAgent is a SEPARATE
+    process and needs its OWN Accessibility grant; this check cannot verify
+    that. The ``service install`` step prints a reminder, and ``service
+    status`` exposes the agent's last-exit code so a missing agent grant is
+    visible (exit 1 with an Accessibility message in the log).
+    """
     try:
         from ApplicationServices import AXIsProcessTrustedWithOptions
         from CoreFoundation import kCFBooleanTrue
@@ -92,7 +100,9 @@ def _check_accessibility() -> CheckResult:
             hint=(
                 "System Settings → Privacy & Security → Accessibility\n"
                 "  Add whiz (or the terminal/Python running it) and enable it,\n"
-                "  then re-run: whiz dictate setup"
+                "  then re-run: whiz dictate setup\n"
+                "  Note: the always-on LaunchAgent is a separate process and\n"
+                "  needs its OWN grant — see `whiz dictate service install`."
             ),
         )
     except ImportError:
@@ -153,10 +163,55 @@ def _check_microphone() -> CheckResult:
         )
 
 
+def _check_hotkey() -> CheckResult:
+    """Validate the configured hotkey parses with pynput.
+
+    A hotkey that pynput's ``HotKey.parse`` rejects (e.g. the historical
+    ``<cmd>+<shift>+<period>`` default — pynput does not treat ``<period>`` as
+    a named key token, the '.' key must be a literal character) makes the
+    engine's hotkey listener fail to start. Under a KeepAlive LaunchAgent that
+    is a silent crash loop with no way to trigger dictation — so catch it here
+    at setup time, before the service is installed, with an actionable hint.
+    """
+    try:
+        from pynput import keyboard
+    except ImportError:
+        # The extra check already reports a missing pynput; don't duplicate.
+        return CheckResult(
+            ok=False,
+            title="Hotkey",
+            detail="pynput not installed — cannot validate",
+            hint="pipx inject whiz 'whiz[dictate]'",
+        )
+    from whiz.config import load as load_config
+
+    cfg = load_config()
+    hotkey = cfg.dictate_hotkey
+    try:
+        keyboard.HotKey.parse(hotkey)
+        return CheckResult(
+            ok=True,
+            title="Hotkey",
+            detail=f"Valid ({hotkey})",
+        )
+    except Exception as e:  # noqa: BLE001
+        return CheckResult(
+            ok=False,
+            title="Hotkey",
+            detail=f"Invalid ({hotkey}): {e}",
+            hint=(
+                "The hotkey must use pynput syntax. Literal keys like '.' are\n"
+                "  written bare, not as '<period>'. Fix it with:\n"
+                "  whiz dictate set hotkey=\"<cmd>+<shift>+.\""
+            ),
+        )
+
+
 _CHECKS = (
     ("extra", _check_extra),
     ("accessibility", _check_accessibility),
     ("microphone", _check_microphone),
+    ("hotkey", _check_hotkey),
 )
 
 

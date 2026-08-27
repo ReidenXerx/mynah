@@ -213,7 +213,7 @@ def _make_engine(
             initial_prompt=eng.DEFAULT_RUSSIAN_PROMPT,
             idle_timeout=45,
             auto_stop_silence=10,
-            hotkey="<cmd>+<shift>+<period>",
+            hotkey="<cmd>+<shift>+.",
             trigger="toggle",
             vad_enabled=True,
             show_indicator=True,
@@ -324,7 +324,7 @@ def test_resolve_settings_defaults():
     assert s.language == "ru"
     assert s.idle_timeout == 45
     assert s.auto_stop_silence == 10
-    assert s.hotkey == "<cmd>+<shift>+<period>"
+    assert s.hotkey == "<cmd>+<shift>+."
     assert s.vad_enabled is True
     assert s.show_indicator is True
 
@@ -1095,13 +1095,47 @@ def test_toggle_listener_uses_global_hot_keys(monkeypatch):
     kb = _install_fake_pynput(monkeypatch, lambda s: [])
     engine = _make_engine(settings=eng.DictateSettings(
         language="ru", initial_prompt="x", idle_timeout=0,
-        auto_stop_silence=0, hotkey="<cmd>+<shift>+<period>", trigger="toggle",
+        auto_stop_silence=0, hotkey="<cmd>+<shift>+.", trigger="toggle",
         vad_enabled=False, show_indicator=False,
     ))
     listener = engine._start_hotkey_listener()
     assert listener is not None
     assert hasattr(listener, "activations")
-    assert "<cmd>+<shift>+<period>" in listener.activations
+    assert "<cmd>+<shift>+." in listener.activations
+
+
+def test_toggle_listener_invalid_hotkey_stops_engine(monkeypatch):
+    """An unparseable hotkey must set _stop_event (fatal), not return None and
+    leave the engine running with no way to trigger it — a listenerless agent
+    under KeepAlive would otherwise silently loop forever."""
+    def _raising_parse(_s):
+        raise ValueError("<period>")
+
+    _install_fake_pynput(monkeypatch, _raising_parse)
+    engine = _make_engine(settings=eng.DictateSettings(
+        language="ru", initial_prompt="x", idle_timeout=0,
+        auto_stop_silence=0, hotkey="<cmd>+<shift>+<period>", trigger="toggle",
+        vad_enabled=False, show_indicator=False,
+    ))
+    listener = engine._start_hotkey_listener()
+    assert listener is None
+    assert engine._stop_event.is_set()
+
+
+def test_ptt_listener_invalid_hotkey_stops_engine(monkeypatch):
+    """Same fatal-stop guarantee for PTT mode."""
+    def _raising_parse(_s):
+        raise ValueError("<period>")
+
+    _install_fake_pynput(monkeypatch, _raising_parse)
+    engine = _make_engine(settings=eng.DictateSettings(
+        language="ru", initial_prompt="x", idle_timeout=0,
+        auto_stop_silence=0, hotkey="<cmd>+<shift>+<period>", trigger="ptt",
+        vad_enabled=False, show_indicator=False,
+    ))
+    listener = engine._start_hotkey_listener()
+    assert listener is None
+    assert engine._stop_event.is_set()
 
 
 def test_auto_stop_ends_session_from_capture_loop(monkeypatch):
@@ -1599,13 +1633,51 @@ def test_setup_check_microphone_fails_on_denial(monkeypatch):
     assert "Microphone" in r.hint
 
 
+def test_setup_check_hotkey_passes_on_valid_default(monkeypatch, tmp_path):
+    """_check_hotkey reports ok when the configured hotkey parses with pynput."""
+    from whiz.dictate import setup as setup_mod
+
+    # Install a fake pynput.keyboard with a parse that accepts the default.
+    fake_kb = types.ModuleType("pynput.keyboard")
+    fake_kb.HotKey = mock.Mock()
+    fake_kb.HotKey.parse = staticmethod(lambda s: ["parsed"])
+    monkeypatch.setitem(sys.modules, "pynput", types.ModuleType("pynput"))
+    monkeypatch.setitem(sys.modules, "pynput.keyboard", fake_kb)
+    # Isolate config so the default hotkey is used.
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    r = setup_mod._check_hotkey()
+    assert r.ok is True
+    assert r.title == "Hotkey"
+    assert "Valid" in r.detail
+
+
+def test_setup_check_hotkey_fails_on_invalid(monkeypatch, tmp_path):
+    """_check_hotkey reports not-ok with a fix hint when parse raises."""
+    from whiz.dictate import setup as setup_mod
+
+    fake_kb = types.ModuleType("pynput.keyboard")
+    fake_kb.HotKey = mock.Mock()
+    def _raising(_s):
+        raise ValueError("<period>")
+    fake_kb.HotKey.parse = staticmethod(_raising)
+    monkeypatch.setitem(sys.modules, "pynput", types.ModuleType("pynput"))
+    monkeypatch.setitem(sys.modules, "pynput.keyboard", fake_kb)
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    r = setup_mod._check_hotkey()
+    assert r.ok is False
+    assert "Invalid" in r.detail
+    assert "whiz dictate set hotkey" in r.hint
+
+
 def test_setup_run_checks_returns_three_results():
     from whiz.dictate import setup as setup_mod
 
     results = setup_mod.run_checks()
-    assert len(results) == 3
+    assert len(results) == 4
     titles = [r.title for r in results]
-    assert titles == ["Dictate extra", "Accessibility", "Microphone"]
+    assert titles == ["Dictate extra", "Accessibility", "Microphone", "Hotkey"]
 
 
 def test_setup_all_pass_points_at_service(monkeypatch, capsys):
@@ -1617,6 +1689,7 @@ def test_setup_all_pass_points_at_service(monkeypatch, capsys):
         setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
     ])
     monkeypatch.setattr(setup_mod, "_service_loaded", lambda: False)
     rc = setup_mod.setup()
@@ -1634,6 +1707,7 @@ def test_setup_all_pass_notes_running_service(monkeypatch, capsys):
         setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
     ])
     monkeypatch.setattr(setup_mod, "_service_loaded", lambda: True)
     rc = setup_mod.setup()
@@ -1650,6 +1724,7 @@ def test_setup_failure_returns_one_and_recheck_hint(monkeypatch, capsys):
         setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
         setup_mod.CheckResult(ok=False, title="Accessibility", detail="no", hint="grant it"),
         setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
     ])
     rc = setup_mod.setup()
     assert rc == 1

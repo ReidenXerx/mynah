@@ -177,7 +177,7 @@ def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
         auto_stop_silence=float(
             overrides.get("auto_stop_silence", config.dictate_auto_stop_silence)
         ),
-        hotkey=(overrides.get("hotkey") or config.dictate_hotkey or "<cmd>+<shift>+d"),
+        hotkey=(overrides.get("hotkey") or config.dictate_hotkey or "<cmd>+<shift>+."),
         trigger=(overrides.get("trigger") or config.dictate_trigger or "toggle").strip().lower(),
         vad_enabled=bool(overrides.get("vad", config.dictate_vad)),
         show_indicator=bool(overrides.get("show_indicator", config.dictate_show_indicator)),
@@ -714,6 +714,17 @@ class DictationEngine:
             keyboard.HotKey.parse(self.s.hotkey)  # validate early
         except Exception as e:  # noqa: BLE001
             print(f"Invalid hotkey '{self.s.hotkey}': {e}", file=sys.stderr)
+            print(
+                "The hotkey listener could not start, so dictation cannot be "
+                "triggered. Fix the hotkey (e.g. whiz dictate set hotkey=\"<cmd>+<shift>+.\")\n"
+                "then restart whiz dictate.",
+                file=sys.stderr,
+            )
+            # Stop the engine instead of running with no way to trigger it —
+            # a listenerless agent would look alive but never respond, which
+            # is worse than a visible crash (especially under a KeepAlive
+            # LaunchAgent that would otherwise silently loop forever).
+            self._stop_event.set()
             return None
 
         def on_activate():
@@ -740,10 +751,18 @@ class DictationEngine:
             parsed = keyboard.HotKey.parse(self.s.hotkey)
         except Exception as e:  # noqa: BLE001
             print(f"Invalid hotkey '{self.s.hotkey}': {e}", file=sys.stderr)
+            print(
+                "The hotkey listener could not start, so dictation cannot be "
+                "triggered. Fix the hotkey (e.g. whiz dictate set hotkey=\"<cmd>+<shift>+.\")\n"
+                "then restart whiz dictate.",
+                file=sys.stderr,
+            )
+            self._stop_event.set()
             return None
 
         if not parsed:
             print(f"Invalid hotkey '{self.s.hotkey}': empty combo", file=sys.stderr)
+            self._stop_event.set()
             return None
 
         target_key = parsed[-1]

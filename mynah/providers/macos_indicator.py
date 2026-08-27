@@ -5,8 +5,8 @@ an ``NSVisualEffectView`` (HUD-window vibrancy material) so the overlay
 blurs the content behind it — the native macOS HUD look — instead of an
 opaque dark box. Inside the pill:
 
-- an SF Symbols ``mic.fill`` template glyph, tinted by state (cyan listening
-  / amber transcribing / gray idle)
+- the whiz waveform-W logo (a custom-drawn monogram), tinted by state
+  (cyan listening / amber transcribing / gray idle)
 - 5 live waveform bars whose heights track the mic amplitude
 
 The indicator runs on the main thread inside the AppKit event loop
@@ -15,7 +15,7 @@ from the audio thread via ``update_level()``, which is thread-safe through
 AppKit's main-thread dispatch. Show/hide animate via an opacity fade
 (``alphaValue``) so the pill eases in/out rather than popping.
 
-States change the glyph tint:
+States change the logo tint:
 - "listening"    → cyan
 - "transcribing" → amber
 - "idle"         → dimmed gray
@@ -244,27 +244,18 @@ class WhizIndicatorView:
             bg_path.setLineWidth_(0.5)
             bg_path.stroke()
 
-            # 3. SF Symbols mic glyph on the left, tinted by state.
+            # 3. whiz waveform-W logo on the left, tinted by state.
+            from whiz.dictate.providers.macos_logo import draw_whiz_logo
+
             glyph_size = 20
             glyph_x = 14
             glyph_y = (h - glyph_size) / 2
-            glyph = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
-                "mic.fill", "whiz dictation"
+            tint = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color)
+            draw_whiz_logo(
+                AppKit,
+                NSRect((glyph_x, glyph_y), (glyph_size, glyph_size)),
+                tint,
             )
-            if glyph is not None:
-                glyph.setTemplate_(True)
-                tint = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color)
-                config = AppKit.NSImageSymbolConfiguration.configurationWithScale_(
-                    AppKit.NSImageSymbolScaleMedium
-                )
-                sized = glyph.imageWithSymbolConfiguration_(config) or glyph
-                tinted = _tint_template(sized, tint, glyph_size)
-                tinted.drawInRect_(
-                    NSRect((glyph_x, glyph_y), (glyph_size, glyph_size)),
-                    NSRect((0, 0), (tinted.size().width, tinted.size().height)),
-                    AppKit.NSCompositeSourceOver,
-                    1.0,
-                )
 
             # 4. Waveform bars to the right of the glyph, heights tracking level.
             bars_x = glyph_x + glyph_size + 12
@@ -312,33 +303,6 @@ class WhizIndicatorView:
             self._vfx_view = vfx
         except Exception:  # noqa: BLE001
             logger.debug("vibrancy view setup failed", exc_info=True)
-
-
-def _tint_template(image: Any, color: Any, target_size: float) -> Any:
-    """Return ``image`` scaled to ``target_size``² and tinted solidly in ``color``."""
-    try:
-        import AppKit
-        from Foundation import NSSize, NSRect
-
-        sized = AppKit.NSImage.alloc().initWithSize_(NSSize(target_size, target_size))
-        sized.lockFocus()
-        try:
-            image.drawInRect_fromRect_operation_fraction_(
-                NSRect((0, 0), (target_size, target_size)),
-                NSRect((0, 0), (image.size().width, image.size().height)),
-                AppKit.NSCompositeSourceOver,
-                1.0,
-            )
-            color.set()
-            AppKit.NSRectFillUsingOperation(
-                NSRect((0, 0), (target_size, target_size)),
-                AppKit.NSCompositeSourceAtop,
-            )
-        finally:
-            sized.unlockFocus()
-        return sized
-    except Exception:  # noqa: BLE001
-        return image
 
 
 # ---------- ObjC runtime glue ----------

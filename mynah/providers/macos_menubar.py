@@ -1,8 +1,8 @@
 """MacMenuBar — a menu bar status item for dictation control (macOS).
 
-An ``NSStatusItem`` in the system menu bar with a template SF Symbols ``mic``
-icon whose tint reflects the current state (gray idle / cyan listening /
-amber transcribing). A click opens an ``NSMenu`` with:
+An ``NSStatusItem`` in the system menu bar with a custom-drawn whiz
+waveform-W logo whose tint reflects the current state (gray idle / cyan
+listening / amber transcribing). A click opens an ``NSMenu`` with:
 
 - **Start Dictation / Stop Dictation** — toggles the session (same path as the
   hotkey) via ``engine.toggle_session()``.
@@ -32,17 +32,17 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 logger = logging.getLogger(__name__)
 
-# State → SF Symbols icon name + tint color (RGBA floats 0–1).
-_STATE_ICON = {
-    "idle": "mic",
-    "listening": "mic.fill",
-    "transcribing": "waveform",
-}
+# State → tint color (RGBA floats 0–1). The logo is monochrome and
+# stroked in this color per state (gray idle / cyan listening / amber
+# transcribing).
 _STATE_COLOR = {
     "idle": (0.6, 0.6, 0.65, 1.0),       # gray
     "listening": (0.2, 0.8, 0.95, 1.0),  # cyan
     "transcribing": (0.95, 0.7, 0.2, 1.0),  # amber
 }
+# Menu bar status item icon size (points). Menu bar items render at ~16-18px;
+# 18 gives the W enough room for its round-cap strokes to read clearly.
+_MENU_ICON_SIZE = 18.0
 
 
 class MacMenuBar:
@@ -171,21 +171,26 @@ class MacMenuBar:
     # ---------- state application (main thread) ----------
 
     def _apply_icon(self, state: str) -> None:
-        """Set the template SF Symbols mic icon + tint for ``state``."""
-        import AppKit
+        """Set the whiz waveform-W logo tinted for ``state``.
 
-        name = _STATE_ICON.get(state, "mic")
-        image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
-            name, "whiz dictation"
-        )
-        if image is None:
-            # Fallback: a tiny default AppKit image so the slot isn't empty.
-            image = AppKit.NSImage.alloc().init()
-        image.setTemplate_(False)  # we tint ourselves for color states
-        color = _STATE_COLOR.get(state, _STATE_COLOR["idle"])
-        tint = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color)
-        tinted = _tint_image(image, tint)
-        self._button.setImage_(tinted)
+        Renders the custom W monogram (not SF Symbols) as a monochrome
+        NSImage and sets it on the menu bar button. Our state colors
+        (cyan/amber) carry meaning, so we render them in directly and keep
+        ``template`` off; the W is always the brand mark, just colored by
+        activity state.
+        """
+        try:
+            import AppKit
+
+            from whiz.dictate.providers.macos_logo import whiz_logo_image
+
+            color_rgba = _STATE_COLOR.get(state, _STATE_COLOR["idle"])
+            color = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color_rgba)
+            img = whiz_logo_image(_MENU_ICON_SIZE, color)
+            if img is not None:
+                self._button.setImage_(img)
+        except Exception:  # noqa: BLE001
+            logger.debug("menu bar icon apply failed", exc_info=True)
 
     def _update_labels(self) -> None:
         """Sync the toggle + state-line labels with the current state."""
@@ -297,34 +302,6 @@ class MacMenuBar:
         threading.Thread(
             target=self._engine.stop, daemon=True
         ).start()
-
-
-def _tint_image(image: Any, color: Any) -> Any:
-    """Return a copy of ``image`` drawn solidly in ``color`` (template-style)."""
-    try:
-        import AppKit
-        from Foundation import NSSize
-
-        size = image.size()
-        tinted = AppKit.NSImage.alloc().initWithSize_(size)
-        tinted.lockFocus()
-        try:
-            image.drawInRect_fromRect_operation_fraction_(
-                AppKit.NSRect((0, 0), (size.width, size.height)),
-                AppKit.NSZeroRect,
-                AppKit.NSCompositeSourceOver,
-                1.0,
-            )
-            color.set()
-            AppKit.NSRectFillUsingOperation(
-                AppKit.NSRect((0, 0), (size.width, size.height)),
-                AppKit.NSCompositeSourceAtop,
-            )
-        finally:
-            tinted.unlockFocus()
-        return tinted
-    except Exception:  # noqa: BLE001
-        return image
 
 
 # ---------- ObjC runtime glue ----------

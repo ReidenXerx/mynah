@@ -30,14 +30,15 @@ LABEL = "com.reidenxerx.whiz.dictate"
 
 _LAUNCH_AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
 _LOG_PATH = Path.home() / "Library" / "Logs" / "whiz-dictate.log"
-# A renamed copy of the venv Python binary, placed in the venv ``bin`` dir so
-# it finds ``pyvenv.cfg`` and the venv ``site-packages``. The kernel process
-# name (``p_comm``) is set from the binary basename at ``execve``, so a binary
-# named ``whiz-runner`` shows as "whiz-runner" in Activity Monitor / Force
-# Quit — not "Python". Recreated on every ``service.install()`` (which runs
-# after ``pipx install --force`` during ``whiz upgrade``), so it survives
-# venv rebuilds.
-_RUNNER_NAME = "whiz-runner"
+# A renamed copy of the framework Python binary, placed at a stable path
+# outside the pipx venv so it survives ``pipx install --force`` during
+# ``whiz upgrade``. The kernel process name (``p_comm``) is set from the
+# binary basename at ``execve``, so a binary named ``whiz`` shows as
+# "whiz" in Activity Monitor / Force Quit — not "Python". Because the path
+# is stable, the Accessibility/TCC permission granted to it persists
+# across upgrades (the pipx venv rebuild doesn't touch it).
+_RUNNER_DIR = Path.home() / ".local" / "share" / "whiz"
+_RUNNER_NAME = "whiz"
 
 
 def plist_path() -> Path:
@@ -66,8 +67,50 @@ def _venv_bin_dir() -> Path | None:
     return None
 
 
+def _framework_python_binary() -> Path | None:
+    """Return the real framework Python binary (the one inside Python.app).
+
+    The venv ``bin/python`` is a symlink to ``bin/python3.x``, which is a
+    *stub* that re-execs from ``Python.app/Contents/MacOS/Python``. A copy
+    of the stub inherits that behaviour, so the kernel process name still
+    resolves to "Python". We must copy the actual ``Python.app`` binary
+    instead — a copy of that, named ``whiz``, reports ``comm=whiz``.
+    """
+    venv_bin = _venv_bin_dir()
+    if venv_bin is None:
+        return None
+    venv_python = venv_bin / "python"
+    if not venv_python.exists():
+        return None
+    real = venv_python.resolve()
+    # The symlink resolves to .../bin/python3.x (the stub). The real binary
+    # is the sibling Python.app bundle's MacOS/Python.
+    fw_root = real.parent.parent  # .../Python.framework/Versions/3.x
+    app_python = fw_root / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
+    if app_python.exists():
+        return app_python
+    # Fallback: some builds don't ship Python.app — use the resolved binary.
+    return real if real.exists() else None
+
+
+def _venv_site_packages() -> str | None:
+    """Return the venv's ``site-packages`` path for PYTHONPATH."""
+    venv_bin = _venv_bin_dir()
+    if venv_bin is None:
+        return None
+    # Derive without importing sysconfig from the venv: the layout is
+    # <venv>/lib/python3.x/site-packages. Scan for it so we don't hardcode
+    # the minor version.
+    lib = venv_bin.parent / "lib"
+    for pydir in sorted(lib.iterdir(), reverse=True):
+        sp = pydir / "site-packages"
+        if sp.is_dir():
+            return str(sp)
+    return None
+
+
 def _ensure_runner() -> str | None:
-    """Create a renamed copy of the venv Python binary named ``whiz-runner``.
+    """Create a renamed copy of the framework Python binary named ``whiz``.
 
     Activity Monitor and Force Quit display the *kernel process name*
     (``proc_name``/``p_comm``), set at ``execve`` from the actual binary's
@@ -77,74 +120,83 @@ def _ensure_runner() -> str | None:
     ``.../Python.app/Contents/MacOS/Python`` and the system UI shows
     "Python".
 
-    A *copy* of the framework Python binary named ``whiz-runner`` placed in
-    the venv ``bin`` dir is still recognised as a venv interpreter (it finds
-    ``pyvenv.cfg`` in its parent), finds the venv ``site-packages``, and
-    reports ``comm=whiz-runner`` — so Activity Monitor shows "whiz-runner".
+    A *copy* of the framework ``Python.app`` binary named ``whiz`` placed
+    at a stable path (``~/.local/share/whiz/whiz``) reports ``comm=whiz`` —
+    so Activity Monitor shows "whiz". Since it's outside the venv, the
+    venv's ``site-packages`` is injected via ``PYTHONPATH`` in the plist.
+    The stable path means the Accessibility/TCC permission granted to it
+    persists across ``pipx install --force`` during ``whiz upgrade``.
 
-    Returns the absolute path to the runner binary, or None if it can't be
-    built (the caller falls back to the plain ``whiz`` script).
+    Returns the absolute path to the runner binary, or None if it can't
+    be built (the caller falls back to the plain ``whiz`` script).
     """
-    venv_bin = _venv_bin_dir()
-    if venv_bin is None:
+    src = _framework_python_binary()
+    if src is None:
         return None
 
-    venv_python = venv_bin / "python"
-    if not venv_python.exists():
-        return None
-    # ``venv_python`` is a symlink to the framework Python binary.
-    real_python = venv_python.resolve()
-    if not real_python.exists():
+    site = _venv_site_packages()
+    if site is None:
         return None
 
-    runner = venv_bin / _RUNNER_NAME
+    _RUNNER_DIR.mkdir(parents=True, exist_ok=True)
+    runner = _RUNNER_DIR / _RUNNER_NAME
 
-    # Only copy if missing or the source changed (avoid rewriting on every call).
+    # Only copy if missing or the source changed (avoid rewriting on every
+    # call — rewriting would invalidate the TCC Accessibility grant).
     need_copy = (
         not runner.exists()
-        or runner.stat().st_size != real_python.stat().st_size
-        or runner.stat().st_mtime < real_python.stat().st_mtime
+        or runner.stat().st_size != src.stat().st_size
+        or runner.stat().st_mtime < src.stat().st_mtime
     )
     if need_copy:
         try:
-            shutil.copy2(real_python, runner)
+            shutil.copy2(src, runner)
             os.chmod(runner, 0o755)
         except OSError:
             return None
 
-    # Sanity check: the runner must start and find the venv. If it can't
-    # import whiz, don't use it — fall back to the plain whiz script.
+    # Sanity check: the runner must start and find whiz via PYTHONPATH. If
+    # it can't import whiz, don't use it — fall back to the plain script.
+    env = os.environ.copy()
+    env["PYTHONPATH"] = site
     probe = subprocess.run(
         [str(runner), "-c", "import whiz"],
         capture_output=True, text=True, check=False, timeout=15,
+        env=env,
     )
     if probe.returncode != 0:
         return None
     return str(runner)
 
 
-def _resolve_whiz_bin() -> list[str]:
-    """Resolve the command to launch ``whiz dictate``.
+def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
+    """Resolve the command (and env vars) to launch ``whiz dictate``.
 
-    Prefer a renamed Python runner binary (``whiz-runner``) so the process
-    shows as ``whiz-runner`` (not ``Python``) in Activity Monitor / Force
-    Quit. Fall back to the ``whiz`` console script on PATH (what pipx
-    installs into ``~/.local/bin``); fall back further to ``python -m whiz``
-    using the current interpreter so the agent still works when whiz is
-    installed editable or run from a venv without the console script.
+    Prefer a renamed Python runner binary (``whiz``) so the process shows
+    as ``whiz`` (not ``Python``) in Activity Monitor / Force Quit. The
+    runner needs ``PYTHONPATH`` pointed at the venv's ``site-packages``.
+    Fall back to the ``whiz`` console script on PATH (what pipx installs
+    into ``~/.local/bin``); fall back further to ``python -m whiz`` using
+    the current interpreter so the agent still works when whiz is installed
+    editable or run from a venv without the console script.
+
+    Returns ``(argv, env_vars)`` where ``env_vars`` is a dict to emit as
+    the plist's ``EnvironmentVariables`` key (empty dict when no override
+    is needed).
     """
     runner = _ensure_runner()
     if runner:
-        return [runner, "-m", "whiz"]
+        site = _venv_site_packages() or ""
+        return [runner, "-m", "whiz"], {"PYTHONPATH": site}
     which = shutil.which("whiz")
     if which:
-        return [which]
-    return [sys.executable, "-m", "whiz"]
+        return [which], {}
+    return [sys.executable, "-m", "whiz"], {}
 
 
 def build_plist() -> str:
     """Build the LaunchAgent plist XML (string)."""
-    argv = _resolve_whiz_bin()
+    argv, env_vars = _resolve_whiz_bin()
     # Ensure the dictation command is explicit (not just bare `whiz`).
     if argv[-1] != "dictate" and "dictate" not in argv:
         argv = argv + ["dictate"]
@@ -153,6 +205,18 @@ def build_plist() -> str:
         f"    <string>{escape(a)}</string>" for a in argv
     )
     log = str(_LOG_PATH)
+    env_xml = ""
+    if env_vars:
+        env_items = "\n".join(
+            f"      <key>{escape(k)}</key>\n      <string>{escape(v)}</string>"
+            for k, v in env_vars.items()
+        )
+        env_xml = (
+            f"  <key>EnvironmentVariables</key>\n"
+            f"  <dict>\n"
+            f"{env_items}\n"
+            f"  </dict>\n"
+        )
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
@@ -165,6 +229,7 @@ def build_plist() -> str:
         f"  <array>\n"
         f"{args_xml}\n"
         f"  </array>\n"
+        f"{env_xml}"
         f"  <key>RunAtLoad</key>\n"
         f"  <true/>\n"
         f"  <key>KeepAlive</key>\n"

@@ -1383,15 +1383,19 @@ def test_service_build_plist_contains_required_keys(monkeypatch):
 
 def test_service_build_plist_uses_runner_when_available(monkeypatch):
     """When _ensure_runner returns a path, the plist launches via the runner
-    binary so Activity Monitor shows 'whiz-runner' instead of 'Python'."""
+    binary so Activity Monitor shows 'whiz' instead of 'Python'."""
     from whiz.dictate import service
 
-    monkeypatch.setattr(service, "_ensure_runner", lambda: "/venv/bin/whiz-runner")
+    monkeypatch.setattr(service, "_ensure_runner", lambda: "/stable/whiz")
+    monkeypatch.setattr(service, "_venv_site_packages", lambda: "/venv/site-packages")
     xml = service.build_plist()
-    assert "/venv/bin/whiz-runner" in xml
+    assert "/stable/whiz" in xml
     assert "-m" in xml
     assert "whiz" in xml
     assert "dictate" in xml
+    assert "EnvironmentVariables" in xml
+    assert "PYTHONPATH" in xml
+    assert "/venv/site-packages" in xml
 
 
 def test_service_build_plist_falls_back_to_python_m(monkeypatch):

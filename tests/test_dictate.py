@@ -1364,7 +1364,9 @@ def test_dictate_set_idle_badge_alias(tmp_path, monkeypatch):
 def test_service_build_plist_contains_required_keys(monkeypatch):
     from whiz.dictate import service
 
-    # Force a deterministic whiz binary resolution.
+    # Force a deterministic whiz binary resolution. Disable the runner binary
+    # path so this test exercises the console-script fallback.
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
     xml = service.build_plist()
     assert service.LABEL in xml
@@ -1379,9 +1381,23 @@ def test_service_build_plist_contains_required_keys(monkeypatch):
     assert "whiz-dictate.log" in xml
 
 
+def test_service_build_plist_uses_runner_when_available(monkeypatch):
+    """When _ensure_runner returns a path, the plist launches via the runner
+    binary so Activity Monitor shows 'whiz-runner' instead of 'Python'."""
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service, "_ensure_runner", lambda: "/venv/bin/whiz-runner")
+    xml = service.build_plist()
+    assert "/venv/bin/whiz-runner" in xml
+    assert "-m" in xml
+    assert "whiz" in xml
+    assert "dictate" in xml
+
+
 def test_service_build_plist_falls_back_to_python_m(monkeypatch):
     from whiz.dictate import service
 
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: None)
     xml = service.build_plist()
     assert "-m" in xml
@@ -1396,6 +1412,7 @@ def test_service_install_writes_plist_and_loads(monkeypatch, tmp_path):
     log = tmp_path / "whiz-dictate.log"
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
     monkeypatch.setattr(service, "_LOG_PATH", log)
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
 
     calls = []
@@ -1424,6 +1441,7 @@ def test_service_unload_on_reinstall(monkeypatch, tmp_path):
     plist.write_text("<old/>")
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
     monkeypatch.setattr(service, "_LOG_PATH", log)
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
 
     calls = []

@@ -1009,6 +1009,10 @@ def run_dictate(config: Config, **overrides: object) -> int:
         stt._model_ref = settings.model  # noqa: SLF001
 
     engine = DictationEngine(settings, stt, injector, indicator)
+    logger.debug(
+        "run_dictate: indicator=%s show_indicator=%s idle_visible=%s menu_bar=%s",
+        type(indicator).__name__, settings.show_indicator, settings.idle_visible, settings.menu_bar,
+    )
     model_name = getattr(stt, "_model_ref", "?")
     trigger_label = "push-to-talk" if settings.trigger == "ptt" else "toggle"
     print(

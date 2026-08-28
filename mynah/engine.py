@@ -291,11 +291,12 @@ class DictationEngine:
         """Update the indicator state and notify registered listeners.
 
         Centralizes the ~7 direct ``self.indicator.set_state(...)`` call sites
-        so a single place fans the state out to the indicator AND any
+        so a single place fans the state down to the indicator AND any
         listeners (menu bar, future HUD surfaces). Behavior is identical to
         the direct call when there are no listeners.
         """
         self._indicator_state = state
+        logger.debug("_set_state(%s) indicator=%s", state, type(self.indicator).__name__)
         self.indicator.set_state(state)
         for fn in self._state_listeners:
             try:

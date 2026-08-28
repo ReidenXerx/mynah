@@ -71,7 +71,12 @@ class MacIndicator(DictationIndicator):
         this once on the main thread (inside ``_run_with_appkit``) so the
         panel exists before any ``show()``.
         """
+        logger.debug("MacIndicator.setup() called")
         self._ensure_panel()
+        logger.debug(
+            "MacIndicator.setup() done: panel=%s view=%s",
+            self._panel is not None, self._view is not None,
+        )
 
     def show(self) -> None:
         """Display the overlay with an opacity fade (main-thread-safe).

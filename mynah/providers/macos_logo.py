@@ -46,21 +46,25 @@ def draw_whiz_logo(appkit: Any, rect: Any, color: Any) -> None:
     try:
         from Foundation import NSPoint
 
-        origin = rect.origin
-        size = min(rect.size.width, rect.size.height)
+        # NSRect in pyobjc is a struct whose subfields are tuples, not
+        # objects with .x/.y/.width/.height — rect.origin returns (x, y)
+        # and rect.size returns (w, h). Index them directly.
+        ox, oy = rect.origin
+        rw, rh = rect.size
+        size = min(rw, rh)
         stroke = size * _W_STROKE
 
         path = appkit.NSBezierPath.alloc().init()
         for i, (px, py) in enumerate(_W_POINTS):
-            pt = NSPoint(origin.x + px * size, origin.y + py * size)
+            pt = NSPoint(ox + px * size, oy + py * size)
             if i == 0:
                 path.moveToPoint_(pt)
             else:
-                path.lineTo_(pt)
+                path.lineToPoint_(pt)
 
         path.setLineWidth_(stroke)
-        path.setLineCapStyle_(appkit.NSCapStyleRound)
-        path.setLineJoinStyle_(appkit.NSJoinStyleRound)
+        path.setLineCapStyle_(appkit.NSLineCapStyleRound)
+        path.setLineJoinStyle_(appkit.NSLineJoinStyleRound)
         color.set()
         path.stroke()
     except Exception:  # noqa: BLE001

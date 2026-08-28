@@ -1642,9 +1642,9 @@ def test_setup_check_extra_fails_when_missing(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: False)
     r = setup_mod._check_extra()
     assert r.ok is False
-    assert "pynput" in r.detail
     assert "pipx inject" in r.hint
 
 
@@ -1765,10 +1765,11 @@ def test_setup_run_checks_returns_three_results():
 
 
 def test_setup_all_pass_points_at_service(monkeypatch, capsys):
-    """When all checks pass and the service isn't loaded, setup points the
-    user at `whiz dictate service install` (doesn't auto-install)."""
+    """When all checks pass and the service isn't loaded, setup auto-installs
+    the login service (the one-command onboarding flow)."""
     from whiz.dictate import setup as setup_mod
 
+    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
         setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
@@ -1776,17 +1777,21 @@ def test_setup_all_pass_points_at_service(monkeypatch, capsys):
         setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
     ])
     monkeypatch.setattr(setup_mod, "_service_loaded", lambda: False)
+    # Mock service.install so it doesn't actually write a plist.
+    from whiz.dictate import service
+    monkeypatch.setattr(service, "install", lambda: 0)
     rc = setup_mod.setup()
     assert rc == 0
     out = capsys.readouterr()
     assert "All checks passed" in out.err
-    assert "whiz dictate service install" in out.err
+    assert "Service installed" in out.err
 
 
 def test_setup_all_pass_notes_running_service(monkeypatch, capsys):
     """When all checks pass and the service is already loaded, note that."""
     from whiz.dictate import setup as setup_mod
 
+    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
         setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
@@ -1800,10 +1805,30 @@ def test_setup_all_pass_notes_running_service(monkeypatch, capsys):
     assert "already installed and running" in out.err
 
 
+def test_setup_no_service_flag_skips_install(monkeypatch, capsys):
+    """install_service=False skips the service install and points at it."""
+    from whiz.dictate import setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(setup_mod, "run_checks", lambda: [
+        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
+    ])
+    monkeypatch.setattr(setup_mod, "_service_loaded", lambda: False)
+    rc = setup_mod.setup(install_service=False)
+    assert rc == 0
+    out = capsys.readouterr()
+    assert "All checks passed" in out.err
+    assert "whiz dictate service install" in out.err
+
+
 def test_setup_failure_returns_one_and_recheck_hint(monkeypatch, capsys):
     """A failing check returns rc=1 and tells the user to re-run setup."""
     from whiz.dictate import setup as setup_mod
 
+    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
         setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
         setup_mod.CheckResult(ok=False, title="Accessibility", detail="no", hint="grant it"),
@@ -1831,6 +1856,15 @@ def test_dictate_parser_doctor_alias():
     parser = cli.build_parser()
     args = parser.parse_args(["dictate", "doctor"])
     assert args.func is cli.cmd_dictate_setup
+
+
+def test_dictate_parser_setup_no_service_alias():
+    from whiz import cli
+
+    parser = cli.build_parser()
+    args = parser.parse_args(["dictate", "setup-no-service"])
+    assert args.func is cli.cmd_dictate_setup
+    assert getattr(args, "no_service", False) is True
 
 
 # ---------------------------------------------------------------------------

@@ -1,26 +1,26 @@
 """Guided first-time setup / doctor for ``whiz dictate``.
 
-``whiz dictate setup`` walks a fresh pipx user through every prerequisite
-in one command and prints a clear ✓/✗ report with next-step hints, so
-onboarding isn't a scavenger hunt across the README:
+``whiz dictate setup`` is a one-command onboarding flow that gets a fresh
+pipx user from ``pipx install`` to a running always-on dictation agent:
 
-1. The ``dictate`` extra installed (sounddevice, pynput, webrtcvad, pyobjc).
-2. macOS Accessibility permission (for the global hotkey + text injection).
-3. macOS Microphone permission (for audio capture) — probed by briefly
-   opening a sounddevice input stream, the same path that triggers the OS
-   permission prompt.
-4. The login LaunchAgent — offered at the end once the above pass, so the
-   user can install the always-on service without remembering a second
-   command.
+1. Auto-inject the ``dictate`` extra (``pipx inject whiz 'whiz[dictate]'``)
+   if the heavy deps are missing — no separate manual step.
+2. Request macOS Accessibility permission (opens System Settings) and
+   poll until granted — no crash loop.
+3. Request macOS Microphone permission (triggers the OS prompt by briefly
+   opening a sounddevice input stream).
+4. Validate the configured hotkey parses.
+5. Auto-install the login LaunchAgent so dictation starts at login and
+   the hotkey is always armed — no second command.
 
-Each check returns a ``CheckResult`` (ok, title, detail, hint). The flow is
-non-fatal: a ✗ prints the hint and continues to the next check rather than
-aborting, so the user sees the full picture in one run. After granting a
-permission, re-run ``whiz dictate setup`` to re-check.
+Each check returns a ``CheckResult`` (ok, title, detail, hint). The flow
+re-runs checks after auto-fixing the extra so the post-install state is
+verified, not assumed.
 """
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from dataclasses import dataclass
 
@@ -35,46 +35,51 @@ class CheckResult:
     hint: str = ""
 
 
-def _check_extra() -> CheckResult:
-    """Verify the 'dictate' extra's importable deps are installed."""
-    missing: list[str] = []
+def _dictate_extra_installed() -> bool:
+    """True if the 'dictate' extra's heavy deps are importable."""
     for mod in ("sounddevice", "pynput", "webrtcvad"):
         try:
             __import__(mod)
         except ImportError:
-            missing.append(mod)
-    # pyobjc is imported by submodule; check the ones the injector/indicator use.
+            return False
     for mod in ("AppKit", "Quartz", "ApplicationServices"):
         try:
             __import__(mod)
         except ImportError:
-            missing.append(mod)
-    if missing:
+            return False
+    return True
+
+
+def _inject_extra() -> int:
+    """Run ``pipx inject whiz 'whiz[dictate]'``, streaming output live.
+
+    Returns the pipx exit code (0 = success).
+    """
+    return subprocess.run(
+        ["pipx", "inject", "whiz", "whiz[dictate]"], check=False
+    ).returncode
+
+
+def _check_extra() -> CheckResult:
+    """Verify the 'dictate' extra's importable deps are installed."""
+    if _dictate_extra_installed():
         return CheckResult(
-            ok=False,
+            ok=True,
             title="Dictate extra",
-            detail=f"Missing: {', '.join(missing)}",
-            hint=(
-                "Install the extra into whiz's environment:\n"
-                "  pipx inject whiz 'whiz[dictate]'"
-            ),
+            detail="sounddevice, pynput, webrtcvad, pyobjc all importable",
         )
     return CheckResult(
-        ok=True,
+        ok=False,
         title="Dictate extra",
-        detail="sounddevice, pynput, webrtcvad, pyobjc all importable",
+        detail="Missing deps — will auto-install now",
+        hint="pipx inject whiz 'whiz[dictate]'",
     )
 
 
 def _check_accessibility() -> CheckResult:
     """Verify macOS Accessibility permission (for CGEvent + global hotkey).
 
-    NOTE: this checks the process running ``whiz dictate setup`` — typically
-    a terminal or Python interpreter. The always-on LaunchAgent is a SEPARATE
-    process and needs its OWN Accessibility grant; this check cannot verify
-    that. The ``service install`` step prints a reminder, and ``service
-    status`` exposes the agent's last-exit code so a missing agent grant is
-    visible (exit 1 with an Accessibility message in the log).
+    Requests the prompt (opens System Settings) if not yet granted.
     """
     try:
         from ApplicationServices import AXIsProcessTrustedWithOptions
@@ -96,11 +101,10 @@ def _check_accessibility() -> CheckResult:
         return CheckResult(
             ok=False,
             title="Accessibility",
-            detail="Not granted yet",
+            detail="Not granted yet — System Settings should be open",
             hint=(
                 "System Settings → Privacy & Security → Accessibility\n"
-                "  Add whiz (or the terminal/Python running it) and enable it,\n"
-                "  then re-run: whiz dictate setup\n"
+                "  Add whiz and enable it, then re-run: whiz dictate setup\n"
                 "  Note: the always-on LaunchAgent is a separate process and\n"
                 "  needs its OWN grant — see `whiz dictate service install`."
             ),
@@ -224,12 +228,39 @@ def _mark(ok: bool) -> str:
     return "✓" if ok else "✗"
 
 
-def setup() -> int:
-    """Run the guided setup: checks → report → optional service install.
+def setup(install_service: bool = True) -> int:
+    """One-command onboarding: inject extra → check perms → install service.
+
+    Auto-injects the ``dictate`` extra if missing, checks Accessibility +
+    Microphone permissions, validates the hotkey, and installs the always-on
+    login LaunchAgent when everything passes.
+
+    Args:
+        install_service: When True (default), auto-install the LaunchAgent
+            after all checks pass. Set False to just run checks without
+            installing the service (the ``--no-service`` flag).
 
     Returns 0 if all checks pass, 1 otherwise.
     """
     print("whiz dictate — first-time setup\n", file=sys.stderr)
+
+    # Step 0: auto-inject the dictate extra if missing. This downloads
+    # mlx-whisper + deps (~1.6 GB), so stream pipx's output live. After
+    # injecting, the checks import lazily so they'll pick up the fresh install.
+    if not _dictate_extra_installed():
+        print("  ⚙ Installing the dictate extra (mlx-whisper + deps)…", file=sys.stderr)
+        print("    This downloads ~1.6 GB — give it a minute.\n", file=sys.stderr)
+        rc = _inject_extra()
+        if rc != 0:
+            print(
+                f"  ✗ Failed to install the dictate extra (pipx exit {rc}).\n"
+                "    Run manually: pipx inject whiz 'whiz[dictate]'",
+                file=sys.stderr,
+            )
+            return 1
+        print("  ✓ Dictate extra installed.\n", file=sys.stderr)
+
+    # Run all checks (extra, accessibility, microphone, hotkey).
     results = run_checks()
     all_ok = True
     for r in results:
@@ -250,11 +281,19 @@ def setup() -> int:
 
     print("All checks passed — dictation is ready to run.\n", file=sys.stderr)
 
-    # Offer the always-on login service once prerequisites are met.
+    # Auto-install the always-on login service unless the user opted out.
+    if not install_service:
+        print(
+            "To install the always-on login service (dictation starts at\n"
+            "login, hotkey always armed):\n"
+            "  whiz dictate service install",
+            file=sys.stderr,
+        )
+        return 0
+
     from whiz.dictate import service
 
-    loaded = _service_loaded()
-    if loaded:
+    if _service_loaded():
         print(
             "The always-on login service is already installed and running.\n"
             "  Manage it with: whiz dictate service status | uninstall",
@@ -262,15 +301,18 @@ def setup() -> int:
         )
         return 0
 
+    print("  ⚙ Installing the always-on login service…", file=sys.stderr)
+    rc = service.install()
+    if rc != 0:
+        print("  ✗ Service install failed — see the message above.", file=sys.stderr)
+        return 1
+    print("  ✓ Service installed. Dictation starts at login.\n", file=sys.stderr)
     print(
-        "Optional: install the always-on login service so dictation starts\n"
-        "at login and the hotkey is always armed (no terminal needed)?\n"
-        "  → whiz dictate service install",
+        "Setup complete! Press Cmd+Shift+. to start dictation.\n"
+        "The process shows as 'whiz' in Activity Monitor. If Accessibility\n"
+        "wasn't granted yet, the service will prompt automatically and wait.",
         file=sys.stderr,
     )
-    # Don't auto-install — the user may just want to run `whiz dictate` in a
-    # terminal. Point them at the one command instead of deciding for them.
-    _ = service  # imported for symmetry; install is invoked by the user.
     return 0
 
 

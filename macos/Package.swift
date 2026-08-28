@@ -25,9 +25,41 @@ let package = Package(
     // see SessionController.
     platforms: [.macOS(.v13)],
     targets: [
+        // whisper.cpp's C API. Homebrew's prefix differs by architecture and
+        // SwiftPM has no way to ask for it, so both are listed; the one that
+        // does not exist is ignored.
+        .systemLibrary(
+            name: "CWhisper",
+            path: "Sources/CWhisper"
+        ),
         .executableTarget(
             name: "WhizApp",
-            path: "Sources/WhizApp"
+            dependencies: ["CWhisper"],
+            path: "Sources/WhizApp",
+            cSettings: [
+                .unsafeFlags([
+                    "-I/opt/homebrew/include",
+                    "-I/usr/local/include",
+                ]),
+            ],
+            swiftSettings: [
+                .unsafeFlags([
+                    "-Xcc", "-I/opt/homebrew/include",
+                    "-Xcc", "-I/usr/local/include",
+                ]),
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L/opt/homebrew/lib",
+                    "-L/usr/local/lib",
+                ]),
+                .linkedLibrary("whisper"),
+                // ggml is a separate Homebrew formula; whisper links against it
+                // but Swift needs it named explicitly to resolve
+                // `ggml_backend_load_all`.
+                .linkedLibrary("ggml"),
+                .linkedLibrary("ggml-base"),
+            ]
         ),
         .testTarget(
             name: "WhizAppTests",

@@ -216,6 +216,10 @@ class DictateSettings:
     idle_visible: bool = True
     model: str = ""
     menu_bar: bool = True
+    # Energy floors and minimum utterance length; see whiz/config.py.
+    frame_energy: float = _VAD_FRAME_ENERGY
+    min_energy: float = _MIN_ENERGY
+    min_utterance: float = _MIN_UTTERANCE_SECONDS
 
 
 def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
@@ -237,6 +241,9 @@ def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
         idle_visible=bool(overrides.get("idle_visible", config.dictate_idle_visible)),
         model=(overrides.get("model") or config.dictate_model or ""),
         menu_bar=bool(overrides.get("menu_bar", config.dictate_menu_bar)),
+        frame_energy=float(config.dictate_frame_energy),
+        min_energy=float(config.dictate_min_energy),
+        min_utterance=float(config.dictate_min_utterance),
     )
 
 
@@ -289,8 +296,8 @@ class DictationEngine:
         # Effective energy gates — raised above the static floors when the
         # ambient noise level warrants it (noisy room). These are the values
         # the capture callback and transcribe worker actually use.
-        self._effective_frame_energy = _VAD_FRAME_ENERGY
-        self._effective_min_energy = _MIN_ENERGY
+        self._effective_frame_energy = self.s.frame_energy
+        self._effective_min_energy = self.s.min_energy
         # Calibration state: collect per-frame RMS during the first
         # _NOISE_CALIBRATION_SECONDS of audio, then compute the noise floor.
         self._noise_cal_rms: list[float] = []
@@ -449,8 +456,8 @@ class DictationEngine:
             # that got louder/quieter between sessions is handled correctly.
             self._noise_cal_rms = []
             self._noise_calibrated = False
-            self._effective_frame_energy = _VAD_FRAME_ENERGY
-            self._effective_min_energy = _MIN_ENERGY
+            self._effective_frame_energy = self.s.frame_energy
+            self._effective_min_energy = self.s.min_energy
             # Start the transcribe worker (drains the utterance queue).
             self._utterance_queue = queue.Queue()
             self._transcribe_thread = threading.Thread(
@@ -658,8 +665,8 @@ class DictationEngine:
         median = sorted_rms[n // 2] if n % 2 else (sorted_rms[n // 2 - 1] + sorted_rms[n // 2]) / 2
         # Raise the effective gates above the noise floor. The static floors
         # remain as minimums — a quiet room keeps them.
-        frame_gate = max(_VAD_FRAME_ENERGY, median * _NOISE_FRAME_MULT)
-        utt_gate = max(_MIN_ENERGY, median * _NOISE_UTT_MULT)
+        frame_gate = max(self.s.frame_energy, median * _NOISE_FRAME_MULT)
+        utt_gate = max(self.s.min_energy, median * _NOISE_UTT_MULT)
         self._effective_frame_energy = frame_gate
         self._effective_min_energy = utt_gate
         logger.info(
@@ -736,7 +743,7 @@ class DictationEngine:
 
     def _transcribe_and_inject(self, pcm_bytes: bytes, np) -> None:
         """Transcribe a PCM utterance and inject the text into the focused app."""
-        if len(pcm_bytes) < 2 * WHISPER_SAMPLE_RATE * _MIN_UTTERANCE_SECONDS:
+        if len(pcm_bytes) < 2 * WHISPER_SAMPLE_RATE * self.s.min_utterance:
             # Too short to be meaningful speech — skip.
             return
         # Energy gate: Whisper hallucinates training-data boilerplate on

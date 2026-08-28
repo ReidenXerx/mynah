@@ -29,6 +29,12 @@ struct WhizConfig {
     var idleVisible: Bool = false
     var menuBar: Bool = true
 
+    // Microphone sensitivity. Defaults match `whiz/config.py` — see the comment
+    // there for why they were lowered from the original 0.03 / 0.025.
+    var frameEnergy: Double = 0.010
+    var minEnergy: Double = 0.008
+    var minUtterance: Double = 0.25
+
     /// Mapping from struct property to TOML key. Single source of truth for
     /// both load and save so the two can't drift.
     private static let keys = (
@@ -42,7 +48,10 @@ struct WhizConfig {
         autoStopSilence: "dictate_auto_stop_silence",
         showIndicator: "dictate_show_indicator",
         idleVisible: "dictate_idle_visible",
-        menuBar: "dictate_menu_bar"
+        menuBar: "dictate_menu_bar",
+        frameEnergy: "dictate_frame_energy",
+        minEnergy: "dictate_min_energy",
+        minUtterance: "dictate_min_utterance"
     )
 
     // MARK: - Location
@@ -84,6 +93,9 @@ struct WhizConfig {
         if case .bool(let v)? = values[keys.showIndicator] { c.showIndicator = v }
         if case .bool(let v)? = values[keys.idleVisible] { c.idleVisible = v }
         if case .bool(let v)? = values[keys.menuBar] { c.menuBar = v }
+        if let v = number(values[keys.frameEnergy]) { c.frameEnergy = v }
+        if let v = number(values[keys.minEnergy]) { c.minEnergy = v }
+        if let v = number(values[keys.minUtterance]) { c.minUtterance = v }
         return c
     }
 
@@ -127,5 +139,8 @@ struct WhizConfig {
         values[k.showIndicator] = .bool(showIndicator)
         values[k.idleVisible] = .bool(idleVisible)
         values[k.menuBar] = .bool(menuBar)
+        values[k.frameEnergy] = .double(frameEnergy)
+        values[k.minEnergy] = .double(minEnergy)
+        values[k.minUtterance] = .double(minUtterance)
     }
 }

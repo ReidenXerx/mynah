@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import AVFoundation
 
 /// Accessibility permission — required for CGEvent posting (text injection).
 ///
@@ -32,6 +33,28 @@ enum Permissions {
         let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - Microphone
+
+    static var microphoneStatus: AVAuthorizationStatus {
+        AVCaptureDevice.authorizationStatus(for: .audio)
+    }
+
+    /// Request microphone access, returning whether it is usable.
+    ///
+    /// Must be awaited *before* starting the audio engine. Starting capture
+    /// first shows the prompt but yields a stream of silence for that session —
+    /// the user grants access, sees a pill, speaks, and nothing is transcribed.
+    static func requestMicrophone() async -> Bool {
+        switch microphoneStatus {
+        case .authorized:
+            return true
+        case .notDetermined:
+            return await AVCaptureDevice.requestAccess(for: .audio)
+        default:
+            return false
+        }
     }
 
     static func openMicrophoneSettings() {

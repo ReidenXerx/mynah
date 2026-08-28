@@ -10,7 +10,6 @@ import SwiftUI
 struct MenuBarContent: View {
     @ObservedObject var controller: SessionController
 
-    @State private var isAccessibilityTrusted = Permissions.isAccessibilityTrusted
     @State private var launchesAtLogin = LoginItem.isEnabled
 
     var body: some View {
@@ -21,11 +20,22 @@ struct MenuBarContent: View {
 
         Text(controller.state.menuLabel)
 
+        // Failures used to be invisible: a missing model or denied microphone
+        // set `lastError` and nothing ever showed it, so the app just silently
+        // did nothing.
+        if let error = controller.lastError {
+            Divider()
+            Text(error)
+        }
+
         Divider()
 
-        if !isAccessibilityTrusted {
-            // Injection silently no-ops without this, so surface it rather than
-            // letting dictation appear to work while typing nothing.
+        // Always shown, with state. Hiding it once granted made it impossible
+        // to tell "granted" from "the menu is broken" — and while the menu was
+        // broken, this was the only route to granting it.
+        if controller.isAccessibilityTrusted {
+            Text("Accessibility: granted")
+        } else {
             Button("Grant Accessibility…") {
                 Permissions.requestAccessibility()
                 Permissions.openAccessibilitySettings()
@@ -44,6 +54,12 @@ struct MenuBarContent: View {
 
         Button("Open Config File") {
             NSWorkspace.shared.open(WhizConfig.path)
+        }
+
+        Button("Reveal Log…") {
+            // `log stream` needs a terminal; opening Console filtered to our
+            // subsystem is the closest one-click equivalent.
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Console.app"))
         }
 
         Divider()

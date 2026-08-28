@@ -1,3 +1,5 @@
+import AppKit
+import Combine
 import SwiftUI
 
 @main
@@ -10,14 +12,17 @@ struct WhizApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            if let controller = delegate.controller {
-                MenuBarContent(controller: controller)
-            }
+            // `delegate.controller` is a non-optional `let` created with the
+            // delegate. It used to be an optional assigned in
+            // `applicationDidFinishLaunching`, which meant SwiftUI rendered this
+            // content once while it was still nil and never re-evaluated —
+            // producing an empty menu that would not open at all.
+            MenuBarContent(controller: delegate.controller)
         } label: {
             // MenuBarExtra's label is rendered as a template image, so the tint
-            // set here is ignored by the system in favour of the menu bar's own
-            // appearance. State is conveyed by the pill; the menu bar item just
-            // marks that whiz is running.
+            // is ignored in favour of the menu bar's own appearance. State is
+            // conveyed by the pill; the menu bar item just marks that whiz is
+            // running.
             Image(nsImage: WhizApp.menuBarIcon)
         }
         .menuBarExtraStyle(.menu)
@@ -46,16 +51,25 @@ struct WhizApp: App {
     }
 }
 
+/// Owns the app's long-lived objects and bridges the hotkey to the session.
+///
+/// `ObservableObject` matters: `@NSApplicationDelegateAdaptor` observes the
+/// delegate when it conforms, which is what lets the menu re-render as state
+/// changes.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
-    private(set) var controller: SessionController?
+    /// Created eagerly rather than in `applicationDidFinishLaunching`, so the
+    /// menu has real content from the very first render.
+    let controller = SessionController()
+
     private var indicator: IndicatorPanel?
     private let hotkeys = HotkeyManager()
+    private var cancellables = Set<AnyCancellable>()
+    private var permissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let controller = SessionController()
-        self.controller = controller
+        Log.ui.notice("launching whiz \(WhizApp.version, privacy: .public)")
 
         if controller.config.showIndicator {
             let indicator = IndicatorPanel(controller: controller)
@@ -64,22 +78,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if controller.config.idleVisible { indicator.show() }
         }
 
-        hotkeys.register(controller.config.hotkey) { [weak self] in
-            self?.handleTrigger()
+        // Drive the pill from observed state rather than imperatively after the
+        // hotkey. Session start is async (a cold model load takes seconds), so
+        // reading `isSessionActive` immediately after `toggleSession()` saw the
+        // old value and hid the pill the instant it was asked to appear.
+        controller.$isSessionActive
+            .removeDuplicates()
+            .sink { [weak self] active in self?.updateIndicator(visible: active) }
+            .store(in: &cancellables)
+
+        // TCC offers no change notification, so poll. Cheap, and it means the
+        // menu reflects a grant made in System Settings without a relaunch.
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+            Task { @MainActor in self.controller.refreshPermissions() }
+        }
+
+        let hotkey = controller.config.hotkey
+        if hotkeys.register(hotkey, onTrigger: { [weak self] in self?.handleTrigger() }) {
+            Log.ui.notice("hotkey registered: \(hotkey, privacy: .public)")
+        } else {
+            Log.ui.error("hotkey registration FAILED: \(hotkey, privacy: .public)")
+            controller.reportError(
+                "Could not register the hotkey '\(hotkey)'. Another app may already use it.")
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        controller?.endSession()
+        controller.endSession()
         hotkeys.unregister()
+        permissionTimer?.invalidate()
     }
 
     private func handleTrigger() {
-        guard let controller else { return }
+        Log.ui.notice("hotkey fired")
         controller.toggleSession()
+    }
 
+    private func updateIndicator(visible: Bool) {
         guard let indicator, controller.config.showIndicator else { return }
-        if controller.isSessionActive {
+        if visible {
             indicator.show()
         } else if !controller.config.idleVisible {
             indicator.hide()

@@ -1,0 +1,14 @@
+// whisper.cpp's C API, exposed to Swift.
+//
+// A system-library target rather than a vendored source build: whiz already
+// requires whisper.cpp for batch transcription (`whisper-cli` on PATH), so the
+// library is present on any machine that can run whiz at all. Homebrew installs
+// the header and dylib alongside the binary.
+//
+// The header search path is supplied by Package.swift, which points at both
+// Homebrew prefixes (Apple Silicon and Intel).
+module CWhisper [system] {
+    header "shim.h"
+    link "whisper"
+    export *
+}

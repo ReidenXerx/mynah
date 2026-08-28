@@ -14,7 +14,25 @@ enum TextInjector {
 
     static func type(_ text: String) {
         guard !text.isEmpty else { return }
-        text.allSatisfy(\.isASCII) ? keystroke(text) : paste(text)
+
+        // Without Accessibility, CGEvent posting does nothing at all — no
+        // error, no exception, no text. That silence is the single most
+        // confusing failure this app has, so name it explicitly.
+        if !Permissions.isAccessibilityTrusted {
+            Log.ui.error(
+                "injection SKIPPED: Accessibility not granted — text is discarded")
+            return
+        }
+
+        // Log where the text is going. "Nothing appeared" almost always means
+        // it went somewhere unexpected — whichever app had focus when the
+        // hotkey fired, which is not necessarily the one being looked at.
+        let isASCII = text.allSatisfy(\.isASCII)
+        let target = NSWorkspace.shared.frontmostApplication?.localizedName ?? "unknown"
+        let method = isASCII ? "keystroke" : "paste"
+        Log.ui.notice(
+            "injecting \(text.count) chars via \(method, privacy: .public) into \(target, privacy: .public)")
+        isASCII ? keystroke(text) : paste(text)
     }
 
     // MARK: - Keystroke path
@@ -50,7 +68,10 @@ enum TextInjector {
         // TODO(phase 2): save and restore the user's clipboard. The Python
         // version left it clobbered too, but it is a real papercut.
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        let wrote = pasteboard.setString(text, forType: .string)
+        // Separates "the clipboard write failed" from "the paste keystroke did
+        // not land" — otherwise both look identical from the outside.
+        Log.ui.notice("pasteboard write: \(wrote, privacy: .public)")
 
         // Let the clipboard write settle before the paste reads it.
         usleep(10_000)
@@ -71,6 +92,7 @@ enum TextInjector {
         for event in [commandDown, vDown, vUp, commandUp] {
             event.post(tap: .cghidEventTap)
         }
+        Log.ui.notice("posted paste keystroke")
 
         usleep(50_000)
     }

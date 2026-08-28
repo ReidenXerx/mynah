@@ -91,12 +91,13 @@ def _ensure_icon_pngs() -> dict[str, str]:
                 draw_whiz_logo(AppKit, NSRect((0, 0), (size, size)), tint)
             finally:
                 img.unlockFocus()
-            # Save as PNG.
+            # Save as PNG via NSBitmapImageRep (representationUsingType_properties_
+            # is on NSBitmapImageRep, not NSImage).
             tiff = img.TIFFRepresentation()
             if tiff is not None:
-                tiff_img = AppKit.NSImage.alloc().initWithData_(tiff)
-                if tiff_img is not None:
-                    png_data = tiff_img.representationUsingType_properties_(
+                rep = AppKit.NSBitmapImageRep.imageRepWithData_(tiff)
+                if rep is not None:
+                    png_data = rep.representationUsingType_properties_(
                         AppKit.NSImageTypePNG, None
                     )
                     if png_data is not None:

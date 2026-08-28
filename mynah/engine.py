@@ -746,26 +746,26 @@ class DictationEngine:
     def _setup_menu_bar(self) -> None:
         """Create the macOS menu bar status item, if enabled and available.
 
-        Must be called on the main thread (run() calls it before the AppKit
-        loop). Degrades to a no-op when ``settings.menu_bar`` is off or
-        pyobjc/AppKit is unavailable, so a non-macOS or headless run is
-        unaffected. Keeps a strong reference on ``self._menu_bar`` so the
-        status item survives for the lifetime of the engine.
+        Uses the rumps-based MacMenuBar provider which handles NSApplication
+        lifecycle, NSStatusItem, and NSMenu internally. Degrades to a no-op
+        when ``settings.menu_bar`` is off or rumps/pyobjc is unavailable.
+        Keeps a strong reference on ``self._menu_bar`` so the status item
+        survives for the lifetime of the engine.
         """
         if not self.s.menu_bar or not _is_macos():
             logger.debug("_setup_menu_bar: skipped (menu_bar=%s, macos=%s)", self.s.menu_bar, _is_macos())
             return
         try:
-            from whiz.dictate.providers.macos_menubar import MacMenuBar
+            from whiz.dictate.providers.macos_rumps import MacMenuBar
         except ImportError:
-            logger.debug("menu bar provider unavailable (pyobjc?)", exc_info=True)
+            logger.debug("menu bar provider unavailable (rumps/pyobjc?)", exc_info=True)
             return
         try:
             mb = MacMenuBar(engine=self)
             mb.setup()
             self.add_state_listener(mb.on_state)
             self._menu_bar = mb
-            logger.debug("_setup_menu_bar: menu bar created and state listener added")
+            logger.debug("_setup_menu_bar: rumps menu bar created and state listener added")
         except Exception:  # noqa: BLE001
             logger.warning("Could not create dictation menu bar item", exc_info=True)
 
@@ -792,63 +792,44 @@ class DictationEngine:
         return 0
 
     def _run_with_appkit(self) -> int:
-        """Run on the main thread with the macOS AppKit event loop.
+        """Run with the macOS AppKit event loop, owned by rumps.
 
-        ALL AppKit UI is created AFTER NSApplication.sharedApplication() +
-        setActivationPolicy_(). Creating NSPanel/NSStatusItem before the app
-        object exists doesn't render — windows and status items exist in
-        memory but never appear on screen, and image updates (icon tint)
-        silently fail. This was the root cause of the invisible pill and the
-        W icon that never changed color.
+        rumps.App.run() handles NSApplication.sharedApplication(),
+        setActivationPolicy, the NSStatusItem, NSMenu, and the full AppKit
+        event loop — including window display, status item redraw, and menu
+        popup. This replaces the manual NSApplication.run() + custom ObjC glue
+        that couldn't properly render the indicator panel or update the
+        status item icon.
 
-        We use NSApplication.run() (the standard AppKit run loop) instead of
-        AppHelper.runConsoleEventLoop(). runConsoleEventLoop doesn't fully
-        support window display, status item image updates, or NSMenu popup —
-        the status item appeared but clicks didn't open the menu, and the
-        indicator panel was created but never rendered. NSApplication.run()
-        pumps the full event loop including window display, menu popup, and
-        status item redraw.
+        The floating pill indicator is dropped (per user decision) — the menu
+        bar W icon now serves as the sole visual indicator, with its tint
+        reflecting the dictation state.
         """
         try:
-            from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
+            from whiz.dictate.providers.macos_rumps import MacMenuBar
         except ImportError:
-            # No pyobjc — fall back to the plain loop (no indicator).
+            # No rumps/pyobjc — fall back to the plain loop (no menu bar).
             return self._run_plain()
 
-        app = NSApplication.sharedApplication()
-        app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
-
-        # Create ALL AppKit UI now — after the app object is initialized.
-        # The indicator panel and the menu bar status item both need the
-        # app to exist before they can render. Order matters: indicator
-        # first (it doesn't depend on the menu bar), then menu bar.
-        self.indicator.setup()
-        if self.s.show_indicator and self.s.idle_visible:
-            self._set_state("idle")
-            self.indicator.show()
+        # Create the rumps-based menu bar (sets up NSStatusItem + NSMenu).
+        # The indicator is a NullIndicator on this path since we dropped the
+        # floating pill — the menu bar W icon is the sole visual indicator.
         self._setup_menu_bar()
 
         # Start the hotkey listener on a background thread.
         listener = self._start_hotkey_listener()
 
-        # NSApplication.run() blocks until app.terminate_() is called. We
-        # poll the stop event on a background thread and call terminate_
-        # when stop() / Ctrl+C sets it. This replaces the CFRunLoopTimer +
-        # runConsoleEventLoop approach, which didn't properly support window
-        # display, status item image updates, or NSMenu popup.
-        def _stop_watcher():
-            while not self._stop_event.is_set():
-                time.sleep(0.1)
-            try:
-                app.terminate_(None)
-            except Exception:  # noqa: BLE001
-                pass
-
-        watcher = threading.Thread(target=_stop_watcher, daemon=True)
-        watcher.start()
-
+        # Run the rumps App event loop — blocks until quit.
+        # rumps handles NSApplication init, accessory policy, the run loop,
+        # and termination (via our Quit menu item calling rumps.quit_application).
         try:
-            app.run()
+            if self._menu_bar is not None:
+                self._menu_bar.run()
+            else:
+                # Menu bar creation failed — fall back to plain loop so the
+                # hotkey still works.
+                while not self._stop_event.is_set():
+                    time.sleep(_TICK)
         except KeyboardInterrupt:
             self.stop()
         finally:

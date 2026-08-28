@@ -2137,7 +2137,7 @@ def test_menubar_toggle_action_calls_engine_toggle():
     the hotkey — so the menu bar can start/stop a real session. do_toggle
     dispatches to a background thread so the AppKit run loop isn't blocked,
     so we poll until the session flips (bounded wait)."""
-    from whiz.dictate.providers.macos_menubar import MacMenuBar
+    from whiz.dictate.providers.macos_rumps import MacMenuBar
 
     engine = _make_engine()
     mb = MacMenuBar(engine=engine)
@@ -2150,11 +2150,17 @@ def test_menubar_toggle_action_calls_engine_toggle():
     assert engine._session_active is False
 
 
-def test_menubar_quit_action_calls_engine_stop():
+def test_menubar_quit_action_calls_engine_stop(monkeypatch):
     """MacMenuBar.do_quit calls engine.stop() (idempotent, ends any session).
     do_quit dispatches to a background thread, so we poll for the stop
-    event + session-end rather than asserting synchronously."""
-    from whiz.dictate.providers.macos_menubar import MacMenuBar
+    event + session-end rather than asserting synchronously. rumps is
+    stubbed so do_quit's rumps.quit_application() call doesn't need the lib."""
+    from whiz.dictate.providers.macos_rumps import MacMenuBar
+
+    # Stub rumps so do_quit's rumps.quit_application() doesn't fail.
+    fake_rumps = types.ModuleType("rumps")
+    fake_rumps.quit_application = lambda: None
+    monkeypatch.setitem(sys.modules, "rumps", fake_rumps)
 
     engine = _make_engine()
     engine._start_session()
@@ -2173,7 +2179,7 @@ def test_menubar_toggle_does_not_block_calling_thread():
     We patch toggle_session to sleep and check do_toggle returned fast."""
     import time as _time
 
-    from whiz.dictate.providers.macos_menubar import MacMenuBar
+    from whiz.dictate.providers.macos_rumps import MacMenuBar
 
     engine = _make_engine()
     mb = MacMenuBar(engine=engine)
@@ -2197,7 +2203,7 @@ def test_menubar_toggle_does_not_block_calling_thread():
 def test_menubar_on_state_updates_internal_state():
     """on_state (the engine state-listener callback) records the state so
     _update_labels can sync the menu — and is safe before setup() runs."""
-    from whiz.dictate.providers.macos_menubar import MacMenuBar
+    from whiz.dictate.providers.macos_rumps import MacMenuBar
 
     engine = _make_engine()
     mb = MacMenuBar(engine=engine)
@@ -2207,49 +2213,55 @@ def test_menubar_on_state_updates_internal_state():
     assert mb._state == "transcribing"
 
 
-def test_menubar_on_state_dispatches_to_controller_not_button():
-    """on_state must dispatch whizUpdateMenuState: to ``self._controller``
-    (where the selector is defined), not to ``self._button`` (NSStatusBarButton,
-    which doesn't implement it). Dispatching to the button raised
-    NSInvalidArgumentException and crashed the process on the first state
-    change, causing a launchd KeepAlive crash-loop — neither the menu bar
-    nor the hotkey worked because the process never stayed up.
-    """
-    from whiz.dictate.providers.macos_menubar import MacMenuBar
+def test_menubar_on_state_updates_menu_labels_and_icon():
+    """on_state must update the toggle item title, state label, and swap the
+    icon — the rumps-based menu bar handles all UI updates via rumps
+    properties, which dispatch to the main thread internally."""
+    from whiz.dictate.providers.macos_rumps import MacMenuBar
 
     mb = MacMenuBar(engine=_make_engine())
-    controller = mock.Mock()
-    button = mock.Mock()
-    mb._controller = controller
-    mb._button = button
+    # Simulate setup() having run: create fake rumps app + menu items.
+    mb._app = mock.Mock()
+    mb._icons = {"idle": "/tmp/idle.png", "listening": "/tmp/listening.png",
+                 "transcribing": "/tmp/transcribing.png"}
+    mb._toggle_item = mock.Mock()
+    mb._state_item = mock.Mock()
 
     mb.on_state("listening")
-    controller.performSelectorOnMainThread_withObject_waitUntilDone_.assert_called_once_with(
-        "whizUpdateMenuState:", None, False
-    )
-    # The button must NOT be the dispatch target — it doesn't implement the selector.
-    button.performSelectorOnMainThread_withObject_waitUntilDone_.assert_not_called()
+    assert mb._toggle_item.title == "Stop Dictation"
+    assert mb._state_item.title == "● Listening"
+    assert mb._app.icon == "/tmp/listening.png"
+
+    mb.on_state("transcribing")
+    assert mb._toggle_item.title == "Stop Dictation"
+    assert mb._state_item.title == "● Transcribing…"
+    assert mb._app.icon == "/tmp/transcribing.png"
+
+    mb.on_state("idle")
+    assert mb._toggle_item.title == "Start Dictation"
+    assert mb._state_item.title == "○ Idle"
+    assert mb._app.icon == "/tmp/idle.png"
 
 
-def test_menubar_on_state_safe_when_no_button():
-    """on_state must not raise when setup() hasn't created the button yet —
+def test_menubar_on_state_safe_before_setup():
+    """on_state must not raise when setup() hasn't created the app yet —
     the engine may fire state changes before the menu bar is wired."""
-    from whiz.dictate.providers.macos_menubar import MacMenuBar
+    from whiz.dictate.providers.macos_rumps import MacMenuBar
 
     mb = MacMenuBar(engine=_make_engine())
-    mb.on_state("listening")  # no button set — must not raise
+    mb.on_state("listening")  # no app set — must not raise
     assert mb._state == "listening"
 
 
 def test_menubar_setup_noop_if_already_setup(monkeypatch):
     """setup() is idempotent — a second call does nothing (guard against
-    double-creating NSStatusItems)."""
-    from whiz.dictate.providers.macos_menubar import MacMenuBar
+    double-creating the rumps App)."""
+    from whiz.dictate.providers.macos_rumps import MacMenuBar
 
     mb = MacMenuBar(engine=_make_engine())
-    mb._status_item = object()  # pretend setup already ran
+    mb._app = object()  # pretend setup already ran
     mb.setup()  # must be a no-op, not raise
-    assert mb._status_item is not None
+    assert mb._app is not None
 
 
 def test_indicator_show_dispatches_fade_to_view_not_panel():

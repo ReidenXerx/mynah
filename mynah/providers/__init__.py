@@ -48,8 +48,12 @@ def _register_macos() -> None:
         "whiz.dictate.providers.mlx", "MlxWhisperProvider"))
     _INJECTORS["mac"] = ("darwin", lambda: _import_attr(
         "whiz.dictate.providers.macos_inject", "MacTextInjector"))
-    _INDICATORS["mac"] = ("darwin", lambda: _import_attr(
-        "whiz.dictate.providers.macos_indicator", "MacIndicator"))
+    # The floating pill NSPanel indicator is dropped (per user decision) —
+    # the rumps menu bar W icon now serves as the sole visual indicator on
+    # macOS. The macOS indicator returns NullIndicator so the engine doesn't
+    # try to create an NSPanel from a LaunchAgent (which couldn't render).
+    # macos_indicator.py is retained for posterity but no longer selected.
+    _INDICATORS["mac"] = ("darwin", lambda: NullIndicator())
 
 
 def _import_attr(module: str, attr: str):

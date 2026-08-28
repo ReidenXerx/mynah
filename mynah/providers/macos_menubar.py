@@ -110,8 +110,10 @@ class MacMenuBar:
             AppKit.NSVariableStatusItemLength
         )
         self._button = self._status_item.button()
-        self._button.setTarget_(self._controller)
-        self._button.setAction_("whizMenuClicked:")
+        # Do NOT set a target/action on the button — when the button has no
+        # action, macOS automatically pops up the status item's menu on click.
+        # Setting an action (even a no-op) intercepts the click and the menu
+        # never appears. The menu was attached via setMenu_ below.
         # Apply the initial (idle) icon.
         self._apply_icon("idle")
 

@@ -2434,7 +2434,8 @@ def test_noise_calibration_median_robust_against_spikes():
     engine._finish_noise_calibration()
     # Median of 20 values = 10th + 11th sorted / 2 -> both ~0.01.
     # The spikes are at the tail and do not affect the median.
-    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY  # 0.01*2.5=0.025 < static
+    # 0.01 * 3.5 = 0.035 which is above the static floor 0.03.
+    assert engine._effective_frame_energy == 0.035  # noise_floor * _NOISE_FRAME_MULT
     engine._end_session()
 
 

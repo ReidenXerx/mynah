@@ -86,26 +86,30 @@ class MacIndicator(DictationIndicator):
         view's ``window()`` resolves the panel at run time.
         """
         if self._view is None:
+            logger.warning("indicator show() but _view is None — panel not created")
             return
         self._visible = True
+        logger.debug("indicator show() — dispatching whizFadeIn: to main thread")
         try:
             self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
                 "whizFadeIn:", None, False
             )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            logger.warning("indicator show() dispatch failed: %s", e, exc_info=True)
 
     def hide(self) -> None:
         """Dismiss the overlay with an opacity fade (main-thread-safe)."""
         if self._view is None:
+            logger.warning("indicator hide() but _view is None — panel not created")
             return
         self._visible = False
+        logger.debug("indicator hide() — dispatching whizFadeOut: to main thread")
         try:
             self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
                 "whizFadeOut:", None, False
             )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            logger.warning("indicator hide() dispatch failed: %s", e, exc_info=True)
 
     def update_level(self, level: float) -> None:
         """Feed a live mic amplitude in [0.0, 1.0] to animate the waveform.
@@ -379,21 +383,26 @@ def _create_objc_view_class():
             # try/except with a non-animated fallback that still shows/hides
             # the panel. The indicator may pop instead of fading, but the
             # process survives and the hotkey + menu bar keep working.
+            logger.debug("_fade_panel(fade_in=%s) called", fade_in)
             try:
                 self._fade_panel_impl(fade_in)
-            except Exception:  # noqa: BLE001
-                logger.debug("indicator fade failed; using instant fallback", exc_info=True)
+                logger.debug("_fade_panel(fade_in=%s) impl succeeded", fade_in)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("indicator fade failed; using instant fallback: %s", e, exc_info=True)
                 try:
                     panel = self.window()
                     if panel is None:
+                        logger.warning("_fade_panel fallback: panel is None")
                         return
                     if fade_in:
                         panel.orderFrontRegardless()
                         panel.setAlphaValue_(1.0)
+                        logger.debug("_fade_panel fallback: ordered front + alpha 1.0")
                     else:
                         panel.setAlphaValue_(0.0)
                         panel.orderOut_(None)
                 except Exception:  # noqa: BLE001
+                    logger.warning("_fade_panel fallback also failed", exc_info=True)
                     pass
 
         def _fade_panel_impl(self, fade_in: bool) -> None:

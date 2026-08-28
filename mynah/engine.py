@@ -85,10 +85,10 @@ _UTTERANCE_SILENCE = 0.8
 # steady low-level noise (fan, keyboard, HVAC) as speech, which produces
 # utterances that pass the whole-buffer RMS gate but are still garbage.
 # This floor short-circuits those frames so they never start/extend an
-# utterance. 0.025 ≈ -32dB — above typical Mac mic room noise, below quiet
-# speech. This is the STATIC floor; the adaptive noise floor (measured at
-# session start) can raise it proportionally — see _NOISE_* constants.
-_VAD_FRAME_ENERGY = 0.025
+# utterance. 0.03 ≈ -30dB — above typical Mac mic room noise and MacBook
+# cooler/fan noise, below quiet speech. This is the STATIC floor; the
+# adaptive noise floor (measured at session start) can raise it further.
+_VAD_FRAME_ENERGY = 0.03
 
 # How often (seconds) the run loops poll the stop event.
 _TICK = 0.05
@@ -101,15 +101,15 @@ _MIN_UTTERANCE_SECONDS = 0.35
 # transcribed. Below this the audio is silence or noise — Whisper is known
 # to hallucinate training-data boilerplate ("субтитры создавал…",
 # "продолжение следует…") on near-silent input, so we skip it entirely.
-# 0.02 ≈ -34dB — above typical Mac mic room noise floor.
-# This is the STATIC floor; the adaptive noise floor can raise it.
-_MIN_ENERGY = 0.02
+# 0.025 ≈ -32dB — above typical Mac mic room noise floor and MacBook cooler
+# noise. This is the STATIC floor; the adaptive noise floor can raise it.
+_MIN_ENERGY = 0.025
 
 # Adaptive noise floor — measure ambient noise at session start (first
-# ~0.5s of audio) and raise the energy gates proportionally. The static
+# ~1.0s of audio) and raise the energy gates proportionally. The static
 # thresholds above are tuned for a quiet room; in a noisy environment
-# (fan, HVAC, open window) steady background noise exceeds them and
-# webrtcvad misclassifies it as speech, seeding hallucination-prone
+# (fan, HVAC, MacBook cooler, open window) steady background noise exceeds
+# them and webrtcvad misclassifies it as speech, seeding hallucination-prone
 # utterances. The adaptive floor uses the median RMS of the calibration
 # window as the noise baseline and sets:
 #   frame gate      = max(_VAD_FRAME_ENERGY, noise_floor * _NOISE_FRAME_MULT)
@@ -117,9 +117,9 @@ _MIN_ENERGY = 0.02
 # The static thresholds remain as floors — a quiet room keeps them, a
 # noisy room gets higher gates. The median (not mean) is robust against
 # transient spikes and brief speech during the calibration window.
-_NOISE_CALIBRATION_SECONDS = 0.5  # sample ambient noise for this long
-_NOISE_FRAME_MULT = 2.5           # frame gate ≈ 8dB above noise floor
-_NOISE_UTT_MULT = 2.0             # utterance gate ≈ 6dB above noise floor
+_NOISE_CALIBRATION_SECONDS = 1.0  # sample ambient noise for this long
+_NOISE_FRAME_MULT = 3.5           # frame gate ~11dB above noise floor
+_NOISE_UTT_MULT = 3.0             # utterance gate ~10dB above noise floor
 _NOISE_MIN_SAMPLES = 5            # need ≥this many frames to trust calibration
 
 # Known Whisper hallucination phrases (lowercased). When the model is fed
@@ -145,6 +145,12 @@ _HALLUCINATION_PHRASES = frozenset(
         "by following",
         "amara.org",
         "расскажите о себе",
+        # Additional artifacts observed on MacBook cooler/fan noise:
+        "субтитры",
+        "следите за обновлениями",
+        "оставайтесь с нами",
+        "не забудьте подписаться",
+        "вы можете поддержать",
     )
 )
 

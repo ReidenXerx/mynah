@@ -217,11 +217,17 @@ class MacIndicator(DictationIndicator):
         # Guard with getattr so test mocks (which don't include
         # NSVisualEffectView) and older macOS SDKs degrade to a plain
         # panel without the blur, rather than crashing.
+        #
+        # Both the vibrancy view and the draw view use a LOCAL frame —
+        # origin (0,0), size (W,H) — because they're subviews/contents of
+        # the panel, NOT positioned on the screen. The panel itself holds
+        # the screen position; its content views are relative to it.
+        local_frame = NSRect(NSPoint(0, 0), NSSize(_PANEL_WIDTH, _PANEL_HEIGHT))
         vfx = None
         NSVisualEffectView = getattr(AppKit, "NSVisualEffectView", None)
         if NSVisualEffectView is not None:
             try:
-                vfx = NSVisualEffectView.alloc().initWithFrame_(frame)
+                vfx = NSVisualEffectView.alloc().initWithFrame_(local_frame)
                 vfx.setMaterial_(AppKit.NSVisualEffectMaterialHUDWindow)
                 vfx.setBlendingMode_(AppKit.NSVisualEffectBlendingModeBehindWindow)
                 vfx.setState_(AppKit.NSVisualEffectStateActive)
@@ -238,14 +244,18 @@ class MacIndicator(DictationIndicator):
 
         # Custom draw view on top of the vibrancy — transparent background
         # so the blur shows through, with the logo + waveform painted on.
+        # Uses the LOCAL frame (origin 0,0) so drawRect_ coordinates match
+        # the view's bounds. The previous code passed the screen-coordinate
+        # frame here, which offset the bounds origin so drawing landed
+        # off-screen relative to the view — the pill appeared empty.
         view_cls = _get_objc_view_class()
-        self._view = view_cls.alloc().initWithFrame_(frame)
+        self._view = view_cls.alloc().initWithFrame_(local_frame)
         self._view._indicator = self  # back-reference for state/level reads
         self._view._vfx_view = vfx   # keep strong ref so it isn't GC'd
-        try:
-            self._view.setWantsLayer_(True)
-        except Exception:  # noqa: BLE001
-            pass
+        # NOTE: do NOT set wantsLayer on the draw view — a layer-backed
+        # NSView may not call drawRect_ reliably in a LaunchAgent context.
+        # The vibrancy view is layer-backed (it needs to be for the blur),
+        # but the draw view on top should use the traditional display path.
         if vfx is not None:
             vfx.addSubview_(self._view)
         else:

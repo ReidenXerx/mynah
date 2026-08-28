@@ -188,11 +188,53 @@ class MacIndicator(DictationIndicator):
         # Start fully transparent — show() fades the alpha up.
         self._panel.setAlphaValue_(0.0)
 
-        # Custom view that draws the vibrancy background + glyph + waveform.
+        # Vibrancy view as the panel's contentView — this gives the native
+        # macOS HUD blur (content behind the window is blurred). It's the
+        # BACKGROUND layer; the custom draw view sits on top of it and
+        # paints the logo + waveform.
+        #
+        # The previous approach added the vibrancy view as a subview of
+        # the custom draw view inside drawRect_. But subviews render ON
+        # TOP of their superview's drawn content, so the vibrancy
+        # material covered the logo and waveform — the pill appeared
+        # as just a blur blob with no visible glyph.
+        #
+        # Guard with getattr so test mocks (which don't include
+        # NSVisualEffectView) and older macOS SDKs degrade to a plain
+        # panel without the blur, rather than crashing.
+        vfx = None
+        NSVisualEffectView = getattr(AppKit, "NSVisualEffectView", None)
+        if NSVisualEffectView is not None:
+            try:
+                vfx = NSVisualEffectView.alloc().initWithFrame_(frame)
+                vfx.setMaterial_(AppKit.NSVisualEffectMaterialHUDWindow)
+                vfx.setBlendingMode_(AppKit.NSVisualEffectBlendingModeBehindWindow)
+                vfx.setState_(AppKit.NSVisualEffectStateActive)
+                vfx.setWantsLayer_(True)
+                try:
+                    vfx.layer().setCornerRadius_(_PANEL_CORNER_RADIUS)
+                    vfx.layer().setMasksToBounds_(True)
+                except Exception:  # noqa: BLE001
+                    pass
+                self._panel.setContentView_(vfx)
+            except Exception:  # noqa: BLE001
+                logger.debug("vibrancy contentView setup failed", exc_info=True)
+                vfx = None
+
+        # Custom draw view on top of the vibrancy — transparent background
+        # so the blur shows through, with the logo + waveform painted on.
         view_cls = _get_objc_view_class()
         self._view = view_cls.alloc().initWithFrame_(frame)
         self._view._indicator = self  # back-reference for state/level reads
-        self._panel.setContentView_(self._view)
+        self._view._vfx_view = vfx   # keep strong ref so it isn't GC'd
+        try:
+            self._view.setWantsLayer_(True)
+        except Exception:  # noqa: BLE001
+            pass
+        if vfx is not None:
+            vfx.addSubview_(self._view)
+        else:
+            self._panel.setContentView_(self._view)
 
 
 class WhizIndicatorView:
@@ -230,13 +272,12 @@ class WhizIndicatorView:
             AppKit.NSColor.clearColor().set()
             AppKit.NSRectFill(NSRect((0, 0), (w, h)))
 
-            # 1. Vibrancy background: an NSVisualEffectView with the HUD-window
-            # material gives a real native blur. We add it as a subview once
-            # (lazy) rather than recreating it every draw. If it's already
-            # installed, this is a no-op.
-            self._ensure_vibrancy(AppKit)
+            # Vibrancy background is the panel's contentView (set up in
+            # _create_panel), not a subview added here. Adding it as a
+            # subview during draw covered the logo/waveform because subviews
+            # render on top of the superview's drawn content.
 
-            # 2. A subtle rounded outline so the pill reads against light
+            # 1. A subtle rounded outline so the pill reads against light
             # backgrounds (the vibrancy alone can wash out on bright walls).
             bg_path = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
                 NSRect((0, 0), (w, h)), _PANEL_CORNER_RADIUS, _PANEL_CORNER_RADIUS
@@ -281,33 +322,6 @@ class WhizIndicatorView:
         except Exception:  # noqa: BLE001
             logger.debug("indicator draw failed", exc_info=True)
 
-    def _ensure_vibrancy(self, AppKit) -> None:
-        """Add an NSVisualEffectView (HUD material) as a subview once."""
-        try:
-            existing = getattr(self, "_vfx_view", None)
-            if existing is not None:
-                return
-            from Foundation import NSRect
-
-            frame = self.bounds()
-            vfx = AppKit.NSVisualEffectView.alloc().initWithFrame_(
-                NSRect((0, 0), (frame.size.width, frame.size.height))
-            )
-            vfx.setMaterial_(AppKit.NSVisualEffectMaterialHUDWindow)
-            vfx.setBlendingMode_(AppKit.NSVisualEffectBlendingModeBehindWindow)
-            vfx.setState_(AppKit.NSVisualEffectStateActive)
-            vfx.setWantsLayer_(True)
-            # Rounded corners via layer cornerRadius.
-            try:
-                vfx.layer().setCornerRadius_(_PANEL_CORNER_RADIUS)
-                vfx.layer().setMasksToBounds_(True)
-            except Exception:  # noqa: BLE001
-                pass
-            self.addSubview_(vfx)
-            self._vfx_view = vfx
-        except Exception:  # noqa: BLE001
-            logger.debug("vibrancy view setup failed", exc_info=True)
-
 
 # ---------- ObjC runtime glue ----------
 # We create a real NSView subclass at import time (only on macOS where
@@ -350,19 +364,6 @@ def _create_objc_view_class():
                 WhizIndicatorView.drawRect_(self, rect)
             except Exception:  # noqa: BLE001
                 logger.debug("drawRect failed", exc_info=True)
-
-        def _ensure_vibrancy(self, AppKit) -> None:
-            """Delegate to WhizIndicatorView._ensure_vibrancy.
-
-            The draw method calls self._ensure_vibrancy() but the ObjC
-            instance doesn't inherit from WhizIndicatorView — it delegates
-            drawRect_ to the class method. This bridge lets the draw method
-            reach the vibrancy setup.
-            """
-            try:
-                WhizIndicatorView._ensure_vibrancy(self, AppKit)
-            except Exception:  # noqa: BLE001
-                logger.debug("_ensure_vibrancy failed", exc_info=True)
 
         # performSelectorOnMainThread:withObject: requires a one-argument
         # selector (trailing colon in ObjC). pyobjc maps Python trailing

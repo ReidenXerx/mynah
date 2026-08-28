@@ -86,6 +86,7 @@ class MacMenuBar:
         and crashes the process on the first state change.
         """
         self._state = state
+        logger.debug("on_state(state=%s) controller=%s", state, self._controller is not None)
         if self._controller is None:
             return
         try:
@@ -93,7 +94,7 @@ class MacMenuBar:
                 "whizUpdateMenuState:", None, False
             )
         except Exception:  # noqa: BLE001
-            pass
+            logger.debug("on_state dispatch failed", exc_info=True)
 
     # ---------- setup ----------
 
@@ -187,6 +188,7 @@ class MacMenuBar:
             from whiz.dictate.providers.macos_logo import whiz_logo_image
 
             color_rgba = _STATE_COLOR.get(state, _STATE_COLOR["idle"])
+            logger.debug("_apply_icon(state=%s)", state)
             color = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color_rgba)
             img = whiz_logo_image(_MENU_ICON_SIZE, color)
             if img is not None:
@@ -197,6 +199,7 @@ class MacMenuBar:
     def _update_labels(self) -> None:
         """Sync the toggle + state-line labels with the current state."""
         state = self._state
+        logger.debug("_update_labels(state=%s)", state)
         active = state in ("listening", "transcribing")
         if self._toggle_item is not None:
             self._toggle_item.setTitle_(

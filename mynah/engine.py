@@ -329,19 +329,18 @@ class DictationEngine:
             self._set_state("idle")
             self.indicator.show()
 
-        # On macOS, optionally create the menu bar status item (NSStatusItem)
-        # on the main thread before the run loop starts. It drives the engine
-        # through the same toggle_session()/stop() the hotkey uses, and mirrors
-        # the indicator state via a state listener. Degrades to no-op when
-        # pyobjc is unavailable.
-        self._setup_menu_bar()
-
         # On macOS, run the AppKit event loop on the main thread whenever
         # ANY AppKit UI is live — the indicator OR the menu bar. The menu
         # bar's NSStatusItem needs the run loop to pump events for clicks +
         # menu display; without it (show_indicator=False + menu_bar=True)
         # the status item appears but is dead. Falls back to the plain loop
         # only when no AppKit UI is in use.
+        #
+        # The menu bar is set up INSIDE _run_with_appkit, AFTER
+        # NSApplication.sharedApplication() + setActivationPolicy_().
+        # Creating an NSStatusItem before the NSApplication is initialized
+        # can leave the status item's menu dead — clicks don't pop up the
+        # menu because the app object isn't fully wired yet.
         if (self.s.show_indicator or self.s.menu_bar) and _is_macos():
             return self._run_with_appkit()
         return self._run_plain()
@@ -767,6 +766,7 @@ class DictationEngine:
         status item survives for the lifetime of the engine.
         """
         if not self.s.menu_bar or not _is_macos():
+            logger.debug("_setup_menu_bar: skipped (menu_bar=%s, macos=%s)", self.s.menu_bar, _is_macos())
             return
         try:
             from whiz.dictate.providers.macos_menubar import MacMenuBar
@@ -778,6 +778,7 @@ class DictationEngine:
             mb.setup()
             self.add_state_listener(mb.on_state)
             self._menu_bar = mb
+            logger.debug("_setup_menu_bar: menu bar created and state listener added")
         except Exception:  # noqa: BLE001
             logger.warning("Could not create dictation menu bar item", exc_info=True)
 
@@ -812,6 +813,13 @@ class DictationEngine:
 
         app = NSApplication.sharedApplication()
         app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+
+        # Create the menu bar status item NOW — after the NSApplication is
+        # initialized and the accessory policy is set. Creating it before
+        # the app object exists can leave the status item's menu dead (clicks
+        # don't open the dropdown). The indicator was already set up in run()
+        # before this point (it doesn't need the app object).
+        self._setup_menu_bar()
 
         # Start the hotkey listener on a background thread.
         listener = self._start_hotkey_listener()

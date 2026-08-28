@@ -192,6 +192,16 @@ class MacIndicator(DictationIndicator):
         self._panel.setHidesOnDeactivate_(False)
         # Start fully transparent — show() fades the alpha up.
         self._panel.setAlphaValue_(0.0)
+        # Appear on all Spaces + full-screen apps so the pill is always
+        # visible regardless of which Space the user is on.
+        try:
+            _ALL_SPACES = (
+                getattr(AppKit, "NSWindowCollectionBehaviorCanJoinAllSpaces", 0)
+                | getattr(AppKit, "NSWindowCollectionBehaviorFullScreenAuxiliary", 0)
+            )
+            self._panel.setCollectionBehavior_(_ALL_SPACES)
+        except Exception:  # noqa: BLE001
+            pass
 
         # Vibrancy view as the panel's contentView — this gives the native
         # macOS HUD blur (content behind the window is blurred). It's the
@@ -425,60 +435,40 @@ def _create_objc_view_class():
                     pass
 
         def _fade_panel_impl(self, fade_in: bool) -> None:
-            from AppKit import NSAnimationContext
-
+            # Direct, non-animated show/hide. NSAnimationContext + animator()
+            # rely on CoreAnimation, which fails to load in a LaunchAgent
+            # context (ModuleNotFoundError: No module named 'CoreAnimation').
+            # The animation "succeeds" (no exception) but the alpha change
+            # never reaches the window server — the panel stays invisible.
+            # Setting alpha directly + forcing display/flush bypasses the
+            # broken animation backend and puts the window on screen.
             panel = self.window()
             if panel is None:
+                logger.debug("_fade_panel_impl: panel is None")
                 return
             if fade_in:
-                # Bump the generation token so any deferred orderOut from a
-                # prior hide sees a stale gen and aborts (see whizOrderOut_:).
                 self._fade_gen += 1
-                # Order front FIRST (alpha is 0 from setup), then animate
-                # alpha to 1. If the animation fails, set alpha instantly.
-                # This guarantees the panel is on screen even if NSAnimationContext
-                # is unavailable (headless test / no graphics context).
                 panel.orderFrontRegardless()
+                panel.setAlphaValue_(1.0)
+                # Force the window + its content to draw NOW.
                 try:
-                    ctx = NSAnimationContext.beginGrouping()
-                    if ctx is not None:
-                        ctx.setDuration_(_FADE_SECONDS)
-                        panel.animator().setAlphaValue_(1.0)
-                        NSAnimationContext.endGrouping()
-                    else:
-                        panel.setAlphaValue_(1.0)
+                    panel.display()
+                    panel.flushWindow()
                 except Exception:  # noqa: BLE001
-                    panel.setAlphaValue_(1.0)
+                    pass
+                # Force the view to redraw (logo + waveform).
+                try:
+                    self.setNeedsDisplay_(True)
+                    self.displayIfNeeded()
+                except Exception:  # noqa: BLE001
+                    pass
+                logger.debug("_fade_panel_impl: ordered front, alpha=1.0, displayed")
             else:
-                # Animate alpha to 0, then order out. If animation fails,
-                # set alpha 0 instantly and order out immediately.
                 self._fade_gen += 1
-                gen = self._fade_gen
-                try:
-                    ctx = NSAnimationContext.beginGrouping()
-                    if ctx is not None:
-                        ctx.setDuration_(_FADE_SECONDS)
-                        panel.animator().setAlphaValue_(0.0)
-                        NSAnimationContext.endGrouping()
-                        # Order out after the fade completes — but only if
-                        # no show bumped the gen since (rapid hide→show).
-                        # We store the gen in _pending_out_gen and pass nil to
-                        # whizOrderOut: (ObjC performSelector needs an ObjC
-                        # object, not a Python int). We can't cancel a
-                        # scheduled perform in pyobjc
-                        # (cancelPreviousPerformRequestsWithTarget: is not
-                        # callable on instances), so we let stale callbacks
-                        # fire and abort inside whizOrderOut:.
-                        self._pending_out_gen = gen
-                        self.performSelector_withObject_afterDelay_(
-                            "whizOrderOut:", None, _FADE_SECONDS + 0.05
-                        )
-                    else:
-                        panel.setAlphaValue_(0.0)
-                        panel.orderOut_(None)
-                except Exception:  # noqa: BLE001
-                    panel.setAlphaValue_(0.0)
-                    panel.orderOut_(None)
+                self._pending_out_gen = self._fade_gen
+                panel.setAlphaValue_(0.0)
+                panel.orderOut_(None)
+                logger.debug("_fade_panel_impl: alpha=0.0, ordered out")
 
         def whizOrderOut_(self, sender):  # noqa: ARG002
             """Deferred hide: order out the panel unless superseded by a show.

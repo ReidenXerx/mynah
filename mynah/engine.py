@@ -86,7 +86,8 @@ _UTTERANCE_SILENCE = 0.8
 # utterances that pass the whole-buffer RMS gate but are still garbage.
 # This floor short-circuits those frames so they never start/extend an
 # utterance. 0.025 ≈ -32dB — above typical Mac mic room noise, below quiet
-# speech.
+# speech. This is the STATIC floor; the adaptive noise floor (measured at
+# session start) can raise it proportionally — see _NOISE_* constants.
 _VAD_FRAME_ENERGY = 0.025
 
 # How often (seconds) the run loops poll the stop event.
@@ -101,7 +102,25 @@ _MIN_UTTERANCE_SECONDS = 0.35
 # to hallucinate training-data boilerplate ("субтитры создавал…",
 # "продолжение следует…") on near-silent input, so we skip it entirely.
 # 0.02 ≈ -34dB — above typical Mac mic room noise floor.
+# This is the STATIC floor; the adaptive noise floor can raise it.
 _MIN_ENERGY = 0.02
+
+# Adaptive noise floor — measure ambient noise at session start (first
+# ~0.5s of audio) and raise the energy gates proportionally. The static
+# thresholds above are tuned for a quiet room; in a noisy environment
+# (fan, HVAC, open window) steady background noise exceeds them and
+# webrtcvad misclassifies it as speech, seeding hallucination-prone
+# utterances. The adaptive floor uses the median RMS of the calibration
+# window as the noise baseline and sets:
+#   frame gate      = max(_VAD_FRAME_ENERGY, noise_floor * _NOISE_FRAME_MULT)
+#   utterance gate   = max(_MIN_ENERGY,       noise_floor * _NOISE_UTT_MULT)
+# The static thresholds remain as floors — a quiet room keeps them, a
+# noisy room gets higher gates. The median (not mean) is robust against
+# transient spikes and brief speech during the calibration window.
+_NOISE_CALIBRATION_SECONDS = 0.5  # sample ambient noise for this long
+_NOISE_FRAME_MULT = 2.5           # frame gate ≈ 8dB above noise floor
+_NOISE_UTT_MULT = 2.0             # utterance gate ≈ 6dB above noise floor
+_NOISE_MIN_SAMPLES = 5            # need ≥this many frames to trust calibration
 
 # Known Whisper hallucination phrases (lowercased). When the model is fed
 # silence/noise it emits these training-data artifacts; we suppress them as
@@ -233,6 +252,16 @@ class DictationEngine:
         self._transcribe_thread: threading.Thread | None = None
         # VAD
         self._vad = VoiceActivityDetector() if settings.vad_enabled else None
+        # Adaptive noise floor: set during calibration at session start.
+        # Effective energy gates — raised above the static floors when the
+        # ambient noise level warrants it (noisy room). These are the values
+        # the capture callback and transcribe worker actually use.
+        self._effective_frame_energy = _VAD_FRAME_ENERGY
+        self._effective_min_energy = _MIN_ENERGY
+        # Calibration state: collect per-frame RMS during the first
+        # _NOISE_CALIBRATION_SECONDS of audio, then compute the noise floor.
+        self._noise_cal_rms: list[float] = []
+        self._noise_calibrated = False
         # State listeners (e.g. the menu bar) notified on each state change.
         self._indicator_state: str = "idle"
         self._state_listeners: list[Callable[[str], None]] = []
@@ -390,6 +419,13 @@ class DictationEngine:
             self._silence_frames = 0
             self._continuous_silence = 0.0
             self._end_session_requested = False
+            # Reset adaptive noise calibration for this session — re-measure
+            # the ambient noise floor every time a session starts, so a room
+            # that got louder/quieter between sessions is handled correctly.
+            self._noise_cal_rms = []
+            self._noise_calibrated = False
+            self._effective_frame_energy = _VAD_FRAME_ENERGY
+            self._effective_min_energy = _MIN_ENERGY
             # Start the transcribe worker (drains the utterance queue).
             self._utterance_queue = queue.Queue()
             self._transcribe_thread = threading.Thread(
@@ -525,6 +561,18 @@ class DictationEngine:
             rms = float(np.sqrt(np.mean(mono ** 2)))
             level = min(1.0, rms * 5.0)
             self.indicator.update_level(level)
+            # Adaptive noise floor calibration: during the first
+            # _NOISE_CALIBRATION_SECONDS of audio, collect per-frame RMS.
+            # Once enough frames are collected, compute the median as the
+            # ambient noise baseline and raise the energy gates so steady
+            # background noise (fan, HVAC) doesn't pass as speech.
+            if not self._noise_calibrated:
+                self._noise_cal_rms.append(rms)
+                cal_frames_needed = int(
+                    _NOISE_CALIBRATION_SECONDS / frame_seconds
+                ) + 1
+                if len(self._noise_cal_rms) >= max(cal_frames_needed, _NOISE_MIN_SAMPLES):
+                    self._finish_noise_calibration()
             # VAD segmentation (or no-VAD passthrough).
             if vad and vad.available:
                 self._process_vad_frames(pcm, frame_bytes, frame_seconds)
@@ -561,6 +609,41 @@ class DictationEngine:
             self._end_session_requested = False
             self._end_session()
 
+    def _finish_noise_calibration(self) -> None:
+        """Compute the ambient noise floor from collected calibration RMS values.
+
+        Uses the median (not mean) of per-frame RMS during the calibration
+        window — the median is robust against transient spikes and brief
+        speech that may occur during calibration. The resulting noise floor
+        raises the effective energy gates above the static floors so steady
+        background noise doesn't pass as speech.
+
+        Called once from the audio callback after enough frames are collected.
+        Safe to call multiple times — _noise_calibrated guards re-entry.
+        """
+        if self._noise_calibrated:
+            return
+        self._noise_calibrated = True
+        samples = self._noise_cal_rms
+        if not samples:
+            return
+        # Median RMS of the calibration window = ambient noise baseline.
+        sorted_rms = sorted(samples)
+        n = len(sorted_rms)
+        median = sorted_rms[n // 2] if n % 2 else (sorted_rms[n // 2 - 1] + sorted_rms[n // 2]) / 2
+        # Raise the effective gates above the noise floor. The static floors
+        # remain as minimums — a quiet room keeps them.
+        frame_gate = max(_VAD_FRAME_ENERGY, median * _NOISE_FRAME_MULT)
+        utt_gate = max(_MIN_ENERGY, median * _NOISE_UTT_MULT)
+        self._effective_frame_energy = frame_gate
+        self._effective_min_energy = utt_gate
+        logger.info(
+            "Adaptive noise floor calibrated: median RMS=%.4f, frame gate=%.4f, utterance gate=%.4f",
+            median, frame_gate, utt_gate,
+        )
+        # Free the calibration buffer.
+        self._noise_cal_rms = []
+
     def _process_vad_frames(self, pcm: bytes, frame_bytes: int, frame_seconds: float) -> None:
         """Run VAD on PCM frames and manage utterance buffering/enqueuing."""
         vad = self._vad
@@ -571,7 +654,8 @@ class DictationEngine:
             # Energy pre-filter: reject frames below the amplitude floor as
             # silence before VAD — webrtcvad misclassifies steady low-level
             # noise as speech, which seeds hallucination-prone utterances.
-            if _rms_int16(chunk) < _VAD_FRAME_ENERGY:
+            # Use the adaptive effective floor (raised in noisy rooms).
+            if _rms_int16(chunk) < self._effective_frame_energy:
                 is_speech = False
             else:
                 is_speech = vad.is_speech(chunk)
@@ -634,8 +718,8 @@ class DictationEngine:
         # near-silent / noise-only audio. Skip utterances below the RMS floor
         # before spending a transcription on them.
         energy = _rms_int16(pcm_bytes)
-        if energy < _MIN_ENERGY:
-            logger.debug("Skipping low-energy utterance (%.4f < %.4f)", energy, _MIN_ENERGY)
+        if energy < self._effective_min_energy:
+            logger.debug("Skipping low-energy utterance (%.4f < %.4f)", energy, self._effective_min_energy)
             return
         samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
         duration = len(samples) / WHISPER_SAMPLE_RATE

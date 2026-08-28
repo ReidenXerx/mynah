@@ -2339,3 +2339,148 @@ def test_run_uses_plain_loop_when_both_indicator_and_menu_bar_off(monkeypatch):
     rc = engine.run()
     assert rc == 0
     assert not called["appkit"], "AppKit loop used when no AppKit UI is live"
+
+
+# ---------------------------------------------------------------------------
+# Adaptive noise floor calibration
+# ---------------------------------------------------------------------------
+
+
+def test_noise_calibration_quiet_room_keeps_static_floor():
+    """In a quiet room the measured noise floor is below the static thresholds,
+    so the effective gates stay at the static values (max() keeps the floor)."""
+    engine = _make_engine()
+    engine._start_session()
+    # Simulate ~0.5s of quiet-room audio: RMS well below _VAD_FRAME_ENERGY.
+    quiet_rms = 0.005  # -46dB — well below the 0.025 static floor
+    for _ in range(20):
+        engine._noise_cal_rms.append(quiet_rms)
+    engine._finish_noise_calibration()
+    assert engine._noise_calibrated is True
+    # Static floors should win — the room is quieter than the static gate.
+    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY
+    assert engine._effective_min_energy == eng._MIN_ENERGY
+    engine._end_session()
+
+
+def test_noise_calibration_noisy_room_raises_gates():
+    """In a noisy room the measured noise floor exceeds the static thresholds,
+    so the effective gates are raised proportionally (noise_floor * mult)."""
+    engine = _make_engine()
+    engine._start_session()
+    # Simulate ~0.5s of noisy-room audio: steady fan/HVAC noise.
+    noisy_rms = 0.06  # -25dB — above the 0.025 static frame floor
+    for _ in range(20):
+        engine._noise_cal_rms.append(noisy_rms)
+    engine._finish_noise_calibration()
+    assert engine._noise_calibrated is True
+    # The adaptive gate should be noise_floor * mult, above the static floor.
+    expected_frame = noisy_rms * eng._NOISE_FRAME_MULT  # 0.15
+    expected_utt = noisy_rms * eng._NOISE_UTT_MULT       # 0.12
+    assert abs(engine._effective_frame_energy - expected_frame) < 0.001
+    assert abs(engine._effective_min_energy - expected_utt) < 0.001
+    assert engine._effective_frame_energy > eng._VAD_FRAME_ENERGY
+    assert engine._effective_min_energy > eng._MIN_ENERGY
+    engine._end_session()
+
+
+def test_noise_calibration_resets_between_sessions():
+    """Each session re-calibrates: the noise floor from a prior session must
+    not carry over (the room may have changed)."""
+    engine = _make_engine()
+    engine._start_session()
+    # First session: noisy room.
+    for _ in range(20):
+        engine._noise_cal_rms.append(0.08)
+    engine._finish_noise_calibration()
+    assert engine._effective_frame_energy > eng._VAD_FRAME_ENERGY
+    engine._end_session()
+    # Second session: quiet room — gates must reset to static floors.
+    engine._start_session()
+    assert engine._noise_calibrated is False
+    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY
+    assert engine._effective_min_energy == eng._MIN_ENERGY
+    assert engine._noise_cal_rms == []
+    engine._end_session()
+
+
+def test_noise_calibration_idempotent():
+    """_finish_noise_calibration must be safe to call multiple times - the
+    _noise_calibrated flag guards re-entry (the audio callback could fire
+    again before the flag is checked)."""
+    engine = _make_engine()
+    engine._start_session()
+    for _ in range(20):
+        engine._noise_cal_rms.append(0.06)
+    engine._finish_noise_calibration()
+    first_frame = engine._effective_frame_energy
+    # Second call should be a no-op.
+    engine._noise_cal_rms = [0.001] * 20  # different values
+    engine._finish_noise_calibration()
+    assert engine._effective_frame_energy == first_frame
+    engine._end_session()
+
+
+def test_noise_calibration_median_robust_against_spikes():
+    """The median (not mean) is used so a transient spike (brief speech, key
+    click) during calibration does not inflate the noise floor."""
+    engine = _make_engine()
+    engine._start_session()
+    # 18 quiet frames + 2 loud spikes (simulating a key press during cal).
+    for _ in range(18):
+        engine._noise_cal_rms.append(0.01)
+    engine._noise_cal_rms.append(0.20)  # spike
+    engine._noise_cal_rms.append(0.25)  # spike
+    engine._finish_noise_calibration()
+    # Median of 20 values = 10th + 11th sorted / 2 -> both ~0.01.
+    # The spikes are at the tail and do not affect the median.
+    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY  # 0.01*2.5=0.025 < static
+    engine._end_session()
+
+
+def test_noise_calibration_empty_samples_no_crash():
+    """If calibration somehow has no samples (race / fast session end), the
+    method must not crash and must leave the static floors in place."""
+    engine = _make_engine()
+    engine._start_session()
+    engine._noise_cal_rms = []  # empty
+    engine._finish_noise_calibration()
+    assert engine._noise_calibrated is True
+    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY
+    assert engine._effective_min_energy == eng._MIN_ENERGY
+    engine._end_session()
+
+
+def test_vad_uses_effective_frame_energy():
+    """_process_vad_frames must use the adaptive _effective_frame_energy, not
+    the static _VAD_FRAME_ENERGY. In a noisy room, a frame just above the
+    static floor but below the adaptive floor should be classified as silence."""
+    engine = _make_engine()
+    engine._start_session()
+    # Simulate a noisy-room calibration so the adaptive floor is raised.
+    for _ in range(20):
+        engine._noise_cal_rms.append(0.08)
+    engine._finish_noise_calibration()
+    # Now a frame with RMS ~0.03 would pass the static floor (0.025) but
+    # should be rejected by the adaptive floor (0.08*2.5=0.20).
+    assert engine._effective_frame_energy > 0.03
+
+    class _AlwaysSpeechVad:
+        available = True
+        frame_bytes = 960
+        def is_speech(self, frame):
+            return True  # would say "speech" if it got the chance
+
+    engine._vad = _AlwaysSpeechVad()
+    # Generate a frame with RMS ~0.03 (below adaptive floor, above static).
+    n = 480
+    amp = int(0.03 * 32767)  # ~983
+    frame = array("h", (amp if i % 2 else -amp for i in range(n))).tobytes()
+    frame_bytes = 960
+    frame_seconds = frame_bytes / 2 / WHISPER_SAMPLE_RATE
+    engine._in_speech = False
+    engine._process_vad_frames(frame, frame_bytes, frame_seconds)
+    # The frame should NOT have been buffered (energy below adaptive floor).
+    assert engine._utterance_buffer == []
+    assert engine._in_speech is False
+    engine._end_session()

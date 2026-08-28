@@ -57,6 +57,7 @@ class MacMenuBar:
         self._toggle_item: Any = None
         self._state_item: Any = None
         self._state: str = "idle"
+        self._last_icon: Any = None  # strong ref to prevent NSImage GC
 
     def setup(self) -> None:
         """Create the status item + menu on the main thread (idempotent)."""
@@ -193,6 +194,16 @@ class MacMenuBar:
             img = whiz_logo_image(_MENU_ICON_SIZE, color)
             if img is not None:
                 self._button.setImage_(img)
+                # Keep a strong reference so the NSImage isn't GC'd before
+                # the status item re-renders. Without this, the image can be
+                # collected between the setImage_ call and the actual
+                # display, leaving the button with a stale/nil image.
+                self._last_icon = img
+                # Force the button to redraw with the new image.
+                try:
+                    self._button.setNeedsDisplay_(True)
+                except Exception:  # noqa: BLE001
+                    pass
         except Exception:  # noqa: BLE001
             logger.debug("menu bar icon apply failed", exc_info=True)
 

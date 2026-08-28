@@ -314,21 +314,6 @@ class DictationEngine:
             print(hint, file=sys.stderr)
             return 1
 
-        # Main-thread indicator setup: platforms whose indicator needs
-        # main-thread-only APIs (macOS NSWindow) create their UI here. run()
-        # is called from the main thread, so this is always safe.
-        self.indicator.setup()
-
-        # Show the indicator in its dimmed idle state as soon as the service
-        # starts, so the user can see dictation is armed. Without this the
-        # NSPanel exists (created above) but is never ordered to the front
-        # until a session begins — which is why the indicator was invisible
-        # at idle. When idle_visible is off, keep the original behavior (hide
-        # until a session starts).
-        if self.s.show_indicator and self.s.idle_visible:
-            self._set_state("idle")
-            self.indicator.show()
-
         # On macOS, run the AppKit event loop on the main thread whenever
         # ANY AppKit UI is live — the indicator OR the menu bar. The menu
         # bar's NSStatusItem needs the run loop to pump events for clicks +
@@ -336,11 +321,13 @@ class DictationEngine:
         # the status item appears but is dead. Falls back to the plain loop
         # only when no AppKit UI is in use.
         #
-        # The menu bar is set up INSIDE _run_with_appkit, AFTER
-        # NSApplication.sharedApplication() + setActivationPolicy_().
-        # Creating an NSStatusItem before the NSApplication is initialized
-        # can leave the status item's menu dead — clicks don't pop up the
-        # menu because the app object isn't fully wired yet.
+        # ALL AppKit UI (indicator panel + menu bar status item) is set up
+        # INSIDE _run_with_appkit, AFTER NSApplication.sharedApplication()
+        # + setActivationPolicy_(). Creating NSPanel/NSStatusItem before the
+        # NSApplication is initialized doesn't render — the window/status
+        # item exists in memory but never appears on screen, and image updates
+        # (icon tint changes) silently fail. This was the root cause of the
+        # pill never showing and the W icon never changing color.
         if (self.s.show_indicator or self.s.menu_bar) and _is_macos():
             return self._run_with_appkit()
         return self._run_plain()
@@ -783,7 +770,16 @@ class DictationEngine:
             logger.warning("Could not create dictation menu bar item", exc_info=True)
 
     def _run_plain(self) -> int:
-        """Run without AppKit — a blocking loop driving the hotkey listener."""
+        """Run without AppKit — a blocking loop driving the hotkey listener.
+
+        On the non-AppKit path, the indicator is a NullIndicator (or a
+        platform indicator that doesn't need NSApplication), so setup()
+        is safe to call here.
+        """
+        self.indicator.setup()
+        if self.s.show_indicator and self.s.idle_visible:
+            self._set_state("idle")
+            self.indicator.show()
         listener = self._start_hotkey_listener()
         try:
             while not self._stop_event.is_set():
@@ -796,17 +792,25 @@ class DictationEngine:
         return 0
 
     def _run_with_appkit(self) -> int:
-        """Run on the main thread with the macOS AppKit event loop (for the indicator)."""
+        """Run on the main thread with the macOS AppKit event loop.
+
+        ALL AppKit UI is created AFTER NSApplication.sharedApplication() +
+        setActivationPolicy_(). Creating NSPanel/NSStatusItem before the app
+        object exists doesn't render — windows and status items exist in
+        memory but never appear on screen, and image updates (icon tint)
+        silently fail. This was the root cause of the invisible pill and the
+        W icon that never changed color.
+
+        We use NSApplication.run() (the standard AppKit run loop) instead of
+        AppHelper.runConsoleEventLoop(). runConsoleEventLoop doesn't fully
+        support window display, status item image updates, or NSMenu popup —
+        the status item appeared but clicks didn't open the menu, and the
+        indicator panel was created but never rendered. NSApplication.run()
+        pumps the full event loop including window display, menu popup, and
+        status item redraw.
+        """
         try:
             from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
-            from Foundation import NSDate
-            from PyObjCTools import AppHelper
-            from CoreFoundation import (
-                CFRunLoopAddTimer,
-                CFRunLoopGetMain,
-                CFRunLoopTimerCreate,
-                kCFRunLoopDefaultMode,
-            )
         except ImportError:
             # No pyobjc — fall back to the plain loop (no indicator).
             return self._run_plain()
@@ -814,34 +818,37 @@ class DictationEngine:
         app = NSApplication.sharedApplication()
         app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
 
-        # Create the menu bar status item NOW — after the NSApplication is
-        # initialized and the accessory policy is set. Creating it before
-        # the app object exists can leave the status item's menu dead (clicks
-        # don't open the dropdown). The indicator was already set up in run()
-        # before this point (it doesn't need the app object).
+        # Create ALL AppKit UI now — after the app object is initialized.
+        # The indicator panel and the menu bar status item both need the
+        # app to exist before they can render. Order matters: indicator
+        # first (it doesn't depend on the menu bar), then menu bar.
+        self.indicator.setup()
+        if self.s.show_indicator and self.s.idle_visible:
+            self._set_state("idle")
+            self.indicator.show()
         self._setup_menu_bar()
 
         # Start the hotkey listener on a background thread.
         listener = self._start_hotkey_listener()
 
-        def timer_callback(_timer, _info):  # noqa: ARG001
-            if self._stop_event.is_set():
+        # NSApplication.run() blocks until app.terminate_() is called. We
+        # poll the stop event on a background thread and call terminate_
+        # when stop() / Ctrl+C sets it. This replaces the CFRunLoopTimer +
+        # runConsoleEventLoop approach, which didn't properly support window
+        # display, status item image updates, or NSMenu popup.
+        def _stop_watcher():
+            while not self._stop_event.is_set():
+                time.sleep(0.1)
+            try:
                 app.terminate_(None)
+            except Exception:  # noqa: BLE001
+                pass
 
-        # Repeating timer that checks the stop event every 100 ms so
-        # Ctrl+C / stop() can terminate the AppKit run loop.
-        timer = CFRunLoopTimerCreate(
-            None,
-            NSDate.distantPast().timeIntervalSinceReferenceDate() + 0.1,
-            0.1,  # interval
-            0, 0,
-            timer_callback,
-            None,
-        )
-        CFRunLoopAddTimer(CFRunLoopGetMain(), timer, kCFRunLoopDefaultMode)
+        watcher = threading.Thread(target=_stop_watcher, daemon=True)
+        watcher.start()
 
         try:
-            AppHelper.runConsoleEventLoop(installInterrupt=True)
+            app.run()
         except KeyboardInterrupt:
             self.stop()
         finally:

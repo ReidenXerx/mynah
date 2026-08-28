@@ -296,7 +296,6 @@ class DictationEngine:
         the direct call when there are no listeners.
         """
         self._indicator_state = state
-        logger.debug("_set_state(%s) indicator=%s", state, type(self.indicator).__name__)
         self.indicator.set_state(state)
         for fn in self._state_listeners:
             try:
@@ -832,12 +831,10 @@ class DictationEngine:
             import rumps.events as rumps_events
 
             def _setup_indicator(*_args, **_kwargs) -> None:
-                logger.debug("rumps before_start: setting up indicator")
                 self.indicator.setup()
                 if self.s.show_indicator and self.s.idle_visible:
                     self._set_state("idle")
                     self.indicator.show()
-                logger.debug("rumps before_start: indicator setup complete")
 
             rumps_events.before_start.register(_setup_indicator)
         except Exception:  # noqa: BLE001
@@ -1010,10 +1007,6 @@ def run_dictate(config: Config, **overrides: object) -> int:
         stt._model_ref = settings.model  # noqa: SLF001
 
     engine = DictationEngine(settings, stt, injector, indicator)
-    logger.debug(
-        "run_dictate: indicator=%s show_indicator=%s idle_visible=%s menu_bar=%s",
-        type(indicator).__name__, settings.show_indicator, settings.idle_visible, settings.menu_bar,
-    )
     model_name = getattr(stt, "_model_ref", "?")
     trigger_label = "push-to-talk" if settings.trigger == "ptt" else "toggle"
     print(

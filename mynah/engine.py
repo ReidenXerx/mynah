@@ -831,10 +831,12 @@ class DictationEngine:
             import rumps.events as rumps_events
 
             def _setup_indicator(*_args, **_kwargs) -> None:
+                logger.debug("rumps before_start: setting up indicator")
                 self.indicator.setup()
                 if self.s.show_indicator and self.s.idle_visible:
                     self._set_state("idle")
                     self.indicator.show()
+                logger.debug("rumps before_start: indicator setup complete")
 
             rumps_events.before_start.register(_setup_indicator)
         except Exception:  # noqa: BLE001

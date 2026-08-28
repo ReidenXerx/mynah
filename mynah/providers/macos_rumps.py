@@ -92,13 +92,21 @@ def _ensure_icon_pngs() -> dict[str, str]:
             finally:
                 img.unlockFocus()
             # Save as PNG via NSBitmapImageRep (representationUsingType_properties_
-            # is on NSBitmapImageRep, not NSImage).
+            # is on NSBitmapImageRep, not NSImage). The PNG file-type constant
+            # has been renamed across SDKs (NSPNGFileType → NSBitmapImageFileTypePNG)
+            # and pyobjc's lazy import doesn't always expose either name, so we
+            # fall back to the stable numeric value (NSPNGFileType == 4).
+            _PNG = (
+                getattr(AppKit, "NSBitmapImageFileTypePNG", None)
+                or getattr(AppKit, "NSPNGFileType", None)
+                or 4
+            )
             tiff = img.TIFFRepresentation()
             if tiff is not None:
                 rep = AppKit.NSBitmapImageRep.imageRepWithData_(tiff)
                 if rep is not None:
                     png_data = rep.representationUsingType_properties_(
-                        AppKit.NSImageTypePNG, None
+                        _PNG, None
                     )
                     if png_data is not None:
                         png_data.writeToFile_atomically_(path, True)

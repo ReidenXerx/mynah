@@ -351,6 +351,19 @@ def _create_objc_view_class():
             except Exception:  # noqa: BLE001
                 logger.debug("drawRect failed", exc_info=True)
 
+        def _ensure_vibrancy(self, AppKit) -> None:
+            """Delegate to WhizIndicatorView._ensure_vibrancy.
+
+            The draw method calls self._ensure_vibrancy() but the ObjC
+            instance doesn't inherit from WhizIndicatorView — it delegates
+            drawRect_ to the class method. This bridge lets the draw method
+            reach the vibrancy setup.
+            """
+            try:
+                WhizIndicatorView._ensure_vibrancy(self, AppKit)
+            except Exception:  # noqa: BLE001
+                logger.debug("_ensure_vibrancy failed", exc_info=True)
+
         # performSelectorOnMainThread:withObject: requires a one-argument
         # selector (trailing colon in ObjC). pyobjc maps Python trailing
         # underscores to ObjC colons, but internal underscores also map to

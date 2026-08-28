@@ -337,6 +337,8 @@ def _create_objc_view_class():
             if self is not None:
                 self._indicator = None
                 self._vfx_view = None
+                self._fade_gen = 0
+                self._pending_out_gen = 0
             return self
 
         def drawRect_(self, rect):
@@ -395,38 +397,78 @@ def _create_objc_view_class():
                     pass
 
         def _fade_panel_impl(self, fade_in: bool) -> None:
-            import AppKit
-            # NSAnimationContext lives in AppKit (Quartz/CoreAnimation is a
-            # separate framework not installed by pyobjc's default extra).
             from AppKit import NSAnimationContext
 
             panel = self.window()
             if panel is None:
                 return
-            # Cancel any pending hide-side ``orderOut:`` scheduled by a prior
-            # ``_fade_panel(False)``. Without this, a rapid hide→show
-            # (toggle double-tap / session restart) re-fronts the panel and
-            # fades alpha to 1, only for the deferred ``orderOut:`` to fire
-            # ~0.2s later and rip the now-visible panel off-screen.
-            panel.cancelPreviousPerformRequestsWithTarget_selector_object_(
-                panel, "orderOut:", None
-            )
             if fade_in:
-                # Order front first (alpha 0), then animate to 1.
+                # Bump the generation token so any deferred orderOut from a
+                # prior hide sees a stale gen and aborts (see whizOrderOut_:).
+                self._fade_gen += 1
+                # Order front FIRST (alpha is 0 from setup), then animate
+                # alpha to 1. If the animation fails, set alpha instantly.
+                # This guarantees the panel is on screen even if NSAnimationContext
+                # is unavailable (headless test / no graphics context).
                 panel.orderFrontRegardless()
-            ctx = NSAnimationContext.beginGrouping()
-            ctx.setDuration_(_FADE_SECONDS)
-            try:
-                panel.animator().setAlphaValue_(1.0 if fade_in else 0.0)
-            finally:
-                NSAnimationContext.endGrouping()
-            if not fade_in:
-                # After the fade, hide the panel so it stops receiving draws.
-                import Foundation
+                try:
+                    ctx = NSAnimationContext.beginGrouping()
+                    if ctx is not None:
+                        ctx.setDuration_(_FADE_SECONDS)
+                        panel.animator().setAlphaValue_(1.0)
+                        NSAnimationContext.endGrouping()
+                    else:
+                        panel.setAlphaValue_(1.0)
+                except Exception:  # noqa: BLE001
+                    panel.setAlphaValue_(1.0)
+            else:
+                # Animate alpha to 0, then order out. If animation fails,
+                # set alpha 0 instantly and order out immediately.
+                self._fade_gen += 1
+                gen = self._fade_gen
+                try:
+                    ctx = NSAnimationContext.beginGrouping()
+                    if ctx is not None:
+                        ctx.setDuration_(_FADE_SECONDS)
+                        panel.animator().setAlphaValue_(0.0)
+                        NSAnimationContext.endGrouping()
+                        # Order out after the fade completes — but only if
+                        # no show bumped the gen since (rapid hide→show).
+                        # We store the gen in _pending_out_gen and pass nil to
+                        # whizOrderOut: (ObjC performSelector needs an ObjC
+                        # object, not a Python int). We can't cancel a
+                        # scheduled perform in pyobjc
+                        # (cancelPreviousPerformRequestsWithTarget: is not
+                        # callable on instances), so we let stale callbacks
+                        # fire and abort inside whizOrderOut:.
+                        self._pending_out_gen = gen
+                        self.performSelector_withObject_afterDelay_(
+                            "whizOrderOut:", None, _FADE_SECONDS + 0.05
+                        )
+                    else:
+                        panel.setAlphaValue_(0.0)
+                        panel.orderOut_(None)
+                except Exception:  # noqa: BLE001
+                    panel.setAlphaValue_(0.0)
+                    panel.orderOut_(None)
 
-                Foundation.NSObject.performSelector_withObject_afterDelay_(
-                    panel, "orderOut:", None, _FADE_SECONDS + 0.02
-                )
+        def whizOrderOut_(self, sender):  # noqa: ARG002
+            """Deferred hide: order out the panel unless superseded by a show.
+
+            ``_pending_out_gen`` was snapshotted at hide time. If a show has
+            bumped ``_fade_gen`` since, the panel is visible again and we
+            skip the orderOut. This replaces
+            ``cancelPreviousPerformRequestsWithTarget:`` which is not
+            callable on pyobjc NSPanel instances (AttributeError).
+            """
+            try:
+                if getattr(self, "_pending_out_gen", 0) != self._fade_gen:
+                    return  # superseded by a show — don't yank the panel
+                panel = self.window()
+                if panel is not None:
+                    panel.orderOut_(None)
+            except Exception:  # noqa: BLE001
+                logger.debug("whizOrderOut failed", exc_info=True)
 
     _OBJC_VIEW_CLASS = _WhizIndicatorViewImpl
     return _OBJC_VIEW_CLASS

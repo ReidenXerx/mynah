@@ -46,11 +46,6 @@ def plist_path() -> Path:
     return _LAUNCH_AGENTS_DIR / f"{LABEL}.plist"
 
 
-def log_path() -> Path:
-    """Return the combined stdout/stderr log path for the agent."""
-    return _LOG_PATH
-
-
 def _venv_bin_dir() -> Path | None:
     """Return the pipx venv ``bin`` dir that owns the ``whiz`` script, or None.
 

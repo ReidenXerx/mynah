@@ -801,9 +801,17 @@ class DictationEngine:
         that couldn't properly render the indicator panel or update the
         status item icon.
 
-        The floating pill indicator is dropped (per user decision) — the menu
-        bar W icon now serves as the sole visual indicator, with its tint
-        reflecting the dictation state.
+        The floating pill indicator is created inside a ``rumps.events.
+        before_start`` callback, which fires AFTER
+        ``NSApplication.sharedApplication()`` has been initialized but BEFORE
+        ``AppHelper.runEventLoop()`` blocks. This is the crucial timing: an
+        NSPanel created before the NSApplication exists never renders, and
+        one created while the run loop is already blocking must be
+        dispatched to the main thread. ``before_start`` gives us a main-thread
+        callback at the exact safe window, so the panel's vibrancy, waveform,
+        and fade all render correctly under rumps' proper event loop — the
+        thing the old manual ``NSApplication.run()`` + background watcher
+        couldn't provide.
         """
         try:
             from whiz.dictate.providers.macos_rumps import MacMenuBar
@@ -812,9 +820,25 @@ class DictationEngine:
             return self._run_plain()
 
         # Create the rumps-based menu bar (sets up NSStatusItem + NSMenu).
-        # The indicator is a NullIndicator on this path since we dropped the
-        # floating pill — the menu bar W icon is the sole visual indicator.
         self._setup_menu_bar()
+
+        # Set up the floating pill indicator in rumps' before_start event —
+        # fires on the main thread after NSApplication.sharedApplication()
+        # exists but before the run loop blocks. This is the safe window for
+        # NSPanel creation; doing it earlier (before rumps creates the
+        # NSApplication) meant the panel never rendered.
+        try:
+            import rumps.events as rumps_events
+
+            def _setup_indicator(*_args, **_kwargs) -> None:
+                self.indicator.setup()
+                if self.s.show_indicator and self.s.idle_visible:
+                    self._set_state("idle")
+                    self.indicator.show()
+
+            rumps_events.before_start.register(_setup_indicator)
+        except Exception:  # noqa: BLE001
+            logger.debug("could not register before_start indicator setup", exc_info=True)
 
         # Start the hotkey listener on a background thread.
         listener = self._start_hotkey_listener()

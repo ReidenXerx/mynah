@@ -188,7 +188,7 @@ class FakeInjector(base.TextInjector):
     def type_text(self, text: str) -> None:
         self.typed.append(text)
 
-    def check_permissions(self) -> tuple[bool, str]:
+    def check_permissions(self, prompt: bool = True) -> tuple[bool, str]:
         if self.permissions_ok:
             return True, ""
         return False, "grant Accessibility"
@@ -613,6 +613,48 @@ def test_run_calls_indicator_setup_before_loop(monkeypatch):
     engine._stop_event.set()
     engine.run()
     assert indicator.setup_called is True
+
+
+def test_run_polls_for_accessibility_then_starts(monkeypatch):
+    """When Accessibility is not granted at first, run() must poll until it is
+    granted instead of exiting immediately — like a normal macOS app that
+    waits at the permission dialog.
+    """
+    injector = FakeInjector()
+    injector.permissions_ok = False
+    engine = _make_engine(injector=injector)
+    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+    # Shorten poll interval/timeout so the test is fast.
+    monkeypatch.setattr(eng, "_PERM_POLL_INTERVAL", 0.01)
+    monkeypatch.setattr(eng, "_PERM_POLL_TIMEOUT", 2.0)
+    # After 3 checks, grant the permission (simulate user toggling it on).
+    call_count = {"n": 0}
+    original = injector.check_permissions
+
+    def granting_check(prompt=True):
+        call_count["n"] += 1
+        if call_count["n"] >= 3:
+            injector.permissions_ok = True
+        return original(prompt=prompt)
+
+    injector.check_permissions = granting_check
+    # Mock _run_plain so it doesn't start a real pynput listener.
+    monkeypatch.setattr(engine, "_run_plain", lambda: 0)
+    rc = engine.run()
+    assert rc == 0
+    assert call_count["n"] >= 3, "should have polled at least 3 times"
+
+
+def test_run_exits_if_accessibility_never_granted(monkeypatch):
+    """If Accessibility is never granted within the timeout, run() exits 1."""
+    injector = FakeInjector()
+    injector.permissions_ok = False
+    engine = _make_engine(injector=injector)
+    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+    monkeypatch.setattr(eng, "_PERM_POLL_INTERVAL", 0.01)
+    monkeypatch.setattr(eng, "_PERM_POLL_TIMEOUT", 0.05)
+    rc = engine.run()
+    assert rc == 1
 
 
 # ---------------------------------------------------------------------------

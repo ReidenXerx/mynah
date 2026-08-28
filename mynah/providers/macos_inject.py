@@ -55,25 +55,34 @@ class MacTextInjector(TextInjector):
         else:
             self._paste(text)
 
-    def check_permissions(self) -> tuple[bool, str]:
-        """Verify Accessibility permission is granted (required for CGEvent posting)."""
+    def check_permissions(self, prompt: bool = True) -> tuple[bool, str]:
+        """Verify Accessibility permission is granted (required for CGEvent posting).
+
+        When ``prompt`` is True, use ``AXIsProcessTrustedWithOptions`` with the
+        prompt flag — this opens System Settings to the Accessibility pane
+        if not yet trusted. When False, use the plain ``AXIsProcessTrusted``
+        which is silent (no dialog) — for polling after the initial prompt.
+        """
         try:
-            from ApplicationServices import AXIsProcessTrustedWithOptions
+            from ApplicationServices import AXIsProcessTrustedWithOptions, AXIsProcessTrusted
             from CoreFoundation import kCFBooleanTrue
             from Foundation import NSDictionary
 
-            # AXIsProcessTrustedWithOptions with the prompt option opens
-            # System Settings to the Accessibility pane if not yet trusted.
-            options = NSDictionary.dictionaryWithDictionary_(
-                {"AXTrustedCheckOptionPrompt": kCFBooleanTrue}
-            )
-            trusted = AXIsProcessTrustedWithOptions(options)
+            if prompt:
+                # AXIsProcessTrustedWithOptions with the prompt option opens
+                # System Settings to the Accessibility pane if not yet trusted.
+                options = NSDictionary.dictionaryWithDictionary_(
+                    {"AXTrustedCheckOptionPrompt": kCFBooleanTrue}
+                )
+                trusted = AXIsProcessTrustedWithOptions(options)
+            else:
+                trusted = AXIsProcessTrusted()
             if trusted:
                 return True, ""
             return False, (
                 "Accessibility permission required. Grant it in:\n"
                 "  System Settings → Privacy & Security → Accessibility\n"
-                "  Add the terminal/Python that runs whiz, then restart whiz dictate."
+                "  Add whiz and enable it — whiz will start automatically once granted."
             )
         except ImportError:
             # Fallback to the simpler API if ApplicationServices isn't available.
@@ -84,7 +93,8 @@ class MacTextInjector(TextInjector):
                     return True, ""
                 return False, (
                     "Accessibility permission required. Grant it in:\n"
-                    "  System Settings → Privacy & Security → Accessibility"
+                    "  System Settings → Privacy & Security → Accessibility\n"
+                    "  Add whiz and enable it — whiz will start automatically once granted."
                 )
             except ImportError:
                 return False, (

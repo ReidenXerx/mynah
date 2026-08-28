@@ -174,6 +174,33 @@ def _rms_int16(pcm_bytes: bytes) -> float:
     return (total / len(raw)) ** 0.5 / 32768.0
 
 
+# How often (seconds) to re-check Accessibility while waiting for the
+# user to grant it in System Settings.
+_PERM_POLL_INTERVAL = 1.0
+# How long (seconds) to wait for the user to grant Accessibility before
+# giving up and exiting. Generous — the user may need to navigate System
+# Settings, find the binary, and toggle it on.
+_PERM_POLL_TIMEOUT = 300  # 5 minutes
+
+
+def _wait_for_accessibility(injector: TextInjector) -> bool:
+    """Poll the Accessibility permission until granted or timeout.
+
+    ``check_permissions(prompt=True)`` was already called, which opened
+    System Settings to the Accessibility pane. Now we poll silently (with
+    ``prompt=False``) until the user toggles the app on, then return True.
+    If the user doesn't grant it within the timeout, return False so the
+    caller can exit cleanly.
+    """
+    deadline = time.monotonic() + _PERM_POLL_TIMEOUT
+    while time.monotonic() < deadline:
+        time.sleep(_PERM_POLL_INTERVAL)
+        ok, _ = injector.check_permissions(prompt=False)
+        if ok:
+            return True
+    return False
+
+
 @dataclass
 class DictateSettings:
     """Resolved dictation settings (config + CLI overrides)."""
@@ -308,11 +335,17 @@ class DictationEngine:
 
         Returns an exit code (0 = clean).
         """
-        # Check permissions before starting.
+        # Check permissions before starting. If Accessibility is not yet
+        # granted, request it (which opens the System Settings prompt) and
+        # poll until the user grants it — like a normal macOS app that waits
+        # at the permission dialog rather than crashing and relying on
+        # launchd KeepAlive to restart it in a crash loop.
         ok, hint = self.injector.check_permissions()
         if not ok:
             print(hint, file=sys.stderr)
-            return 1
+            if not _wait_for_accessibility(self.injector):
+                return 1
+            print("Accessibility granted — starting whiz dictate.", file=sys.stderr)
 
         # On macOS, run the AppKit event loop on the main thread whenever
         # ANY AppKit UI is live — the indicator OR the menu bar. The menu

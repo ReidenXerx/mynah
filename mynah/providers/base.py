@@ -57,12 +57,17 @@ class TextInjector(ABC):
         """Type ``text`` into whatever app currently has keyboard focus."""
 
     @abstractmethod
-    def check_permissions(self) -> tuple[bool, str]:
+    def check_permissions(self, prompt: bool = True) -> tuple[bool, str]:
         """Verify platform permissions are granted.
 
         Returns ``(ok, hint)`` where ``hint`` is a human-readable remediation
         message shown when ``ok`` is False (e.g. "grant Accessibility in
         System Settings → Privacy & Security").
+
+        When ``prompt`` is True (the default), the platform API may trigger
+        the OS permission dialog (e.g. macOS ``AXIsProcessTrustedWithOptions``
+        with the prompt flag opens System Settings). When ``prompt`` is
+        False, the check is silent — used for polling after the initial prompt.
         """
 
 

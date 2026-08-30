@@ -31,10 +31,11 @@ final class SessionController: ObservableObject {
     /// failed. TCC sends no notification, so polling is the only option.
     @Published private(set) var isAccessibilityTrusted = Permissions.isAccessibilityTrusted
 
-    var config: WhizConfig
+    @Published var config: WhizConfig
 
     private let capture = AudioCapture()
     private var whisper: WhisperEngine?
+    private var vad: SileroVAD?
     private lazy var detector = makeDetector()
     private var idleUnloadTask: Task<Void, Never>?
 
@@ -64,6 +65,11 @@ final class SessionController: ObservableObject {
     /// Async because a cold model load takes seconds. `engine.py` did this
     /// synchronously; on the main thread that would beachball the menu bar.
     private func beginSession() async {
+        // Re-read the config file so edits made since launch — from the
+        // settings window, `whiz dictate set`, or a text editor — take effect on
+        // the next dictation instead of requiring a restart.
+        config = WhizConfig.load()
+
         // Load before claiming the session is live, so a missing model surfaces
         // immediately rather than after the user has spoken a whole sentence
         // into a dead session.
@@ -146,6 +152,22 @@ final class SessionController: ObservableObject {
         lastError = message
     }
 
+    /// Mutate settings, persist them, and apply what can be applied live.
+    ///
+    /// Saving is read-modify-write, so keys owned by the Python CLI survive.
+    func updateConfig(_ mutate: (inout WhizConfig) -> Void) {
+        var updated = config
+        mutate(&updated)
+        guard updated != config else { return }
+        config = updated
+        do {
+            try updated.save()
+        } catch {
+            Log.session.error("could not save config: \(error.localizedDescription, privacy: .public)")
+            lastError = "Could not save settings: \(error.localizedDescription)"
+        }
+    }
+
     /// Re-read permission state. Called on a timer from `AppDelegate`.
     func refreshPermissions() {
         let trusted = Permissions.isAccessibilityTrusted
@@ -185,12 +207,24 @@ final class SessionController: ObservableObject {
 
         state = .transcribing
         let samples = utterance.samples
+        let voiceDetector = vad
         let previous = transcriptionChain
         transcriptionChain = Task { [weak self] in
             // Await the previous utterance so text is injected in the order it
             // was spoken. Actor isolation serialises access to the whisper
             // context but says nothing about ordering.
             _ = await previous.result
+
+            // The energy gates decided this was loud enough; Silero decides
+            // whether it is actually a voice. This is where fan noise and
+            // keyboard clacks are rejected before Whisper can hallucinate
+            // subtitle credits out of them.
+            if let voiceDetector, !(await voiceDetector.containsSpeech(samples)) {
+                Log.session.notice("utterance rejected by VAD: no speech detected")
+                await self?.finishTranscription()
+                return
+            }
+
             do {
                 let text = try await whisper.transcribe(
                     samples: samples, language: language, prompt: prompt)
@@ -199,6 +233,11 @@ final class SessionController: ObservableObject {
                 self?.deliver(.failure(error))
             }
         }
+    }
+
+    /// Return to the resting state without injecting anything.
+    private func finishTranscription() {
+        state = isSessionActive ? .listening : .idle
     }
 
     private func deliver(_ result: Result<String, Error>) {
@@ -229,6 +268,23 @@ final class SessionController: ObservableObject {
         let engine = whisper ?? WhisperEngine(modelURL: modelURL)
         try await engine.load()
         whisper = engine
+
+        // Optional: dictation still works without it, just with cruder
+        // noise rejection. A missing model must not block a session.
+        guard config.vad, vad == nil else { return }
+        guard let vadURL = WhisperModel.resolveVAD() else {
+            Log.stt.notice(
+                "no Silero VAD model — energy gates only; get it with: whiz models download-vad")
+            return
+        }
+        let detector = SileroVAD(modelURL: vadURL)
+        do {
+            try await detector.load()
+            vad = detector
+            Log.stt.notice("Silero VAD loaded: \(vadURL.lastPathComponent, privacy: .public)")
+        } catch {
+            Log.stt.error("Silero VAD failed to load: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Keep the model resident for `dictate_idle_timeout` so back-to-back
@@ -250,6 +306,8 @@ final class SessionController: ObservableObject {
         guard !isSessionActive else { return }
         await whisper?.unload()
         whisper = nil
+        await vad?.unload()
+        vad = nil
     }
 }
 

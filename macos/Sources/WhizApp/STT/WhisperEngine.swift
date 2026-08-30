@@ -31,15 +31,6 @@ actor WhisperEngine {
 
     var isLoaded: Bool { context != nil }
 
-    /// `ggml_backend_load_all()` is not documented as thread-safe and only
-    /// needs to happen once per process. A `let` global is initialised lazily
-    /// and exactly once by the runtime, which gives `dispatch_once` semantics
-    /// and satisfies Swift 6's global-state rules.
-    private static let backendsRegistered: Bool = {
-        ggml_backend_load_all()
-        return true
-    }()
-
     // MARK: - Lifecycle
 
     /// Load the model. Seconds on a cold start, which is why the caller keeps it
@@ -48,15 +39,7 @@ actor WhisperEngine {
     func load() throws {
         guard context == nil else { return }
 
-        // ggml's compute backends (Metal, BLAS, CPU) are separately-loadable
-        // modules that must be registered before a context is created —
-        // otherwise the device registry is empty and
-        // `whisper_init_from_file_with_params` aborts on `GGML_ASSERT(device)`
-        // rather than returning null, taking the whole app with it.
-        //
-        // Idempotent, but the first call compiles the Metal library and can
-        // take several seconds; it is part of what makes a cold load slow.
-        _ = Self.backendsRegistered
+        GGMLBackends.registerOnce()
 
         var params = whisper_context_default_params()
         // Metal. The whole reason for choosing a GPU-capable runtime.

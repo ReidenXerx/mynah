@@ -13,7 +13,7 @@ import Foundation
 /// Defaults mirror `whiz/config.py`. Keep them in sync — if they drift, the
 /// same config file means two different things depending on which binary reads
 /// it.
-struct WhizConfig {
+struct WhizConfig: Equatable {
 
     // MARK: - Dictation keys (Swift-owned)
 

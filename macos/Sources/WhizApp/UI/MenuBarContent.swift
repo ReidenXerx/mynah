@@ -9,6 +9,7 @@ import SwiftUI
 /// problem, so both files and the dependency go away together.
 struct MenuBarContent: View {
     @ObservedObject var controller: SessionController
+    var onOpenSettings: () -> Void
 
     @State private var launchesAtLogin = LoginItem.isEnabled
 
@@ -51,6 +52,11 @@ struct MenuBarContent: View {
                     launchesAtLogin = LoginItem.isEnabled
                 }
             }
+
+        Button("Settings…") {
+            onOpenSettings()
+        }
+        .keyboardShortcut(",")
 
         Button("Open Config File") {
             NSWorkspace.shared.open(WhizConfig.path)

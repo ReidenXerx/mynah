@@ -17,7 +17,9 @@ struct WhizApp: App {
             // `applicationDidFinishLaunching`, which meant SwiftUI rendered this
             // content once while it was still nil and never re-evaluated —
             // producing an empty menu that would not open at all.
-            MenuBarContent(controller: delegate.controller)
+            MenuBarContent(
+                controller: delegate.controller,
+                onOpenSettings: { delegate.showSettings() })
         } label: {
             // MenuBarExtra's label is rendered as a template image, so the tint
             // is ignored in favour of the menu bar's own appearance. State is
@@ -64,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let controller = SessionController()
 
     private var indicator: IndicatorPanel?
+    private lazy var settings = SettingsWindow(controller: controller)
     private let hotkeys = HotkeyManager()
     private var cancellables = Set<AnyCancellable>()
     private var permissionTimer: Timer?
@@ -93,7 +96,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             Task { @MainActor in self.controller.refreshPermissions() }
         }
 
-        let hotkey = controller.config.hotkey
+        registerHotkey(controller.config.hotkey)
+
+        // Re-register when the hotkey is edited in Settings, so it takes effect
+        // without a restart.
+        controller.$config
+            .map(\.hotkey)
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] hotkey in self?.registerHotkey(hotkey) }
+            .store(in: &cancellables)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        controller.endSession()
+        hotkeys.unregister()
+        permissionTimer?.invalidate()
+    }
+
+    func showSettings() {
+        settings.show()
+    }
+
+    private func registerHotkey(_ hotkey: String) {
         if hotkeys.register(hotkey, onTrigger: { [weak self] in self?.handleTrigger() }) {
             Log.ui.notice("hotkey registered: \(hotkey, privacy: .public)")
         } else {
@@ -101,12 +126,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             controller.reportError(
                 "Could not register the hotkey '\(hotkey)'. Another app may already use it.")
         }
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        controller.endSession()
-        hotkeys.unregister()
-        permissionTimer?.invalidate()
     }
 
     private func handleTrigger() {

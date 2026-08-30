@@ -1,14 +1,14 @@
 // whisper.cpp's C API, exposed to Swift.
 //
-// A system-library target rather than a vendored source build: whiz already
-// requires whisper.cpp for batch transcription (`whisper-cli` on PATH), so the
-// library is present on any machine that can run whiz at all. Homebrew installs
-// the header and dylib alongside the binary.
+// Headers come from the vendored build (`vendor/install/include`), produced by
+// `scripts/build-whisper.sh` from the pinned submodule — not from Homebrew.
+// Linking Homebrew's copy made the app unshippable: absolute /opt/homebrew
+// paths, binaries built for a much newer macOS than our deployment target, and
+// compute backends living as loose .so files in Cellar/*/libexec.
 //
-// The header search path is supplied by Package.swift, which points at both
-// Homebrew prefixes (Apple Silicon and Intel).
+// `link` is deliberately absent: the static archives are passed explicitly by
+// build-app.sh, in dependency order, which a module map cannot express.
 module CWhisper [system] {
     header "shim.h"
-    link "whisper"
     export *
 }

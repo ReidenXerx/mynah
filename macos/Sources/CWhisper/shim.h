@@ -1,10 +1,8 @@
 // Indirection so the module map does not hardcode an absolute path; the real
-// headers are found via the include paths set in Package.swift.
+// headers are found via the include paths set by build-app.sh / Package.swift,
+// which point at vendor/install/include.
 //
-// ggml-backend.h is needed as well as whisper.h: ggml ships its Metal, BLAS and
-// CPU backends as separately-loadable modules, and they must be registered with
-// `ggml_backend_load_all()` before a context is created. Without it the backend
-// registry is empty and `whisper_init_from_file_with_params` aborts on
-// `GGML_ASSERT(device)`.
+// ggml-backend.h is needed as well as whisper.h so Swift can see
+// `ggml_backend_load_all` — see GGMLBackends.swift for why it must be called.
 #include <whisper.h>
 #include <ggml-backend.h>

@@ -73,17 +73,9 @@ struct SettingsView: View {
                 LabeledContent("Language") {
                     TextField("", text: binding(\.language)).frame(width: 80)
                 }
-                LabeledContent("Model") {
-                    Text(resolvedModelName).foregroundStyle(.secondary)
-                }
             }
 
-            Section {
-                Toggle("Voice activity detection", isOn: binding(\.vad))
-                Text(vadDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            ModelSectionView(controller: controller)
 
             Section {
                 Text("Prompt")
@@ -97,18 +89,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-    }
-
-    private var resolvedModelName: String {
-        WhisperModel.resolve(configured: controller.config.model)?.lastPathComponent
-            ?? "none found — run: whiz models download ggml-large-v3-turbo.bin"
-    }
-
-    private var vadDescription: String {
-        WhisperModel.resolveVAD() == nil
-            ? "Silero model missing — run: whiz models download-vad"
-            : "Uses Silero to check an utterance is a human voice, not just loud. "
-              + "Rejects fans, keyboards and vacuum cleaners before transcription."
     }
 
     // MARK: - Sensitivity

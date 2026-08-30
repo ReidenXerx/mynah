@@ -16,16 +16,35 @@ set -euo pipefail
 CONFIGURATION="${1:-debug}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/build/Whiz.app"
-BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+VENDOR="$ROOT/vendor/install"
 
-# Match Package.swift. Keep in sync.
+# Match Package.swift and build-whisper.sh. Keep in sync.
 DEPLOYMENT_TARGET="13.0"
 
-if [ ! -f "$BREW_PREFIX/include/whisper.h" ]; then
-  echo "error: whisper.h not found under $BREW_PREFIX/include" >&2
-  echo "       install it with: brew install whisper-cpp" >&2
+# Build the vendored whisper.cpp if it is not already there. Statically linking
+# our own build is what makes the app distributable: no Homebrew requirement, no
+# absolute /opt/homebrew paths, and a deployment target we control.
+"$ROOT/scripts/build-whisper.sh" || exit 1
+
+if [ ! -f "$VENDOR/lib/libwhisper.a" ]; then
+  echo "error: vendored whisper.cpp not built at $VENDOR" >&2
   exit 1
 fi
+
+# Link order matters for static archives: dependents before dependencies.
+# whisper -> ggml -> ggml-metal/cpu -> ggml-base.
+#
+# -lc++ is also required. whisper.cpp and ggml are C++; Swift links libc++ only
+# when it knows C++ is involved, and a static archive reached through a C module
+# map does not tell it. Without this the link fails on std:: symbols and
+# ___gxx_personality_v0.
+WHISPER_LIBS=(
+  "$VENDOR/lib/libwhisper.a"
+  "$VENDOR/lib/libggml.a"
+  "$VENDOR/lib/libggml-metal.a"
+  "$VENDOR/lib/libggml-cpu.a"
+  "$VENDOR/lib/libggml-base.a"
+)
 
 build_with_swiftpm() {
   swift build --package-path "$ROOT" -c "$CONFIGURATION" >/dev/null 2>&1 || return 1
@@ -47,9 +66,12 @@ build_with_swiftc() {
     -sdk "$(xcrun --show-sdk-path)" \
     -target "arm64-apple-macosx$DEPLOYMENT_TARGET" \
     -swift-version 6 -parse-as-library $opt \
-    -Xcc "-I$BREW_PREFIX/include" \
+    -Xcc "-I$VENDOR/include" \
     -I "$ROOT/Sources/CWhisper" \
-    -L "$BREW_PREFIX/lib" -lwhisper -lggml -lggml-base \
+    "${WHISPER_LIBS[@]}" \
+    -lc++ \
+    -framework Metal -framework MetalKit -framework Accelerate \
+    -framework Foundation -framework CoreML \
     $(find "$ROOT/Sources/WhizApp" -name '*.swift') \
     -o "$out/WhizApp" || return 1
   echo "$out"

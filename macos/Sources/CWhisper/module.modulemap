@@ -1,0 +1,20 @@
+// whisper.cpp's C API, exposed to Swift.
+//
+// Headers are referenced by a path relative to this file, pointing into the
+// vendored build produced by `scripts/build-whisper.sh` from the pinned
+// submodule — never Homebrew.
+//
+// The relative path is load-bearing rather than stylistic. A `.systemLibrary`
+// target accepts no `cSettings`, and the include paths set on the WhizApp target
+// apply when compiling *WhizApp*, not when clang builds this module — so an
+// `#include <whisper.h>` here cannot be satisfied by any flag SwiftPM lets us
+// set. Naming the headers directly is what makes `swift build` and `swift test`
+// work at all.
+//
+// whisper.h's own `#include "ggml.h"` resolves because clang searches the
+// including file's directory first, and both headers are installed side by side.
+module CWhisper [system] {
+    header "../../vendor/install/include/whisper.h"
+    header "../../vendor/install/include/ggml-backend.h"
+    export *
+}

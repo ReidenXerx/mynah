@@ -71,24 +71,3 @@ def draw_whiz_logo(appkit: Any, rect: Any, color: Any) -> None:
         logger.debug("whiz logo draw failed", exc_info=True)
 
 
-def whiz_logo_image(size: float, color: Any) -> Any:
-    """Render the whiz logo as a tinted ``NSImage`` of the given square size.
-
-    Returns an ``NSImage`` suitable for ``NSStatusItem.button().setImage_()``,
-    or ``None`` if pyobjc/AppKit is unavailable (the caller falls back to no
-    icon).
-    """
-    try:
-        import AppKit
-        from Foundation import NSRect, NSSize
-
-        img = AppKit.NSImage.alloc().initWithSize_(NSSize(size, size))
-        img.lockFocus()
-        try:
-            draw_whiz_logo(AppKit, NSRect((0, 0), (size, size)), color)
-        finally:
-            img.unlockFocus()
-        return img
-    except Exception:  # noqa: BLE001
-        logger.debug("whiz logo image failed", exc_info=True)
-        return None

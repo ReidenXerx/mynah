@@ -1,0 +1,56 @@
+{
+  "quiet_two_utterances": [
+    {
+      "start": 1.2,
+      "end": 3.18,
+      "rejected_by_energy_gate": false
+    },
+    {
+      "start": 3.39,
+      "end": 4.98,
+      "rejected_by_energy_gate": false
+    }
+  ],
+  "speech_during_calibration": [
+    {
+      "start": 0.0,
+      "end": 1.77,
+      "rejected_by_energy_gate": true
+    }
+  ],
+  "speech_late_in_calibration": [
+    {
+      "start": 0.9,
+      "end": 2.7,
+      "rejected_by_energy_gate": false
+    }
+  ],
+  "noisy_room": [
+    {
+      "start": 0.0,
+      "end": 1.77,
+      "rejected_by_energy_gate": true
+    }
+  ],
+  "click_below_min": [
+    {
+      "start": 1.2,
+      "end": 2.1,
+      "rejected_by_energy_gate": false
+    }
+  ],
+  "trailing_silence_trim": [
+    {
+      "start": 1.2,
+      "end": 2.88,
+      "rejected_by_energy_gate": false
+    }
+  ],
+  "gap_below_silence": [
+    {
+      "start": 1.2,
+      "end": 4.56,
+      "rejected_by_energy_gate": false
+    }
+  ]
+}

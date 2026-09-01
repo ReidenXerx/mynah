@@ -13,19 +13,14 @@ import Foundation
 /// a guarantee. Add to it as testing turns up new artifacts.
 enum TranscriptFilter {
 
-    /// Minimum utterance length. Shorter than this is a click, breath or knock.
-    static let minimumDuration: Double = 0.35
-
-    /// Minimum RMS energy (normalised 0...1) to bother transcribing.
-    /// ~-32 dB — above a typical Mac room noise floor and cooler noise. Whisper
-    /// hallucinates training-data boilerplate on near-silent input, so the
-    /// cheapest defence is never sending it silence.
-    static let minimumEnergy: Double = 0.025
-
-    /// Per-frame energy floor, applied *before* VAD. webrtcvad and Silero alike
-    /// can classify steady low-level noise (fan, HVAC, keyboard) as speech;
-    /// this stops those frames from ever starting or extending an utterance.
-    static let frameEnergyFloor: Double = 0.03
+    // The duration and energy floors that used to live here were dead: the
+    // gating moved to `SessionController.enqueue`, driven by
+    // `dictate_min_utterance` / `dictate_min_energy` / `dictate_frame_energy`.
+    // Keeping them meant two sources of truth, and the copy here still held the
+    // old, too-high values (0.35 / 0.025 / 0.03) that the config keys were added
+    // to replace — so wiring them back up would have silently restored the
+    // "you have to shout" behaviour. Defaults now live in `whiz/config.py` and
+    // `WhizConfig`.
 
     /// Silence that ends an utterance within a session. Shorter is snappier but
     /// clips slow speech; longer feels natural but delays the text appearing.
@@ -78,17 +73,6 @@ enum TranscriptFilter {
         var sum: Double = 0
         for sample in samples { sum += Double(sample) * Double(sample) }
         return (sum / Double(samples.count)).squareRoot()
-    }
-
-    /// Whether an utterance is worth sending to Whisper at all.
-    static func isWorthTranscribing(
-        samples: [Float],
-        sampleRate: Double,
-        energyThreshold: Double
-    ) -> Bool {
-        let duration = Double(samples.count) / sampleRate
-        guard duration >= minimumDuration else { return false }
-        return rms(samples) >= energyThreshold
     }
 
     /// Whether transcribed text is a hallucination and should be dropped.

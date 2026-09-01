@@ -2,6 +2,11 @@ import Testing
 import Foundation
 @testable import WhizApp
 
+// swift-testing, not XCTest: XCTest ships only with a full Xcode install, while
+// Testing.framework is present in Command Line Tools — which is how this app is
+// built. Package.swift adds the CLT framework search path when it finds one, so
+// `swift test` works without Xcode.
+
 /// The config file is co-owned by the Swift app and the Python CLI, so these
 /// tests are really compatibility tests against `whiz/config.py`.
 @Suite("Flat TOML")
@@ -44,6 +49,52 @@ struct FlatTOMLTests {
     func parsesCommaInString() {
         let values = FlatTOML.parse(#"model_dirs = ["/a,b", "/c"]"#)
         #expect(values["model_dirs"] == .stringArray(["/a,b", "/c"]))
+    }
+
+    @Test("keeps values that carry a trailing comment")
+    func stripsTrailingComments() {
+        // Regression: the RHS was passed to parseValue with the comment still
+        // attached, so every numeric and bool key with a trailing comment
+        // failed to parse and vanished. `WhizConfig.save()` then re-emitted
+        // only what parsed, deleting those keys from disk — while Python's
+        // tomllib read the same file fine.
+        let values = FlatTOML.parse("""
+        dictate_frame_energy = 0.010 # tuned for my mic
+        dictate_vad = true  # silero
+        ai_max_frames = 50 # cap
+        dictate_vad_alt = true#no-space
+        """)
+        #expect(values["dictate_frame_energy"] == .double(0.010))
+        #expect(values["dictate_vad"] == .bool(true))
+        #expect(values["ai_max_frames"] == .int(50))
+        #expect(values["dictate_vad_alt"] == .bool(true))
+    }
+
+    @Test("does not mistake a # inside a value for a comment")
+    func keepsHashInsideValues() {
+        #expect(FlatTOML.parse(#"p = "say #1 loudly""#)["p"] == .string("say #1 loudly"))
+        #expect(FlatTOML.parse(#"d = ["/a#b", "/c"]"#)["d"] == .stringArray(["/a#b", "/c"]))
+        #expect(FlatTOML.parse(#"p = "say #1" # comment"#)["p"] == .string("say #1"))
+        #expect(FlatTOML.parse(#"p = "quote \" then #hash""#)
+                == ["p": .string(#"quote " then #hash"#)])
+    }
+
+    @Test("a commented key survives a parse/emit round trip")
+    func roundTripKeepsCommentedKeys() {
+        // The end-to-end failure this guards: a hand-edited config with an
+        // annotated value, saved by the Swift settings window.
+        let document = """
+        ai_model = "qwen3.5:9b"
+        dictate_frame_energy = 0.010 # tuned
+        dictate_vad = true # silero
+        ocr_min_width = 1920
+        """
+        let parsed = FlatTOML.parse(document)
+        let round = FlatTOML.parse(FlatTOML.emit(parsed))
+        #expect(round.count == 4)
+        #expect(round["dictate_frame_energy"] == .double(0.010))
+        #expect(round["dictate_vad"] == .bool(true))
+        #expect(round["ocr_min_width"] == .int(1920))
     }
 
     @Test("skips comments, blank lines and table headers")

@@ -1,5 +1,29 @@
 // swift-tools-version: 6.0
+import Foundation
 import PackageDescription
+
+// swift-testing lives in Testing.framework. A full Xcode install wires it into
+// SwiftPM automatically; a Command Line Tools install ships the framework but
+// not the search path, so `swift test` fails with "no such module 'Testing'".
+// XCTest is not an escape hatch — it ships only with Xcode, so on a CLT machine
+// there is no test framework at all without this.
+//
+// Detected rather than hardcoded, so the flag is absent on Xcode machines where
+// it would be wrong.
+// Paths in `unsafeFlags` are NOT resolved relative to the package root — they
+// reach the compiler as written and are interpreted against its working
+// directory, so "vendor/install/include" silently fails to find whisper.h.
+// Deriving an absolute path from the manifest's own location works from any
+// checkout and any invocation directory.
+let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
+let vendorInclude = "\(packageDirectory)/vendor/install/include"
+let vendorLib = "\(packageDirectory)/vendor/install/lib"
+
+let cltFrameworks = "/Library/Developer/CommandLineTools/Library/Developer/Frameworks"
+let testFrameworkFlags: [String] =
+    FileManager.default.fileExists(atPath: cltFrameworks + "/Testing.framework")
+        ? ["-F", cltFrameworks]
+        : []
 
 // The whiz macOS app.
 //
@@ -36,35 +60,54 @@ let package = Package(
             name: "WhizApp",
             dependencies: ["CWhisper"],
             path: "Sources/WhizApp",
+            // Headers and libraries come from the vendored whisper.cpp build in
+            // `vendor/install`, produced by `scripts/build-whisper.sh` from the
+            // pinned submodule — never from Homebrew.
+            //
+            // This manifest previously pointed at /opt/homebrew, which was wrong
+            // in both directions: `swift build` failed outright on machines
+            // without Homebrew whisper.cpp, and on machines that had it, it
+            // silently linked that copy — a different, unpinned build than the
+            // v1.9.2 submodule the app is compiled against everywhere else.
+            //
+            // The paths are relative to this package root, so they work from any
+            // checkout. SwiftPM has no way to resolve a path at manifest
+            // evaluation time, hence the literal "vendor/install".
+            //
+            // NOTE: `swift build` still needs `scripts/build-whisper.sh` to have
+            // run first. `scripts/build-app.sh` does that automatically and is
+            // the supported path; this manifest exists for `swift test` and
+            // editor tooling.
             cSettings: [
-                .unsafeFlags([
-                    "-I/opt/homebrew/include",
-                    "-I/usr/local/include",
-                ]),
+                .unsafeFlags(["-I\(vendorInclude)"]),
             ],
             swiftSettings: [
-                .unsafeFlags([
-                    "-Xcc", "-I/opt/homebrew/include",
-                    "-Xcc", "-I/usr/local/include",
-                ]),
+                .unsafeFlags(["-Xcc", "-I\(vendorInclude)"]),
             ],
             linkerSettings: [
                 .unsafeFlags([
-                    "-L/opt/homebrew/lib",
-                    "-L/usr/local/lib",
+                    // Static archives, dependents before dependencies.
+                    "\(vendorLib)/libwhisper.a",
+                    "\(vendorLib)/libggml.a",
+                    "\(vendorLib)/libggml-metal.a",
+                    "\(vendorLib)/libggml-cpu.a",
+                    "\(vendorLib)/libggml-base.a",
+                    // whisper.cpp and ggml are C++; Swift does not link libc++
+                    // for a static archive reached through a C module map.
+                    "-lc++",
                 ]),
-                .linkedLibrary("whisper"),
-                // ggml is a separate Homebrew formula; whisper links against it
-                // but Swift needs it named explicitly to resolve
-                // `ggml_backend_load_all`.
-                .linkedLibrary("ggml"),
-                .linkedLibrary("ggml-base"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreML"),
             ]
         ),
         .testTarget(
             name: "WhizAppTests",
             dependencies: ["WhizApp"],
-            path: "Tests/WhizAppTests"
+            path: "Tests/WhizAppTests",
+            swiftSettings: [.unsafeFlags(testFrameworkFlags)],
+            linkerSettings: [.unsafeFlags(testFrameworkFlags)]
         ),
     ]
 )

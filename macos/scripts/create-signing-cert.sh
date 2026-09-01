@@ -11,7 +11,17 @@
 # across rebuilds, so the grant is made once. This is for local development
 # only; distribution needs a Developer ID certificate and notarization.
 #
+# This is a DEVELOPMENT-ONLY convenience and must never appear in distribution
+# instructions — shipping to anyone else needs a Developer ID certificate and
+# notarization, not this. Note that the trust step below marks the certificate
+# as a trusted root in your user domain, which means anything holding its
+# private key can sign code your Mac will accept locally.
+#
 # Run once:  macos/scripts/create-signing-cert.sh
+#
+# To undo, removing both the trust setting and the key:
+#   security remove-trusted-cert ~/Desktop/whiz-dev.cer   # if you exported it
+#   security delete-identity -c whiz-dev
 set -euo pipefail
 
 NAME="whiz-dev"

@@ -14,7 +14,7 @@ struct MenuBarContent: View {
     @State private var launchesAtLogin = LoginItem.isEnabled
 
     var body: some View {
-        Button(controller.isSessionActive ? "Stop Dictation" : "Start Dictation") {
+        Button(controller.isEngaged ? "Stop Dictation" : "Start Dictation") {
             controller.toggleSession()
         }
         .keyboardShortcut("d")

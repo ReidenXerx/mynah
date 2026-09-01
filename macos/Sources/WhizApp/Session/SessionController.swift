@@ -39,6 +39,26 @@ final class SessionController: ObservableObject {
     private lazy var detector = makeDetector()
     private var idleUnloadTask: Task<Void, Never>?
 
+    /// The in-flight `beginSession()`, while the model is still loading.
+    ///
+    /// A cold load takes seconds, and `isSessionActive` only flips once it
+    /// finishes — so without this a second hotkey press during the load saw an
+    /// inactive session, started a *second* one, and the user's attempt to
+    /// cancel brought the session up anyway moments later.
+    private var startTask: Task<Void, Never>?
+
+    /// Guards against a finished start clearing a *newer* one.
+    ///
+    /// Cancel-then-immediately-restart produces: task A cancelled, `startTask`
+    /// set to B, then A's continuation runs and would null out B — leaving a
+    /// live start that `isEngaged` cannot see. Everything here is main-actor
+    /// serialised, so a counter is enough to tell the two apart.
+    private var startGeneration = 0
+
+    /// True while a session is live *or* still starting. This is what the
+    /// trigger should test, not `isSessionActive` alone.
+    var isEngaged: Bool { isSessionActive || startTask != nil }
+
     /// Serialises transcription so utterances are injected in the order spoken.
     /// Without this, a short utterance following a long one could finish first
     /// and type its text ahead of the earlier sentence.
@@ -51,15 +71,20 @@ final class SessionController: ObservableObject {
     // MARK: - Trigger
 
     func toggleSession() {
-        isSessionActive ? endSession() : startSession()
+        isEngaged ? endSession() : startSession()
     }
 
     func startSession() {
-        guard !isSessionActive else { return }
+        guard !isEngaged else { return }
         idleUnloadTask?.cancel()
         idleUnloadTask = nil
         lastError = nil
-        Task { await beginSession() }
+        startGeneration += 1
+        let generation = startGeneration
+        startTask = Task { [weak self] in
+            await self?.beginSession()
+            self?.clearStartTask(generation)
+        }
     }
 
     /// Async because a cold model load takes seconds. `engine.py` did this
@@ -81,8 +106,19 @@ final class SessionController: ObservableObject {
             state = .idle
             return
         }
+        // The user may have pressed the hotkey again while the model loaded.
+        guard !Task.isCancelled else {
+            Log.session.notice("session start cancelled during model load")
+            state = .idle
+            return
+        }
         // Ask for the microphone before starting capture. Granting it while
         // the engine is already running yields silence for the whole session.
+        guard !Task.isCancelled else {
+            Log.session.notice("session start cancelled")
+            state = .idle
+            return
+        }
         guard await Permissions.requestMicrophone() else {
             Log.session.error("microphone permission denied")
             lastError = "Microphone access is required. Enable whiz in "
@@ -119,6 +155,16 @@ final class SessionController: ObservableObject {
     }
 
     func endSession() {
+        // Cancel a start that has not completed yet, so the second press of the
+        // hotkey aborts a cold load rather than being ignored.
+        if let startTask {
+            startTask.cancel()
+            self.startTask = nil
+            if !isSessionActive {
+                state = .idle
+                return
+            }
+        }
         guard isSessionActive else { return }
         capture.stop()
         isSessionActive = false
@@ -150,6 +196,11 @@ final class SessionController: ObservableObject {
     /// Surface a failure raised outside the controller (e.g. hotkey registration).
     func reportError(_ message: String) {
         lastError = message
+    }
+
+    private func clearStartTask(_ generation: Int) {
+        guard generation == startGeneration else { return }
+        startTask = nil
     }
 
     /// Mutate settings, persist them, and apply what can be applied live.
@@ -221,7 +272,7 @@ final class SessionController: ObservableObject {
             // subtitle credits out of them.
             if let voiceDetector, !(await voiceDetector.containsSpeech(samples)) {
                 Log.session.notice("utterance rejected by VAD: no speech detected")
-                await self?.finishTranscription()
+                self?.finishTranscription()
                 return
             }
 
@@ -302,6 +353,35 @@ final class SessionController: ObservableObject {
         }
     }
 
+    /// Free the whisper and VAD contexts before the process exits, blocking
+    /// briefly for it.
+    ///
+    /// ggml's Metal backend asserts in `ggml_metal_device_free` when a device is
+    /// torn down with residency sets still registered, and that runs from a
+    /// static destructor at exit — so quitting with a model loaded turns a clean
+    /// quit into `SIGABRT` and a crash report. Verified: exit code 134 without
+    /// this, 0 with it.
+    ///
+    /// Blocking the main thread is acceptable here; the app is terminating and
+    /// the unload is a couple of `free()` calls.
+    func shutdownBlocking(timeout: TimeInterval = 2) {
+        let engine = whisper
+        let detector = vad
+        whisper = nil
+        vad = nil
+        guard engine != nil || detector != nil else { return }
+
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            await engine?.unload()
+            await detector?.unload()
+            done.signal()
+        }
+        if done.wait(timeout: .now() + timeout) == .timedOut {
+            Log.stt.error("timed out unloading models at shutdown")
+        }
+    }
+
     private func unloadModel() async {
         guard !isSessionActive else { return }
         await whisper?.unload()
@@ -325,3 +405,25 @@ enum DefaultPrompt {
         заебись, бля, сука, хуй, пизда, мудак.
         """
 }
+
+#if DEBUG
+extension SessionController {
+    /// Builds a controller in a chosen visual state, for SwiftUI previews.
+    ///
+    /// Lives here rather than beside the views because `state` and `level` are
+    /// `private(set)` — the point of which is that only the session lifecycle
+    /// moves them. Previews are the one legitimate exception, and confining the
+    /// escape hatch to `#if DEBUG` keeps it out of shipping builds.
+    static func preview(
+        state: DictationState = .listening,
+        level: Double = 0.55,
+        error: String? = nil
+    ) -> SessionController {
+        let controller = SessionController()
+        controller.state = state
+        controller.level = level
+        controller.lastError = error
+        return controller
+    }
+}
+#endif

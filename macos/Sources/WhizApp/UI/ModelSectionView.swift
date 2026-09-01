@@ -39,10 +39,10 @@ struct ModelSectionView: View {
             Toggle("Reject non-speech audio", isOn: vadBinding)
                 .disabled(!hasVAD)
             if hasVAD {
-                Text("Uses Silero to check an utterance is a human voice, not just loud. "
-                     + "Rejects fans, keyboards and vacuum cleaners before transcription.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                AppliesNote(.nextSession,
+                            detail: "Uses Silero to check an utterance is a human voice, not "
+                                  + "just loud. Rejects fans, keyboards and vacuum cleaners "
+                                  + "before transcription.")
             } else {
                 HStack {
                     Text("Silero model not installed (0.8 MB).")

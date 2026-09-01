@@ -14,6 +14,9 @@ import SwiftUI
 /// window it orders front sits behind whatever the user was using. Temporarily
 /// switching to `.regular` gives it a Dock icon and lets it come forward
 /// properly, and it reverts on close.
+///
+/// Spaces need explicit handling on top of that — see `moveToActiveSpace` in
+/// `build()` and the ordering comment in `show()`.
 @MainActor
 final class SettingsWindow: NSObject, NSWindowDelegate {
 
@@ -25,14 +28,26 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        if window == nil { build() }
+        let isNew = window == nil
+        if isNew { build() }
+        guard let window else { return }
 
-        // Become a regular app so the window can take focus, then restore
-        // accessory status when it closes (see windowWillClose).
+        // Become a regular app so the window can take focus and standard text
+        // editing shortcuts work, then restore accessory status on close (see
+        // windowWillClose).
         NSApp.setActivationPolicy(.regular)
+
+        // Order the window in *before* activating. Activating first asks macOS
+        // to bring the app forward while its only window still belongs to
+        // whichever Space it was last shown on — so macOS switched Spaces to go
+        // find it, dragging the user to the Desktop while the window stayed
+        // behind. Placing the window on the active Space first (see
+        // `moveToActiveSpace` in build()) means activation has something local
+        // to raise.
+        window.makeKeyAndOrderFront(nil)
+        // Only centre on first open, so a window the user has moved stays put.
+        if isNew { window.center() }
         NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
-        window?.center()
     }
 
     private func build() {
@@ -43,6 +58,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             defer: false
         )
         window.title = "whiz Settings"
+        // Follow the user between Spaces rather than pulling them to wherever
+        // the window was last shown. Without this, opening Settings from a
+        // second Space switched the user to the Desktop and left the window
+        // behind on the Space it came from.
+        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         window.contentView = NSHostingView(rootView: SettingsView(controller: controller))
         window.isReleasedWhenClosed = false  // reuse the instance across opens
         window.delegate = self

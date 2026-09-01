@@ -60,3 +60,12 @@ struct WhizLogoView: View {
             .frame(width: size, height: size)
     }
 }
+
+#Preview("Logo at menu bar and pill sizes") {
+    HStack(spacing: 24) {
+        WhizLogoView(state: .idle, size: 18)
+        WhizLogoView(state: .listening, size: 20)
+        WhizLogoView(state: .transcribing, size: 44)
+    }
+    .padding()
+}

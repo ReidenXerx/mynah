@@ -40,14 +40,18 @@ construction, so all of the above stops being necessary rather than being fixed.
 | Start at login | `System/LoginItem.swift` | `service.py` (343 lines → 2 calls) |
 | Config | `Config/FlatTOML.swift`, `Config/WhizConfig.swift` | shares `config.py`'s file |
 | Speech recognition | `STT/WhisperEngine.swift`, `Sources/CWhisper` | `providers/mlx.py` |
-| Model resolution | `STT/WhisperModel.swift` | `providers/mlx.py` |
+| Voice activity detection | `STT/SileroVAD.swift` | `webrtcvad` via `vad.py` |
+| Model resolution + download | `STT/WhisperModel.swift`, `STT/ModelDownloader.swift` | `whiz models download` |
+| Language list | `STT/WhisperLanguages.swift` | — |
+| ggml backend registration | `STT/GGMLBackends.swift` | — |
 | Gates + hallucination filter | `STT/TranscriptFilter.swift` | `engine.py` constants |
 | Utterance segmentation | `STT/UtteranceDetector.swift` | `vad.py` + `engine.py` |
 | Mic capture (16 kHz mono) | `Session/AudioCapture.swift` | `sounddevice` |
+| Settings window | `UI/SettingsWindow.swift`, `UI/SettingsView.swift`, `UI/ModelSectionView.swift` | — |
 
-Speech recognition is wired (see "Decision 1"), but **has never been run against
-real speech** — only against synthetic noise, and never with the UI on screen.
-Treat the end-to-end path as unverified until someone dictates into it.
+Speech recognition is wired and has been exercised by hand, including in a room
+with a robot vacuum running. What remains unverified is called out in
+"Open issues" below.
 
 ## Deployment target
 
@@ -160,11 +164,8 @@ That test is the gate on this decision, and it has not been run.
 Findings from testing go here. Add to this list rather than editing the decision
 above, so the reasoning and the evidence against it stay separately readable.
 
-1. **Homebrew's dylibs are built for macOS 26**, so linking them contradicts the
-   macOS 13 deployment floor (`ld: building for macOS-13.0, but linking with
-   dylib ... built for newer version 26.0`). Fine for local development; a
-   distributable app must vendor and build whisper.cpp with its own deployment
-   target rather than link Homebrew's.
+1. ~~**Homebrew's dylibs are built for macOS 26**~~ — **fixed** by vendoring; the
+   binary now reports `minos 13.0` and has no Homebrew dependency.
 2. **ggml backends need explicit registration.** Metal, BLAS and CPU ship as
    loadable modules in `$(brew --prefix)/Cellar/ggml/*/libexec/*.so` and are not
    registered automatically. `WhisperEngine` calls `ggml_backend_load_all()`
@@ -174,15 +175,11 @@ above, so the reasoning and the evidence against it stay separately readable.
    `whisper_init_from_file_with_params`, killing the process. It cannot be
    caught, so the backend registration in issue 2 is load-bearing, not
    defensive.
-4. **Homebrew version skew.** `whisper-cli` links ggml 0.18.1 while the installed
-   ggml is 0.20.2. Another argument for vendoring.
+4. ~~**Homebrew version skew.**~~ — **fixed** by vendoring; the build is pinned to
+   the submodule at v1.9.2.
 5. **First-ever model load takes ~7 s** compiling the Metal library, versus
    ~0.25 s once cached. Cold start needs UI feedback or a warm-up at launch.
-6. **Only `ggml-large-v3-turbo-q5_0.bin` is on this machine.** The preferred
-   unquantized turbo is not downloaded, so `WhisperModel.resolve` currently falls
-   through to the quantized model that `ea49da8` warns about. Run
-   `whiz models download ggml-large-v3-turbo.bin` before quality testing, or the
-   test measures the wrong model.
+6. ~~**No way to obtain models from the app.**~~ — **fixed**; see "Models" above.
 7. **Text injection fails silently without Accessibility.** CGEvent posting
    is a no-op when the process is untrusted — no error, no exception, nothing
    typed. Found in first real testing: STT ran correctly and logged
@@ -198,10 +195,115 @@ above, so the reasoning and the evidence against it stay separately readable.
    thread — it always read the stale value and hid the pill immediately. The
    microphone prompt appeared during the first capture, which yields a session
    of silence; permission is now awaited before the engine starts.
-9. **`models.py:PREFERENCE` prefers `q5_0` for batch.** Same model class
+9. **ggml aborts at process exit if a model is still loaded.**
+   `ggml_metal_device_free` asserts when a device is torn down with residency
+   sets still registered, and that runs from a static destructor — so quitting
+   with a model loaded turned a clean quit into `SIGABRT` and a crash report.
+   Measured: exit code 134 without unloading, 0 with.
+   `SessionController.shutdownBlocking()` now frees both contexts on terminate.
+   Found while testing session cancellation, not by review.
+10. **`Package.swift` was unbuildable and nobody noticed**, because the local
+   SwiftPM install was broken so no one could run it. Two defects: paths in
+   `unsafeFlags` are *not* resolved relative to the package root (now derived
+   from `#filePath`), and a `.systemLibrary` target accepts no `cSettings` — so
+   `#include <whisper.h>` in the module map could not be satisfied by any flag
+   SwiftPM allows. The module map now names the vendored headers by a path
+   relative to itself, and the `shim.h` indirection is gone.
+11. **The calibration window used to discard the first ~1 s of speech.** Fixed —
+   it now samples the ambient level and falls through to segmentation in the
+   same frame, matching `engine.py`. Anyone who pressed the hotkey and started
+   talking immediately lost their opening word.
+12. **Settings text fields wrote on every keystroke.** Each edit saved the config
+   file, briefly persisting partial values (`r`, then `""`, while retyping a
+   language code). Now committed on Return or focus loss, with the hotkey field
+   validated through the same `HotkeySpec.parse` that registration uses.
+13. **Opening Settings from a second Space switched the user to the Desktop**
+   and left the window behind. The window now uses `.moveToActiveSpace` and is
+   ordered in before the app is activated.
+14. **`models.py:PREFERENCE` prefers `q5_0` for batch.** Same model class
    `ea49da8` found garbles Russian in dictation. q5_0 is milder than q4 and may
    be fine, but the batch default now contradicts the dictation finding and
    nobody has checked. Independent of this decision, worth testing.
+
+## Two-stage speech detection
+
+Segmentation and speech detection are deliberately separate, because they answer
+different questions at different costs:
+
+| Stage | Question | Cost | Where |
+|---|---|---|---|
+| Energy gates | *when* does an utterance start and end? | per audio buffer | `UtteranceDetector` |
+| Silero VAD | *is* this a human voice? | once per utterance | `SileroVAD` |
+
+The energy gates only measure loudness, so a fan, a door or a keyboard passes as
+readily as speech — and near-silent noise handed to Whisper is precisely what
+produces its subtitle-credit hallucinations. Silero is a 0.8 MB model that judges
+by the shape of the sound rather than its level, and runs in 20–45 ms against a
+~600 ms transcription.
+
+Measured on synthetic input: pink noise at RMS 0.0037 and 0.0090 and near-silence
+at 0.0002 are all rejected; a 200 Hz sine tone is a **false positive**, since it
+sits in the male vocal pitch range. Real rooms rarely contain sustained pure
+tones, but it is not infallible.
+
+It **fails open**: if the model is missing or fails to load, utterances pass
+through rather than being silently swallowed. The worst case is the old
+behaviour, not a mute app.
+
+Being level-independent also makes Silero the right pairing for Apple's voice
+processing / AGC, should that ever be added — AGC deliberately destroys the
+stable relationship between loudness and speech that the energy gates depend on.
+
+The model is the same one the batch pipeline downloads via
+`whiz models download-vad`; there is no second asset.
+
+## Models
+
+`ModelDownloader` fetches from the same HuggingFace repositories as
+`whiz/models.py`, into the same `~/.cache/whisper`. One cache, both tools:
+`whiz models list` sees what the app downloads and vice versa. This removed the
+last reason a dictation-only user needed the Python package installed.
+
+`WhisperModel.preference` puts **unquantized** turbo first, unlike
+`models.py:PREFERENCE` which prefers `q5_0` for batch speed. That is deliberate —
+see the evidence in Decision 1.
+
+Non-2xx responses are rejected before the file is moved into place. A 404 body is
+a perfectly valid small file, and without that check it lands on disk named
+`ggml-large-v3-turbo.bin` and fails much later with a baffling error.
+
+## Vendored whisper.cpp
+
+`macos/vendor/whisper.cpp` is a submodule pinned to **v1.9.2**, built statically
+by `scripts/build-whisper.sh`. Linking Homebrew's copy made the app unshippable:
+absolute `/opt/homebrew` paths (broken on Intel, or on any machine without
+`whisper-cpp`), binaries built for a much newer macOS than the 13.0 floor, and
+ggml's compute backends living as loose `.so` files in `Cellar/*/libexec`.
+
+Three cmake options do the work:
+
+- **`BUILD_SHARED_LIBS=OFF`** — static ggml compiles the compute backends in and
+  registers them directly. This single flag removed the entire bundling problem:
+  no dylibs to copy into `Contents/Frameworks/`, no `install_name_tool`, no
+  `@rpath`, no loadable modules to locate.
+- **`GGML_METAL_EMBED_LIBRARY=ON`** — Metal shaders compiled into the binary.
+  Otherwise ggml looks for `ggml-metal.metal` at runtime and silently drops to
+  CPU.
+- **`GGML_NATIVE=OFF`** — required for two independent reasons. A native build
+  bakes in the build machine's CPU features and can fault on an older Mac, which
+  defeats the point of vendoring. And ggml's native detection probes features by
+  compiling *and running* test programs — its SVE probe **hangs forever** on
+  Apple Silicon, spinning at 100% CPU instead of faulting, so cmake never
+  returns. Configure went from hanging indefinitely to 1.5 seconds.
+
+`-lc++` is also needed: whisper.cpp and ggml are C++, and Swift does not link
+libc++ for a static archive reached through a C module map.
+
+Result: a 3.4 MB bundle with **no Homebrew dependency** and `minos 13.0`.
+
+Bumping the submodule is a deliberate act — re-run the Russian test set
+afterwards, since whisper.cpp's decoding loop differs from the reference
+implementation and hallucination behaviour can change between releases.
 
 ## Config is co-owned
 
@@ -284,8 +386,27 @@ swiftc -sdk "$(xcrun --show-sdk-path)" -target arm64-apple-macosx13.0 \
   $(find macos/Sources/WhizApp -name '*.swift') -o /tmp/WhizApp
 ```
 
-`swift test` needs SwiftPM, so `Tests/WhizAppTests` cannot run until the
-toolchain is fixed.
+### Running the tests
+
+```sh
+swift test --package-path macos     # 18 tests in 3 suites
+```
+
+This needs **full Xcode**, not just Command Line Tools — and for two separate
+reasons, both discovered the hard way:
+
+1. CLT shipped a `libPackageDescription.dylib` inconsistent with its own
+   `.swiftmodule`, so SwiftPM could not link any manifest — even a three-line
+   package failed. Reinstalling Command Line Tools fixes this and is worth doing
+   first; it is what makes `swift build` work.
+2. Executing the resulting `.xctest` bundle needs the `xctest` runner, which
+   ships only with Xcode. XCTest is not an escape hatch — it is also Xcode-only.
+   `Testing.framework` *is* present in CLT, which is why the suite uses
+   swift-testing and `Package.swift` adds the CLT framework search path when it
+   finds one.
+
+`build-app.sh` needs none of this; it falls back to `swiftc` and produces the
+same binary.
 
 ## Roadmap
 
@@ -295,11 +416,35 @@ toolchain is fixed.
 3. **Speech recognition** — done, pending validation. whisper.cpp linked via its
    C API; VAD, adaptive noise floor and hallucination filter ported. See
    "Decision 1" above, including what remains unvalidated.
-4. **Bundle Python** — embed a relocatable interpreter (python-build-standalone)
+4. **Distribution** — `scripts/package.sh` produces a shareable zip today, but
+   the app is signed with a local self-signed identity and is not notarized, so
+   recipients need `xattr -dr com.apple.quarantine` once. Notarization needs a
+   paid Apple Developer account. Still arm64-only; a universal build is a
+   `CMAKE_OSX_ARCHITECTURES` change plus the matching swiftc target.
+5. **Bundle Python** — embed a relocatable interpreter (python-build-standalone)
    under `Contents/Resources/python` for `whiz analyze` and friends, plus a
    `/usr/local/bin/whiz` shim. Every bundled dylib needs individual signing for
-   notarization.
-5. **Cutover** — delete `service.py`, `setup.py`, and the `macos_*` providers.
+   notarization. Not started; unlike phase 3 this is not on the critical path,
+   since dictation no longer needs Python at all.
+6. **Cutover** — delete `service.py`, `setup.py`, and the `macos_*` providers.
    Sign with a Developer ID and notarize.
-6. **Other platforms** — same structure for Windows and Linux; `providers/base.py`
+7. **Extract a `WhizKit` library target** — move everything except `@main` and
+   `AppDelegate` out of the executable, leaving a thin app shell.
+
+   Two reasons. Xcode 16 refuses to render SwiftUI previews in an executable
+   target without the `ENABLE_DEBUG_DYLIB` build setting, which `Package.swift`
+   has no way to express — previews only work in library targets. And a test
+   target is meant to depend on a library; `@testable import` of an executable
+   works but is a known rough edge.
+
+   `#Preview` blocks already exist in `UI/IndicatorPanel.swift`,
+   `UI/SettingsView.swift`, `UI/WhizLogo.swift` and `UI/AppliesNote.swift`. They
+   compile and cost nothing; they start rendering the moment this lands.
+
+   Cost is ~2,900 lines relocated and seven types made `public`
+   (`SessionController`, `IndicatorPanel`, `HotkeyManager`, `SettingsWindow`,
+   `MenuBarContent`, `WhizLogo`, `Log`) plus the members the shell touches.
+   Mechanical, but it touches every file — worth doing as its own PR so it does
+   not bury a feature change in access-modifier churn.
+8. **Other platforms** — same structure for Windows and Linux; `providers/base.py`
    stays as the seam.

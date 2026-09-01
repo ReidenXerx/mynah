@@ -112,6 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         controller.endSession()
         hotkeys.unregister()
         permissionTimer?.invalidate()
+        // Must come last: ggml aborts at exit if a model is still loaded.
+        controller.shutdownBlocking()
     }
 
     func showSettings() {

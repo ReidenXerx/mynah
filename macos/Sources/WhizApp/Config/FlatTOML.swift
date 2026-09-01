@@ -33,11 +33,45 @@ enum FlatTOML {
             if line.isEmpty || line.hasPrefix("#") || line.hasPrefix("[") { continue }
             guard let eq = line.firstIndex(of: "=") else { continue }
             let key = String(line[line.startIndex..<eq]).trimmingCharacters(in: .whitespaces)
-            let rhs = String(line[line.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
+            var rhs = String(line[line.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
             if key.isEmpty { continue }
+            // Strip a trailing comment before parsing. Without this, `x = 1 # note`
+            // reaches parseValue as "1 # note", fails every branch, and the key
+            // vanishes — then `WhizConfig.save()` re-emits only what parsed and
+            // deletes it from disk. String and array values happened to survive
+            // (their parsers stop at the closing quote/bracket), so the loss hit
+            // numbers and bools only, which made it easy to miss.
+            if let hash = firstUnquotedHash(in: rhs) {
+                rhs = String(rhs[..<hash]).trimmingCharacters(in: .whitespaces)
+            }
             if let value = parseValue(rhs) { out[key] = value }
         }
         return out
+    }
+
+    /// Index of the first `#` that starts a comment, or nil.
+    ///
+    /// Quote-aware: `dictate_prompt = "say #1 loudly"` has no comment, and
+    /// neither does `model_dirs = ["/a#b"]`. Backslash escapes are honoured so a
+    /// `\"` inside a string does not end it prematurely.
+    private static func firstUnquotedHash(in s: String) -> String.Index? {
+        var inString = false
+        var escaped = false
+        var index = s.startIndex
+        while index < s.endIndex {
+            let c = s[index]
+            if escaped {
+                escaped = false
+            } else if c == "\\" && inString {
+                escaped = true
+            } else if c == "\"" {
+                inString.toggle()
+            } else if c == "#" && !inString {
+                return index
+            }
+            index = s.index(after: index)
+        }
+        return nil
     }
 
     private static func parseValue(_ raw: String) -> Value? {

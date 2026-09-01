@@ -29,21 +29,28 @@ struct SettingsView: View {
         Form {
             Section {
                 LabeledContent("Hotkey") {
-                    TextField("", text: binding(\.hotkey))
-                        .frame(width: 160)
+                    CommittedTextField(
+                        value: binding(\.hotkey),
+                        validate: { spec in
+                            HotkeySpec.parse(spec) == nil
+                                ? "Not a valid hotkey. Use e.g. <cmd>+<shift>+. or <f8>."
+                                : nil
+                        },
+                        width: 160)
                 }
-                Text("pynput syntax, e.g. `<cmd>+<shift>+.` or `<f8>`. Re-registered immediately.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                AppliesNote(.immediately,
+                            detail: "pynput syntax, e.g. <cmd>+<shift>+. or <f8>. "
+                                  + "Saved on Return, or when you click away.")
             }
 
             Section {
                 Toggle("Show floating indicator", isOn: binding(\.showIndicator))
                 Toggle("Keep indicator visible when idle", isOn: binding(\.idleVisible))
                     .disabled(!controller.config.showIndicator)
-                Text("Indicator changes apply after restarting whiz.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                // The panel is built once in applicationDidFinishLaunching, so
+                // unlike every other setting this one cannot be picked up by the
+                // per-session config reload.
+                AppliesNote(.restart)
             }
 
             Section {
@@ -57,9 +64,9 @@ struct SettingsView: View {
                             .frame(width: 52, alignment: .trailing)
                     }
                 }
-                Text("Keeps the model warm for back-to-back dictation, then frees the memory.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                AppliesNote(.nextSession,
+                            detail: "Keeps the model warm for back-to-back dictation, "
+                                  + "then frees the memory.")
             }
         }
         .formStyle(.grouped)
@@ -70,22 +77,29 @@ struct SettingsView: View {
     private var recognition: some View {
         Form {
             Section {
-                LabeledContent("Language") {
-                    TextField("", text: binding(\.language)).frame(width: 80)
+                Picker("Language", selection: binding(\.language)) {
+                    // An unrecognised value from a hand-edited config still needs
+                    // an entry, or the Picker would silently show the first item
+                    // and overwrite it on the next save.
+                    if !WhisperLanguages.isKnown(controller.config.language) {
+                        Text(WhisperLanguages.language(for: controller.config.language).label)
+                            .tag(controller.config.language)
+                    }
+                    ForEach(WhisperLanguages.all) { language in
+                        Text(language.label).tag(language.code)
+                    }
                 }
+                AppliesNote(.nextSession)
             }
 
             ModelSectionView(controller: controller)
 
             Section {
                 Text("Prompt")
-                TextEditor(text: binding(\.prompt))
-                    .font(.system(.body, design: .monospaced))
-                    .frame(height: 60)
-                Text("Biases recognition. Leave empty for the built-in Russian prompt that "
-                     + "stops Whisper censoring slang and obscenity.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                PromptEditor(text: binding(\.prompt))
+                AppliesNote(.nextSession,
+                            detail: "Biases recognition. Leave empty for the built-in Russian "
+                                  + "prompt that stops Whisper censoring slang and obscenity.")
             }
         }
         .formStyle(.grouped)
@@ -100,13 +114,13 @@ struct SettingsView: View {
                 slider("Utterance energy", binding(\.minEnergy), range: 0.001...0.05, digits: 3)
                 slider("Min utterance", binding(\.minUtterance), range: 0.05...1.0, digits: 2, unit: "s")
             } footer: {
-                Text("Lower values are more sensitive. These are floors — whiz measures the "
-                     + "room at the start of each session and raises them if it is noisy.\n\n"
-                     + "If you have to raise your voice, check the system input volume first "
-                     + "(System Settings → Sound → Input); a quiet mic loses detail that no "
-                     + "setting here can recover.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                AppliesNote(.nextSession,
+                            detail: "Lower values are more sensitive. These are floors — whiz "
+                                  + "measures the room at the start of each session and raises "
+                                  + "them if it is noisy.\n\nIf you have to raise your voice, "
+                                  + "check the system input volume first (System Settings → "
+                                  + "Sound → Input); a quiet mic loses detail that no setting "
+                                  + "here can recover.")
             }
 
             Section {
@@ -147,4 +161,8 @@ struct SettingsView: View {
             set: { newValue in controller.updateConfig { $0[keyPath: path] = newValue } }
         )
     }
+}
+
+#Preview("Settings") {
+    SettingsView(controller: .preview(state: .idle))
 }

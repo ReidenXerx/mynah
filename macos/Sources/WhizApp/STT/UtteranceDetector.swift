@@ -60,14 +60,25 @@ struct UtteranceDetector {
         let frameDuration = Double(frame.count) / sampleRate
         let energy = TranscriptFilter.rms(frame)
 
+        // Sample the ambient level, but keep processing this frame.
+        //
+        // This used to `return nil` during the calibration window, which threw
+        // away the first second of every session — so anyone who pressed the
+        // hotkey and started talking immediately lost their opening word.
+        // `engine.py` collects the sample and falls through to segmentation in
+        // the same frame; this now matches. The gates in use during the window
+        // are the static floors, exactly as in Python, until `applyCalibration`
+        // raises them.
+        //
+        // Speech during calibration does skew the measured noise floor, which is
+        // why the floor is a median rather than a mean — a few loud frames among
+        // ~30 do not move it.
         if calibratedDuration < TranscriptFilter.noiseCalibrationDuration {
             calibrationSamples.append(energy)
             calibratedDuration += frameDuration
             if calibratedDuration >= TranscriptFilter.noiseCalibrationDuration {
                 applyCalibration()
             }
-            // Do not start an utterance from the calibration window itself.
-            return nil
         }
 
         if energy >= frameThreshold {

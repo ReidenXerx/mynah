@@ -2461,15 +2461,20 @@ def test_noise_calibration_quiet_room_keeps_static_floor():
     so the effective gates stay at the static values (max() keeps the floor)."""
     engine = _make_engine()
     engine._start_session()
-    # Simulate ~0.5s of quiet-room audio: RMS well below _VAD_FRAME_ENERGY.
-    quiet_rms = 0.005  # -46dB — well below the 0.025 static floor
+    # Simulate ~0.5s of quiet-room audio. "Quiet" is defined relative to the
+    # configured floor: the adaptive gate is noise * _NOISE_FRAME_MULT, so the
+    # room only counts as quiet while that product stays under the floor.
+    # Deriving it here keeps the test honest when the defaults change — it was
+    # previously hardcoded to 0.005, which stopped being quiet once the floors
+    # were lowered from 0.03/0.025 to 0.010/0.008.
+    quiet_rms = engine.s.frame_energy / eng._NOISE_FRAME_MULT / 2
     for _ in range(20):
         engine._noise_cal_rms.append(quiet_rms)
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
     # Static floors should win — the room is quieter than the static gate.
-    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY
-    assert engine._effective_min_energy == eng._MIN_ENERGY
+    assert engine._effective_frame_energy == engine.s.frame_energy
+    assert engine._effective_min_energy == engine.s.min_energy
     engine._end_session()
 
 
@@ -2489,8 +2494,8 @@ def test_noise_calibration_noisy_room_raises_gates():
     expected_utt = noisy_rms * eng._NOISE_UTT_MULT       # 0.12
     assert abs(engine._effective_frame_energy - expected_frame) < 0.001
     assert abs(engine._effective_min_energy - expected_utt) < 0.001
-    assert engine._effective_frame_energy > eng._VAD_FRAME_ENERGY
-    assert engine._effective_min_energy > eng._MIN_ENERGY
+    assert engine._effective_frame_energy > engine.s.frame_energy
+    assert engine._effective_min_energy > engine.s.min_energy
     engine._end_session()
 
 
@@ -2503,13 +2508,13 @@ def test_noise_calibration_resets_between_sessions():
     for _ in range(20):
         engine._noise_cal_rms.append(0.08)
     engine._finish_noise_calibration()
-    assert engine._effective_frame_energy > eng._VAD_FRAME_ENERGY
+    assert engine._effective_frame_energy > engine.s.frame_energy
     engine._end_session()
     # Second session: quiet room — gates must reset to static floors.
     engine._start_session()
     assert engine._noise_calibrated is False
-    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY
-    assert engine._effective_min_energy == eng._MIN_ENERGY
+    assert engine._effective_frame_energy == engine.s.frame_energy
+    assert engine._effective_min_energy == engine.s.min_energy
     assert engine._noise_cal_rms == []
     engine._end_session()
 
@@ -2557,8 +2562,8 @@ def test_noise_calibration_empty_samples_no_crash():
     engine._noise_cal_rms = []  # empty
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
-    assert engine._effective_frame_energy == eng._VAD_FRAME_ENERGY
-    assert engine._effective_min_energy == eng._MIN_ENERGY
+    assert engine._effective_frame_energy == engine.s.frame_energy
+    assert engine._effective_min_energy == engine.s.min_energy
     engine._end_session()
 
 

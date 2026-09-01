@@ -216,10 +216,18 @@ class DictateSettings:
     idle_visible: bool = True
     model: str = ""
     menu_bar: bool = True
-    # Energy floors and minimum utterance length; see whiz/config.py.
-    frame_energy: float = _VAD_FRAME_ENERGY
-    min_energy: float = _MIN_ENERGY
-    min_utterance: float = _MIN_UTTERANCE_SECONDS
+    # Energy floors and minimum utterance length.
+    #
+    # `whiz/config.py` is the single source of truth for these defaults, and
+    # `resolve_settings` always passes them explicitly — so these values are
+    # only reached by code constructing DictateSettings directly, such as test
+    # helpers. They previously mirrored the legacy module constants
+    # (0.03/0.025/0.35), which are the too-high thresholds the config keys were
+    # added to get away from; a direct construction silently got the old
+    # behaviour back. Kept in step with config.py instead.
+    frame_energy: float = 0.010
+    min_energy: float = 0.008
+    min_utterance: float = 0.25
 
 
 def resolve_settings(config: Config, **overrides: object) -> DictateSettings:

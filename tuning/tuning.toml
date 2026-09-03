@@ -1,0 +1,99 @@
+# Shared tuning contract for every whiz implementation.
+#
+# One source of truth for the dictate segmentation pipeline's constants:
+# energy floors, adaptive-noise calibration, utterance shaping, and the
+# Whisper hallucination phrase list. Python (`whiz/dictate/engine.py`),
+# Swift (`macos/Sources/WhizApp/...`), and the Rust core all hardcode
+# these values in their own language, and tests in all three assert that
+# their constants match this file:
+#
+#   python: tests/test_tuning.py
+#   swift:  macos/Tests/WhizAppTests/TuningTests.swift
+#
+# It is deliberately NOT read at runtime. Each implementation keeps its
+# constants compiled in; this file is the contract that test suites pin
+# them against. A value changed here must be changed in all three places
+# or the tests fail — the 0.03 vs 0.010 drift caught in the PR #1 review
+# happened precisely because there was no single place to diff against.
+#
+# Rules of the file:
+# - Flat keys only: no tables, no nesting. Python reads it with stdlib
+#   `tomllib`; the Swift side reads it with `FlatTOML`, which handles
+#   exactly this shape.
+# - No inline tables; the phrase list is a plain string array.
+# - Keep every value's rationale in the implementation where it is
+#   measured (engine.py / TranscriptFilter.swift); this file carries
+#   short provenance comments only.
+
+# --- Segmentation ---
+
+# Seconds of continuous silence that ends an utterance within a session.
+# Shorter = snappier transcription but may cut off slow speech; longer =
+# more natural but adds latency before text appears.
+utterance_silence = 0.8
+
+# Seconds of trailing silence kept on the utterance when it is closed.
+# Enough that word endings are not clipped, without dragging the
+# whole-buffer RMS down. The Swift implementation trims the accumulated
+# trailing silence to this before emitting; the Python implementation
+# keeps all of it — so this value shapes utterances differently in the
+# two engines and must not be read as "how much padding Python keeps".
+trailing_padding = 0.2
+
+# --- Adaptive noise calibration ---
+
+# Measure ambient noise for this many seconds at session start.
+noise_calibration_seconds = 1.0
+# Frame gate ends up ~11 dB above the measured noise floor.
+noise_frame_multiplier = 3.5
+# Utterance gate ends up ~10 dB above the measured noise floor.
+noise_utterance_multiplier = 3.0
+# Calibration needs at least this many frames to be trusted.
+noise_min_samples = 5
+
+# --- Config defaults (must match whiz/config.py and WhizConfig.swift) ---
+
+# Static per-frame energy floor (normalized RMS, 0.0-1.0). Frames below
+# this are silence before any VAD sees them. The original 0.03 was tuned
+# on one machine and proved far too high on others — see whiz/config.py
+# for the full rationale. The adaptive noise floor can raise this.
+frame_energy_default = 0.010
+# Minimum whole-utterance RMS to bother transcribing at all.
+min_energy_default = 0.008
+# Minimum utterance length in seconds; below this it is a click or breath.
+# Short words like "да" / "yes" can fall under 0.35s — hence 0.25.
+min_utterance_default = 0.25
+
+# --- Whisper hallucination phrases (lowercased) ---
+#
+# Fed silence or noise, Whisper emits training-data artifacts — mostly
+# Russian subtitle-credit boilerplate, since that is what dominates its
+# Russian training data. Matching is substring-based on the lowercased
+# transcript, in every implementation. Keep in sync with
+# `_HALLUCINATION_PHRASES` in whiz/dictate/engine.py and
+# `TranscriptFilter.hallucinationPhrases`. Order is irrelevant; the
+# lists must contain exactly the same members.
+hallucination_phrases = [
+    "спасибо за субтитры",
+    "субтитры создавал",
+    "субтитры выполнил",
+    "субтитры делал",
+    "субтитры подготовил",
+    "редактор субтитров",
+    "корректор",
+    "перевод",
+    "продолжение следует",
+    "спасибо за просмотр",
+    "спасибо за внимание",
+    "подписывайтесь на канал",
+    "by follows",
+    "by following",
+    "amara.org",
+    "расскажите о себе",
+    # Additional artifacts observed on MacBook cooler/fan noise:
+    "субтитры",
+    "следите за обновлениями",
+    "оставайтесь с нами",
+    "не забудьте подписаться",
+    "вы можете поддержать",
+]

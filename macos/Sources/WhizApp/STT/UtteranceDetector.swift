@@ -23,7 +23,9 @@ struct UtteranceDetector {
 
     /// Trailing silence kept when closing an utterance. Enough that word
     /// endings are not clipped, without dragging the whole-buffer RMS down.
-    private static let trailingPadding: Double = 0.2
+    /// Internal (not private) so the tuning-contract tests can pin it
+    /// against tuning/tuning.toml — see macos/Tests/WhizAppTests/TuningTests.swift.
+    static let trailingPadding: Double = 0.2
 
     private let sampleRate: Double
     private var buffer: [Float] = []

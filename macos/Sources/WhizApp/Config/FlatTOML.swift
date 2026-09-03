@@ -28,8 +28,12 @@ enum FlatTOML {
     /// matching how the Python side drops unknown keys instead of failing.
     static func parse(_ text: String) -> [String: Value] {
         var out: [String: Value] = [:]
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        var index = 0
+        while index < lines.count {
+            let line = lines[index]
+            index += 1
             if line.isEmpty || line.hasPrefix("#") || line.hasPrefix("[") { continue }
             guard let eq = line.firstIndex(of: "=") else { continue }
             let key = String(line[line.startIndex..<eq]).trimmingCharacters(in: .whitespaces)
@@ -43,6 +47,34 @@ enum FlatTOML {
             // numbers and bools only, which made it easy to miss.
             if let hash = firstUnquotedHash(in: rhs) {
                 rhs = String(rhs[..<hash]).trimmingCharacters(in: .whitespaces)
+            }
+            // An array value that opens but doesn't close on this line
+            // continues over the following lines until its `]` — standard
+            // TOML that the shared tuning contract (tuning/tuning.toml) uses
+            // for the hallucination phrase list. Comment lines inside the
+            // continuation are skipped like comments anywhere else. If the
+            // bracket never closes, the key is dropped and scanning resumes
+            // at the next line — a malformed value must not swallow the rest
+            // of the document.
+            if rhs.hasPrefix("["), rhs.firstIndex(of: "]") == nil {
+                var joined = rhs
+                var lookahead = index
+                var closed = false
+                var scanned = 0
+                while lookahead < lines.count, scanned < 1000 {
+                    var next = lines[lookahead]
+                    scanned += 1
+                    lookahead += 1
+                    if let hash = firstUnquotedHash(in: next) {
+                        next = String(next[..<hash]).trimmingCharacters(in: .whitespaces)
+                    }
+                    if next.isEmpty { continue }
+                    joined += " " + next
+                    if next.contains("]") { closed = true; break }
+                }
+                guard closed else { continue }
+                rhs = joined
+                index = lookahead
             }
             if let value = parseValue(rhs) { out[key] = value }
         }

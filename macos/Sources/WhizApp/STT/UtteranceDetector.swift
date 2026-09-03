@@ -150,7 +150,12 @@ struct UtteranceDetector {
             return
         }
         let sorted = quiet.sorted()
-        let noiseFloor = sorted[sorted.count / 2]
+        // The averaging median — engine.py's convention. Swift used to take
+        // the upper-middle element for even counts, a divergence the golden
+        // corpus cannot see (every fixture's quiet frames are uniform);
+        // the median/boundary tests in TuningTests.swift pin the convention.
+        let n = sorted.count
+        let noiseFloor = n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2
 
         frameThreshold = max(frameFloor, noiseFloor * TranscriptFilter.noiseFrameMultiplier)
         utteranceThreshold = max(utteranceFloor, noiseFloor * TranscriptFilter.noiseUtteranceMultiplier)

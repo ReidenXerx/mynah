@@ -112,8 +112,10 @@ _MIN_ENERGY = 0.025
 # them and webrtcvad misclassifies it as speech, seeding hallucination-prone
 # utterances. The adaptive floor uses the median RMS of the calibration
 # window as the noise baseline and sets:
-#   frame gate      = max(_VAD_FRAME_ENERGY, noise_floor * _NOISE_FRAME_MULT)
-#   utterance gate   = max(_MIN_ENERGY,       noise_floor * _NOISE_UTT_MULT)
+#   frame gate      = max(s.frame_energy, noise_floor * _NOISE_FRAME_MULT)
+#   utterance gate  = max(s.min_energy,   noise_floor * _NOISE_UTT_MULT)
+# (the session settings' static floors — s.frame_energy / s.min_energy —
+# not the legacy module constants above).
 # The static thresholds remain as floors — a quiet room keeps them, a
 # noisy room gets higher gates.
 _NOISE_CALIBRATION_SECONDS = 1.0  # sample ambient noise for this long

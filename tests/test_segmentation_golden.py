@@ -357,6 +357,14 @@ def test_golden_corpus_exists() -> None:
         assert (GOLDEN_DIR / f"{name}.wav").exists(), f"missing {name}.wav"
 
 
+def test_expected_json_holds_exactly_the_pinned_cases() -> None:
+    """Orphan guard: a case dropped from CASES silently stops being
+    tested (the parametrized tests visit CASES only), and a stray
+    expected.json entry is never noticed — the `[name]` lookups in the
+    tests below fail for missing keys, never for extra ones."""
+    assert set(_load_expected().keys()) == set(CASES)
+
+
 @pytest.mark.parametrize("name", CASES)
 def test_engine_regions_match_expected(name: str) -> None:
     """The engine's real callback must segment the fixture as pinned."""

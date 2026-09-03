@@ -233,17 +233,21 @@ struct TuningTests {
         Int((TranscriptFilter.utteranceSilence / frameSeconds).rounded(.up))
     }
 
+    /// The corpus's pinned cases — a single list so the orphan guard below
+    /// can hold it against expected.json's keys.
+    private static let goldenCases = [
+        "quiet_two_utterances",
+        "speech_during_calibration",
+        "speech_late_in_calibration",
+        "noisy_room",
+        "click_below_min",
+        "trailing_silence_trim",
+        "gap_below_silence",
+        "speech_over_noise_in_calibration",
+    ]
+
     @Test("UtteranceDetector segments the golden corpus as pinned",
-          arguments: [
-            "quiet_two_utterances",
-            "speech_during_calibration",
-            "speech_late_in_calibration",
-            "noisy_room",
-            "click_below_min",
-            "trailing_silence_trim",
-            "gap_below_silence",
-            "speech_over_noise_in_calibration",
-          ])
+          arguments: TuningTests.goldenCases)
     func goldenSegmentation(name: String) throws {
         let samples = try Self.loadWavSamples(name)
         let expected = try Self.loadExpected(name)
@@ -301,6 +305,21 @@ struct TuningTests {
                 \(exp.rejectedByEnergyGate) (RMS vs calibrated gate)
                 """)
         }
+    }
+
+    @Test("expected.json holds exactly the pinned cases")
+    func expectedJsonHoldsExactlyThePinnedCases() throws {
+        // Orphan guard: a case dropped from goldenCases would silently stop
+        // being tested (the parametrized test visits goldenCases only), and
+        // a stray expected.json entry would never be noticed — loadExpected
+        // throws only for a MISSING entry, never for an extra one.
+        let url = Self.goldenDir.appendingPathComponent("expected.json")
+        let data = try Data(contentsOf: url)
+        let obj = try JSONSerialization.jsonObject(with: data)
+        guard let all = obj as? [String: Any] else {
+            throw FixtureError.malformed("expected.json: not a map of case -> regions")
+        }
+        #expect(Set(all.keys) == Set(Self.goldenCases))
     }
 
     @Test("speech in the calibration window aborts to the static gates — the first word survives")
@@ -375,5 +394,83 @@ struct TuningTests {
             buffer RMS \(rms) should pass the raised gate \
             \(detector.currentEnergyThreshold)
             """)
+    }
+
+    // MARK: - Calibration median + abort boundary (mirror of the
+    // speech-aware calibration block in tests/test_dictate.py)
+
+    /// A frame of constant samples has RMS == |amplitude| — the cheapest
+    /// input with a known energy. The amplitudes below are dyadic (exact in
+    /// Float and Double alike), so the median/gate arithmetic is exact too.
+    private static func constantFrame(_ amplitude: Float) -> [Float] {
+        Array(repeating: amplitude, count: frameLen)
+    }
+
+    @Test("even count of non-uniform quiet frames: the two middle values are averaged")
+    func evenQuietMedianAveragesTheTwoMiddleValues() throws {
+        // Swift used to take the upper-middle element for even counts while
+        // engine.py averages the two middle values — a divergence the golden
+        // corpus cannot see (every fixture's quiet frames are uniform).
+        // 10 frames at 1/128 + 10 at 1/64: the two middle values differ, and
+        // the median must be their average (3/256), not the upper-middle
+        // element (1/64).
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        // 34 frames x 0.03s >= the 1s calibration window — 34 is the
+        // engine's int(1.0 / 0.03) + 1, the frame count that triggers
+        // calibration in production. 20 non-uniform quiet frames, then 14
+        // speech frames (0.0625 >= calibrationSpeechFloor — excluded).
+        for i in 0..<20 {
+            _ = detector.process(Self.constantFrame(i % 2 == 0 ? 0.0078125 : 0.015625))
+        }
+        for _ in 20..<34 {
+            _ = detector.process(Self.constantFrame(0.0625))
+        }
+        // Median = (1/128 + 1/64) / 2 = 3/256; utterance gate = 3/256 * 3.
+        #expect(detector.currentEnergyThreshold == (0.0078125 + 0.015625) / 2 * 3.0)
+    }
+
+    @Test("exactly noiseMinimumSamples quiet frames still calibrates")
+    func fiveQuietFramesStillCalibrate() throws {
+        // The abort boundary is >= noiseMinimumSamples: the minimum count of
+        // quiet frames must still adapt. A regression to a strict >
+        // comparison — the mirror of engine.py's guard flipping < to <= —
+        // would abort here and leave the static gates in force.
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        for _ in 0..<5 {
+            _ = detector.process(Self.constantFrame(0.015625))  // quiet
+        }
+        for _ in 5..<34 {
+            _ = detector.process(Self.constantFrame(0.0625))    // speech
+        }
+        #expect(detector.currentEnergyThreshold == 0.015625 * 3.0,
+                "5 quiet frames is exactly noiseMinimumSamples — must adapt")
+    }
+
+    @Test("one quiet frame short of noiseMinimumSamples aborts")
+    func fourQuietFramesAbort() throws {
+        // The boundary counterpart: 4 quiet frames is too few to trust, the
+        // static gates stay in force for the session. Together with the
+        // 5-quiet test this pins the comparison as >= (not >).
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        for _ in 0..<4 {
+            _ = detector.process(Self.constantFrame(0.015625))  // quiet
+        }
+        for _ in 4..<34 {
+            _ = detector.process(Self.constantFrame(0.0625))    // speech
+        }
+        #expect(detector.currentEnergyThreshold == 0.008,
+                "4 quiet frames < noiseMinimumSamples — calibration must abort")
     }
 }

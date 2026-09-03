@@ -129,6 +129,33 @@ def test_tuning_toml_keys_are_expected(tuning: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_golden_generator_constants_match_tuning(tuning: dict) -> None:
+    """generate.py duplicates the contract's constants to synthesize
+    fixtures; pin each duplicate against tuning.toml so a contract change
+    must update the generator in the same commit — otherwise the corpus
+    regenerates from stale values and only the byte-identity test below
+    catches it, late and without saying why."""
+    import importlib.util
+
+    golden_dir = TUNING_PATH.parent / "golden"
+    spec = importlib.util.spec_from_file_location(
+        "golden_generate", golden_dir / "generate.py"
+    )
+    assert spec is not None and spec.loader is not None
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)  # safe: main() is __main__-guarded
+
+    assert gen.UTTERANCE_SILENCE == tuning["utterance_silence"]
+    assert gen.TRAILING_PADDING == tuning["trailing_padding"]
+    assert gen.FRAME_ENERGY_DEFAULT == tuning["frame_energy_default"]
+    assert gen.MIN_ENERGY_DEFAULT == tuning["min_energy_default"]
+    assert gen.CAL_WINDOW == tuning["noise_calibration_seconds"]
+    assert gen.FRAME_MULT == tuning["noise_frame_multiplier"]
+    assert gen.UTT_MULT == tuning["noise_utterance_multiplier"]
+    assert gen.MIN_SAMPLES == tuning["noise_min_samples"]
+    assert gen.CAL_SPEECH_FLOOR == tuning["calibration_speech_floor"]
+
+
 def test_golden_corpus_is_regenerable() -> None:
     import subprocess
 

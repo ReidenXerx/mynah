@@ -106,7 +106,7 @@ SPEECH_AMP = 0.06          # normalized peak — RMS 0.042, well above every gat
 NOISY_FLOOR_AMP = 0.03     # RMS 0.021 — above the 0.010 static floor,
                            # so ONLY calibration can reject it
 SPEECH_OVER_NOISE_AMP = 0.15  # case 8: RMS 0.106 — must clear the raised
-                              # utterance gate (0.021 * 3.0 = 0.064)
+                              # utterance gate (0.021 * 3.0 ≈ 0.064)
 
 # From the tuning contract (duplicated here only to synthesize cases;
 # pinned against tuning/tuning.toml by tests/test_tuning.py).
@@ -377,8 +377,9 @@ def main() -> None:
     #    (fan-level) frames raise the gates via the quiet-only median;
     #    the speech frames are excluded from it; the speech clears the
     #    raised utterance gate. Durations are frame-aligned (16 + 50 +
-    #    28 frames) so the completing window frame (16 noise + 18
-    #    speech) is mixed, and the region closes inside the fixture.
+    #    28 frames) so the calibration WINDOW is mixed — 16 noise + 18
+    #    speech frames; the frame completing the window is pure speech —
+    #    and the region closes inside the fixture.
     cases["speech_over_noise_in_calibration"] = (
         _sinusoid_segment(0.48, NOISY_FLOOR_AMP, freq=60.0)
         + _sinusoid_segment(1.5, SPEECH_OVER_NOISE_AMP)

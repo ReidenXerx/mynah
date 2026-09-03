@@ -71,12 +71,14 @@ struct TuningTests {
         let frameMult = try Self.number(t, "noise_frame_multiplier")
         let uttMult = try Self.number(t, "noise_utterance_multiplier")
         let minSamples = try Self.number(t, "noise_min_samples")
+        let calSpeechFloor = try Self.number(t, "calibration_speech_floor")
         let trailingPadding = try Self.number(t, "trailing_padding")
         #expect(TranscriptFilter.utteranceSilence == utteranceSilence)
         #expect(TranscriptFilter.noiseCalibrationDuration == calDuration)
         #expect(TranscriptFilter.noiseFrameMultiplier == frameMult)
         #expect(TranscriptFilter.noiseUtteranceMultiplier == uttMult)
         #expect(Double(TranscriptFilter.noiseMinimumSamples) == minSamples)
+        #expect(TranscriptFilter.calibrationSpeechFloor == calSpeechFloor)
         #expect(UtteranceDetector.trailingPadding == trailingPadding)
     }
 
@@ -115,6 +117,7 @@ struct TuningTests {
             "noise_frame_multiplier",
             "noise_utterance_multiplier",
             "noise_min_samples",
+            "calibration_speech_floor",
             "frame_energy_default",
             "min_energy_default",
             "min_utterance_default",
@@ -230,16 +233,21 @@ struct TuningTests {
         Int((TranscriptFilter.utteranceSilence / frameSeconds).rounded(.up))
     }
 
+    /// The corpus's pinned cases — a single list so the orphan guard below
+    /// can hold it against expected.json's keys.
+    private static let goldenCases = [
+        "quiet_two_utterances",
+        "speech_during_calibration",
+        "speech_late_in_calibration",
+        "noisy_room",
+        "click_below_min",
+        "trailing_silence_trim",
+        "gap_below_silence",
+        "speech_over_noise_in_calibration",
+    ]
+
     @Test("UtteranceDetector segments the golden corpus as pinned",
-          arguments: [
-            "quiet_two_utterances",
-            "speech_during_calibration",
-            "speech_late_in_calibration",
-            "noisy_room",
-            "click_below_min",
-            "trailing_silence_trim",
-            "gap_below_silence",
-          ])
+          arguments: TuningTests.goldenCases)
     func goldenSegmentation(name: String) throws {
         let samples = try Self.loadWavSamples(name)
         let expected = try Self.loadExpected(name)
@@ -299,15 +307,31 @@ struct TuningTests {
         }
     }
 
-    @Test("poisoned calibration raises the gate and rejects the first word")
-    func poisonedCalibrationPinsTheDefect() throws {
-        // speech_during_calibration: speech fills the 1 s calibration
-        // window, so the median noise floor is measured on speech and the
-        // utterance gate rises to ~3x the speech RMS. The region is still
-        // segmented (that was the PR #1 bug — dropped frames), but the
-        // calibrated gate then rejects the buffer. Shared defect with the
-        // Python engine, pinned as-is by the corpus; see
-        // docs/ARCHITECTURE.md "Known shared defects".
+    @Test("expected.json holds exactly the pinned cases")
+    func expectedJsonHoldsExactlyThePinnedCases() throws {
+        // Orphan guard: a case dropped from goldenCases would silently stop
+        // being tested (the parametrized test visits goldenCases only), and
+        // a stray expected.json entry would never be noticed — loadExpected
+        // throws only for a MISSING entry, never for an extra one.
+        let url = Self.goldenDir.appendingPathComponent("expected.json")
+        let data = try Data(contentsOf: url)
+        let obj = try JSONSerialization.jsonObject(with: data)
+        guard let all = obj as? [String: Any] else {
+            throw FixtureError.malformed("expected.json: not a map of case -> regions")
+        }
+        #expect(Set(all.keys) == Set(Self.goldenCases))
+    }
+
+    @Test("speech in the calibration window aborts to the static gates — the first word survives")
+    func speechDuringCalibrationKeepsStaticGates() throws {
+        // speech_during_calibration pins the speech-aware calibration
+        // fix: speech fills the 1 s window, the speech frames are
+        // excluded from the noise median, too few quiet frames remain,
+        // and calibration aborts to the static gates. The region is
+        // segmented AND passes the energy gate. Before the fix the
+        // median was measured on speech, the utterance gate rose to ~3x
+        // the speech RMS, and the first word was silently rejected —
+        // the shared defect this fixture used to pin as-is.
         let samples = try Self.loadWavSamples("speech_during_calibration")
 
         var detector = UtteranceDetector(
@@ -318,19 +342,135 @@ struct TuningTests {
         var emitted: UtteranceDetector.Utterance?
         var i = 0
         while i + Self.frameLen <= samples.count {
-            if let utterance = detector.process(Array(samples[i..<i + Self.frameLen])) {
+            if let utterance = detector.process(Array(samples[i..<Self.frameLen + i])) {
                 emitted = utterance
             }
             i += Self.frameLen
         }
 
         let utterance = try #require(emitted)
-        #expect(detector.currentEnergyThreshold > 0.008,
-                "calibration did not raise the utterance gate")
+        // A window full of speech must abort calibration: the gates stay
+        // at the static floors — the median may never be measured on speech.
+        #expect(detector.currentEnergyThreshold == 0.008,
+                "a window full of speech must abort calibration to the static gates")
         let rms = TranscriptFilter.rms(utterance.samples)
-        #expect(rms < detector.currentEnergyThreshold, """
-            buffer RMS \(rms) should be rejected by the calibrated gate \
-            \(detector.currentEnergyThreshold) (the static floor would pass it)
+        #expect(rms >= detector.currentEnergyThreshold, """
+            buffer RMS \(rms) should pass the static gate \
+            \(detector.currentEnergyThreshold) — the first word must survive
             """)
+    }
+
+    @Test("speech over noise excludes speech from the median but still adapts")
+    func speechOverNoiseRaisesGatesButExcludesSpeech() throws {
+        // speech_over_noise_in_calibration: fan-level noise then speech
+        // inside the window. The speech frames are excluded from the
+        // median, the noise frames raise the gates, and the utterance
+        // still clears the raised gate. A regression to "any speech →
+        // skip calibration" would leave the gates static and let the
+        // noise tail pass — this pins the exclusion mechanism itself.
+        let samples = try Self.loadWavSamples("speech_over_noise_in_calibration")
+
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        var emitted: UtteranceDetector.Utterance?
+        var i = 0
+        while i + Self.frameLen <= samples.count {
+            if let utterance = detector.process(Array(samples[i..<Self.frameLen + i])) {
+                emitted = utterance
+            }
+            i += Self.frameLen
+        }
+
+        let utterance = try #require(emitted)
+        // The quiet (noise) frames raise the gate — speech exclusion must
+        // not disable adaptation.
+        #expect(detector.currentEnergyThreshold > 0.008,
+                "the noise frames in the window must still raise the utterance gate")
+        let rms = TranscriptFilter.rms(utterance.samples)
+        #expect(rms >= detector.currentEnergyThreshold, """
+            buffer RMS \(rms) should pass the raised gate \
+            \(detector.currentEnergyThreshold)
+            """)
+    }
+
+    // MARK: - Calibration median + abort boundary (mirror of the
+    // speech-aware calibration block in tests/test_dictate.py)
+
+    /// A frame of constant samples has RMS == |amplitude| — the cheapest
+    /// input with a known energy. The amplitudes below are dyadic (exact in
+    /// Float and Double alike), so the median/gate arithmetic is exact too.
+    private static func constantFrame(_ amplitude: Float) -> [Float] {
+        Array(repeating: amplitude, count: frameLen)
+    }
+
+    @Test("even count of non-uniform quiet frames: the two middle values are averaged")
+    func evenQuietMedianAveragesTheTwoMiddleValues() throws {
+        // Swift used to take the upper-middle element for even counts while
+        // engine.py averages the two middle values — a divergence the golden
+        // corpus cannot see (every fixture's quiet frames are uniform).
+        // 10 frames at 1/128 + 10 at 1/64: the two middle values differ, and
+        // the median must be their average (3/256), not the upper-middle
+        // element (1/64).
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        // 34 frames x 0.03s >= the 1s calibration window — 34 is the
+        // engine's int(1.0 / 0.03) + 1, the frame count that triggers
+        // calibration in production. 20 non-uniform quiet frames, then 14
+        // speech frames (0.0625 >= calibrationSpeechFloor — excluded).
+        for i in 0..<20 {
+            _ = detector.process(Self.constantFrame(i % 2 == 0 ? 0.0078125 : 0.015625))
+        }
+        for _ in 20..<34 {
+            _ = detector.process(Self.constantFrame(0.0625))
+        }
+        // Median = (1/128 + 1/64) / 2 = 3/256; utterance gate = 3/256 * 3.
+        #expect(detector.currentEnergyThreshold == (0.0078125 + 0.015625) / 2 * 3.0)
+    }
+
+    @Test("exactly noiseMinimumSamples quiet frames still calibrates")
+    func fiveQuietFramesStillCalibrate() throws {
+        // The abort boundary is >= noiseMinimumSamples: the minimum count of
+        // quiet frames must still adapt. A regression to a strict >
+        // comparison — the mirror of engine.py's guard flipping < to <= —
+        // would abort here and leave the static gates in force.
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        for _ in 0..<5 {
+            _ = detector.process(Self.constantFrame(0.015625))  // quiet
+        }
+        for _ in 5..<34 {
+            _ = detector.process(Self.constantFrame(0.0625))    // speech
+        }
+        #expect(detector.currentEnergyThreshold == 0.015625 * 3.0,
+                "5 quiet frames is exactly noiseMinimumSamples — must adapt")
+    }
+
+    @Test("one quiet frame short of noiseMinimumSamples aborts")
+    func fourQuietFramesAbort() throws {
+        // The boundary counterpart: 4 quiet frames is too few to trust, the
+        // static gates stay in force for the session. Together with the
+        // 5-quiet test this pins the comparison as >= (not >).
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        for _ in 0..<4 {
+            _ = detector.process(Self.constantFrame(0.015625))  // quiet
+        }
+        for _ in 4..<34 {
+            _ = detector.process(Self.constantFrame(0.0625))    // speech
+        }
+        #expect(detector.currentEnergyThreshold == 0.008,
+                "4 quiet frames < noiseMinimumSamples — calibration must abort")
     }
 }

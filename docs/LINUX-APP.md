@@ -95,8 +95,14 @@ end-to-end dictate, golden corpus green through `whiz-core`'s detector.
    non-sandboxed build this is plain PipeWire permission, but if we ever
    sandbox the daemon, mic access needs the pipewire portal story nailed
    down.
-4. **Calibration defect is shared** (see ARCHITECTURE.md — poisoned
-   calibration). The Rust core inherits the fix, whatever it turns out to be.
+4. **Calibration defect — resolved, no longer open.** The shared
+   poisoned-calibration defect is fixed speech-aware in both engines
+   (see ARCHITECTURE.md): calibration frames at or above
+   `calibration_speech_floor` are excluded from the noise median, and
+   fewer than `noise_min_samples` quiet frames aborts calibration to
+   the static gates. `whiz-core` ports that exactly; the corpus cases
+   `speech_during_calibration` and `speech_over_noise_in_calibration`
+   pin it for every implementation, Rust included.
 
 ## Out of scope for P1
 

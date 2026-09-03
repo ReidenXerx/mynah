@@ -45,16 +45,18 @@ Cases:
    regions. The lead-in is longer than the calibration window so the
    noise floor is measured on silence, not on speech.
 2. speech_during_calibration — speech starts at t=0, filling the
-   calibration window. Segmentation keeps it (the bug fixed in the PR
-   #1 review dropped these frames entirely), but the poisoned median
-   raises the utterance gate to ~3x the speech RMS, so the energy gate
-   then REJECTS the first utterance. This is real shared behavior in
-   both implementations — a known defect, pinned here as-is; see
-   docs/ARCHITECTURE.md ("Known shared defects").
+   calibration window. The speech frames are excluded from the noise
+   median, too few quiet frames remain, and calibration aborts to the
+   static gates: the region is segmented AND the first word survives
+   the energy gate. (Before the speech-aware fix the median was
+   measured on speech, the utterance gate rose to ~3x the speech RMS,
+   and the first word was silently rejected — the defect this case
+   used to pin as-is; see docs/ARCHITECTURE.md.)
 3. speech_late_in_calibration — speech starts at t=0.9s, near the end
-   of the 1.0s window. Silence dominates the median, the gates stay at
-   their static floors, and the utterance survives — the boundary
-   counterpart of case 2.
+   of the 1.0s window. The speech frames are excluded, the quiet
+   silence frames dominate the median, the gates stay at their static
+   floors, and the utterance survives — the boundary counterpart of
+   case 2.
 4. noisy_room — steady noise ABOVE the static frame floor for the whole
    clip. Only the adaptive calibration can reject it. Segmentation
    still opens one spurious region during the window (the static gate
@@ -73,6 +75,12 @@ Cases:
    the leftover tail opens nothing.
 7. gap_below_silence — a 0.78s (26-frame) gap between two phrases:
    below the close threshold, so the two phrases merge into ONE region.
+8. speech_over_noise_in_calibration — fan-level noise, then louder
+   speech inside the window: the speech frames are excluded from the
+   median while the noise frames raise the gates, and the speech still
+   clears the raised utterance gate. Pins the exclusion mechanism
+   itself — cases 2 and 3 alone would also pass a naive "any speech →
+   skip calibration" regression; this case would not.
 
 Regenerate after changing tuning/tuning.toml or the segmentation logic:
     python3 tuning/golden/generate.py
@@ -97,6 +105,8 @@ HERE = Path(__file__).resolve().parent
 SPEECH_AMP = 0.06          # normalized peak — RMS 0.042, well above every gate
 NOISY_FLOOR_AMP = 0.03     # RMS 0.021 — above the 0.010 static floor,
                            # so ONLY calibration can reject it
+SPEECH_OVER_NOISE_AMP = 0.15  # case 8: RMS 0.106 — must clear the raised
+                              # utterance gate (0.021 * 3.0 ≈ 0.064)
 
 # From the tuning contract (duplicated here only to synthesize cases;
 # pinned against tuning/tuning.toml by tests/test_tuning.py).
@@ -114,6 +124,7 @@ CAL_WINDOW = 1.0
 FRAME_MULT = 3.5
 UTT_MULT = 3.0
 MIN_SAMPLES = 5
+CAL_SPEECH_FLOOR = 0.03   # calibration frames >= this are speech, not noise
 
 
 def _sinusoid_segment(duration_s: float, amp_norm: float, freq: float = 200.0) -> list[int]:
@@ -185,7 +196,10 @@ def reference_speech_regions(
     for the first int(cal_window / frame_seconds) + 1 frames, then the
     median raises both gates; frames are NOT dropped during calibration
     and the frame that completes the window is itself measured against
-    the static gates.
+    the resulting gates (raised, or static when calibration aborts).
+    Speech-aware, like engine.py: calibration frames with RMS >=
+    CAL_SPEECH_FLOOR are excluded from the median, and fewer than
+    MIN_SAMPLES quiet frames aborts calibration to the static gates.
 
     Each returned region is {"start", "end", "rejected_by_energy_gate"}:
     - start/end in seconds; end is the start time of the closing frame,
@@ -246,20 +260,26 @@ def reference_speech_regions(
         # Calibration: collect, then apply — but keep processing the
         # frame (engine.py falls through to segmentation during
         # calibration). The frame that completes the window is itself
-        # measured against the RAISED gates — engine.py calls
+        # measured against the resulting gates — engine.py calls
         # _finish_noise_calibration() before the segmentation check,
         # so a noisy window's completing frame already counts as
-        # silence (see cases 2 and 4: regions close at 1.77s, one
-        # frame earlier than a static-gate reading would give).
+        # silence under the raised gates (see case 4: the region closes
+        # at 1.77s, one frame earlier than a static-gate reading gives).
         if not calibrated:
             cal_rms.append(energy)
             if len(cal_rms) >= max(cal_needed, MIN_SAMPLES):
                 calibrated = True
-                s = sorted(cal_rms)
-                n = len(s)
-                median = s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
-                eff_frame_gate = max(frame_energy, median * FRAME_MULT)
-                eff_utt_gate = max(min_energy, median * UTT_MULT)
+                # Speech-aware: only quiet frames measure the noise
+                # floor; a window with too few quiet frames aborts to
+                # the static gates (mirrors engine.py — the median must
+                # never be measured on speech).
+                quiet = [r for r in cal_rms if r < CAL_SPEECH_FLOOR]
+                if len(quiet) >= MIN_SAMPLES:
+                    s = sorted(quiet)
+                    n = len(s)
+                    median = s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
+                    eff_frame_gate = max(frame_energy, median * FRAME_MULT)
+                    eff_utt_gate = max(min_energy, median * UTT_MULT)
 
         if energy >= eff_frame_gate:
             if not in_speech:
@@ -302,10 +322,11 @@ def main() -> None:
     )
 
     # 2. Speech starts at t=0 — inside the calibration window. The
-    #    region must be segmented (the PR #1 Swift bug dropped it), but
-    #    the poisoned median raises the utterance gate above the speech
-    #    RMS, so the energy gate rejects the first word. Known shared
-    #    defect, pinned as-is — see docs/ARCHITECTURE.md.
+    #    speech frames are excluded from the noise median and too few
+    #    quiet frames remain, so calibration aborts to the static
+    #    gates: the region is segmented (the PR #1 Swift bug dropped
+    #    it) AND the first word survives the energy gate — the fix
+    #    pinned by this case.
     cases["speech_during_calibration"] = (
         _sinusoid_segment(1.0, SPEECH_AMP)
         + _silence_segment(1.5)
@@ -350,6 +371,19 @@ def main() -> None:
         + _silence_segment(0.78)
         + _sinusoid_segment(0.9, SPEECH_AMP)
         + _silence_segment(1.0)
+    )
+
+    # 8. Speech over noise inside the calibration window. The noise
+    #    (fan-level) frames raise the gates via the quiet-only median;
+    #    the speech frames are excluded from it; the speech clears the
+    #    raised utterance gate. Durations are frame-aligned (16 + 50 +
+    #    28 frames) so the calibration WINDOW is mixed — 16 noise + 18
+    #    speech frames; the frame completing the window is pure speech —
+    #    and the region closes inside the fixture.
+    cases["speech_over_noise_in_calibration"] = (
+        _sinusoid_segment(0.48, NOISY_FLOOR_AMP, freq=60.0)
+        + _sinusoid_segment(1.5, SPEECH_OVER_NOISE_AMP)
+        + _sinusoid_segment(0.84, NOISY_FLOOR_AMP, freq=60.0)
     )
 
     expected: dict[str, list[dict[str, object]]] = {}

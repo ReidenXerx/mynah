@@ -41,6 +41,13 @@ utterance_silence = 0.8
 trailing_padding = 0.2
 
 # --- Adaptive noise calibration ---
+#
+# Speech-aware: a calibration frame with RMS >= calibration_speech_floor
+# is speech, not noise, and is excluded from the median. If too few quiet
+# frames remain (noise_min_samples), calibration aborts to the static
+# gates for the session — the median must never be measured on speech
+# (that raised the utterance gate to ~3x the speech RMS and silently
+# dropped the first word in both implementations; see ARCHITECTURE.md).
 
 # Measure ambient noise for this many seconds at session start.
 noise_calibration_seconds = 1.0
@@ -48,8 +55,19 @@ noise_calibration_seconds = 1.0
 noise_frame_multiplier = 3.5
 # Utterance gate ends up ~10 dB above the measured noise floor.
 noise_utterance_multiplier = 3.0
-# Calibration needs at least this many frames to be trusted.
+# Calibration needs at least this many QUIET frames to be trusted.
 noise_min_samples = 5
+# Calibration frames at or above this RMS are speech, not noise —
+# excluded from the median regardless of the gates in force. An absolute
+# discrimination line, not a gate: the legacy measured per-frame floor
+# (0.03 ≈ -30dB), between real MacBook-cooler/fan noise (~0.02, measured
+# in docs/SWIFT-APP.md) and quiet speech (~0.04). Deliberately NOT derived
+# from noise_frame_multiplier: the multiplier sets gate height above
+# measured noise; this decides what counts as speech. Trade-off: steady
+# noise at/above this level can no longer be calibrated against (energy
+# alone cannot tell it from speech) — VAD and the hallucination filter
+# own that regime instead.
+calibration_speech_floor = 0.03
 
 # --- Config defaults (must match whiz/config.py and WhizConfig.swift) ---
 

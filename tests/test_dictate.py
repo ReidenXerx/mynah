@@ -2480,18 +2480,22 @@ def test_noise_calibration_quiet_room_keeps_static_floor():
 
 def test_noise_calibration_noisy_room_raises_gates():
     """In a noisy room the measured noise floor exceeds the static thresholds,
-    so the effective gates are raised proportionally (noise_floor * mult)."""
+    so the effective gates are raised proportionally (noise_floor * mult).
+    Note the amplitude: fan/HVAC levels (~0.02), which sit BELOW
+    _CALIBRATION_SPEECH_FLOOR — noise at or above that floor is speech by
+    definition and no longer calibratable (see the speech-aware tests below)."""
     engine = _make_engine()
     engine._start_session()
-    # Simulate ~0.5s of noisy-room audio: steady fan/HVAC noise.
-    noisy_rms = 0.06  # -25dB — above the 0.025 static frame floor
+    # Simulate ~0.5s of fan-noise audio: steady fan/HVAC noise.
+    noisy_rms = 0.02  # ~real fan level — above the 0.010 static frame floor,
+                      # below the 0.03 calibration speech floor
     for _ in range(20):
         engine._noise_cal_rms.append(noisy_rms)
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
     # The adaptive gate should be noise_floor * mult, above the static floor.
-    expected_frame = noisy_rms * eng._NOISE_FRAME_MULT  # 0.15
-    expected_utt = noisy_rms * eng._NOISE_UTT_MULT       # 0.12
+    expected_frame = noisy_rms * eng._NOISE_FRAME_MULT  # 0.07
+    expected_utt = noisy_rms * eng._NOISE_UTT_MULT       # 0.06
     assert abs(engine._effective_frame_energy - expected_frame) < 0.001
     assert abs(engine._effective_min_energy - expected_utt) < 0.001
     assert engine._effective_frame_energy > engine.s.frame_energy
@@ -2506,7 +2510,7 @@ def test_noise_calibration_resets_between_sessions():
     engine._start_session()
     # First session: noisy room.
     for _ in range(20):
-        engine._noise_cal_rms.append(0.08)
+        engine._noise_cal_rms.append(0.02)
     engine._finish_noise_calibration()
     assert engine._effective_frame_energy > engine.s.frame_energy
     engine._end_session()
@@ -2537,20 +2541,76 @@ def test_noise_calibration_idempotent():
 
 
 def test_noise_calibration_median_robust_against_spikes():
-    """The median (not mean) is used so a transient spike (brief speech, key
-    click) during calibration does not inflate the noise floor."""
+    """Loud frames during calibration do not inflate the noise floor — with
+    speech-aware calibration they are excluded by _CALIBRATION_SPEECH_FLOOR
+    outright, and the median runs over the quiet frames only."""
     engine = _make_engine()
     engine._start_session()
     # 18 quiet frames + 2 loud spikes (simulating a key press during cal).
     for _ in range(18):
         engine._noise_cal_rms.append(0.01)
-    engine._noise_cal_rms.append(0.20)  # spike
-    engine._noise_cal_rms.append(0.25)  # spike
+    engine._noise_cal_rms.append(0.20)  # spike — speech-level, excluded
+    engine._noise_cal_rms.append(0.25)  # spike — speech-level, excluded
     engine._finish_noise_calibration()
-    # Median of 20 values = 10th + 11th sorted / 2 -> both ~0.01.
-    # The spikes are at the tail and do not affect the median.
-    # 0.01 * 3.5 = 0.035 which is above the static floor 0.03.
+    # Median of the 18 quiet frames = 0.01; the spikes never enter it.
+    # 0.01 * 3.5 = 0.035 which is above the static floor 0.010.
     assert engine._effective_frame_energy == 0.035  # noise_floor * _NOISE_FRAME_MULT
+    engine._end_session()
+
+
+def test_noise_calibration_speech_in_window_aborts_to_static():
+    """A calibration window full of speech must abort to the static gates —
+    the median may never be measured on speech. This is the unit-level
+    mirror of the golden corpus's speech_during_calibration case: before
+    the speech-aware fix the poisoned median raised the utterance gate to
+    ~3x the speech RMS and the first word was silently dropped."""
+    engine = _make_engine()
+    engine._start_session()
+    # A window of speech-energy frames (user pressed the hotkey and talked
+    # immediately). 0.06 >= _CALIBRATION_SPEECH_FLOOR (0.03) — all speech.
+    for _ in range(20):
+        engine._noise_cal_rms.append(0.06)
+    engine._finish_noise_calibration()
+    assert engine._noise_calibrated is True
+    assert engine._effective_frame_energy == engine.s.frame_energy
+    assert engine._effective_min_energy == engine.s.min_energy
+    engine._end_session()
+
+
+def test_noise_calibration_mixed_window_excludes_speech():
+    """A mixed window (noise + speech) measures the floor on the quiet
+    (noise) frames only: the gates rise on the noise AND the speech is
+    excluded from the median."""
+    engine = _make_engine()
+    engine._start_session()
+    # 10 fan-level noise frames (below the speech floor) + 10 speech frames.
+    for _ in range(10):
+        engine._noise_cal_rms.append(0.02)
+    for _ in range(10):
+        engine._noise_cal_rms.append(0.06)  # speech — excluded
+    engine._finish_noise_calibration()
+    assert engine._noise_calibrated is True
+    # Median over the 10 quiet frames = 0.02.
+    expected_frame = 0.02 * eng._NOISE_FRAME_MULT  # 0.07
+    expected_utt = 0.02 * eng._NOISE_UTT_MULT       # 0.06
+    assert abs(engine._effective_frame_energy - expected_frame) < 0.001
+    assert abs(engine._effective_min_energy - expected_utt) < 0.001
+    engine._end_session()
+
+
+def test_noise_calibration_all_quiet_window_unchanged():
+    """An all-quiet window behaves exactly as before the speech-aware change:
+    every frame is below the speech floor, the median runs over all of them,
+    and the gates rise on the measured noise."""
+    engine = _make_engine()
+    engine._start_session()
+    for _ in range(20):
+        engine._noise_cal_rms.append(0.01)  # below the 0.03 speech floor
+    engine._finish_noise_calibration()
+    assert engine._noise_calibrated is True
+    # Median 0.01 -> gates 0.035 / 0.03, both above the static floors.
+    assert abs(engine._effective_frame_energy - 0.01 * eng._NOISE_FRAME_MULT) < 0.001
+    assert abs(engine._effective_min_energy - 0.01 * eng._NOISE_UTT_MULT) < 0.001
     engine._end_session()
 
 
@@ -2575,10 +2635,10 @@ def test_vad_uses_effective_frame_energy():
     engine._start_session()
     # Simulate a noisy-room calibration so the adaptive floor is raised.
     for _ in range(20):
-        engine._noise_cal_rms.append(0.08)
+        engine._noise_cal_rms.append(0.02)
     engine._finish_noise_calibration()
-    # Now a frame with RMS ~0.03 would pass the static floor (0.025) but
-    # should be rejected by the adaptive floor (0.08*2.5=0.20).
+    # Now a frame with RMS ~0.03 would pass the static floor (0.010) but
+    # should be rejected by the adaptive floor (0.02*3.5=0.07).
     assert engine._effective_frame_energy > 0.03
 
     class _AlwaysSpeechVad:

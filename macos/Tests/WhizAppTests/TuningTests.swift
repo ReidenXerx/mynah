@@ -71,12 +71,14 @@ struct TuningTests {
         let frameMult = try Self.number(t, "noise_frame_multiplier")
         let uttMult = try Self.number(t, "noise_utterance_multiplier")
         let minSamples = try Self.number(t, "noise_min_samples")
+        let calSpeechFloor = try Self.number(t, "calibration_speech_floor")
         let trailingPadding = try Self.number(t, "trailing_padding")
         #expect(TranscriptFilter.utteranceSilence == utteranceSilence)
         #expect(TranscriptFilter.noiseCalibrationDuration == calDuration)
         #expect(TranscriptFilter.noiseFrameMultiplier == frameMult)
         #expect(TranscriptFilter.noiseUtteranceMultiplier == uttMult)
         #expect(Double(TranscriptFilter.noiseMinimumSamples) == minSamples)
+        #expect(TranscriptFilter.calibrationSpeechFloor == calSpeechFloor)
         #expect(UtteranceDetector.trailingPadding == trailingPadding)
     }
 
@@ -115,6 +117,7 @@ struct TuningTests {
             "noise_frame_multiplier",
             "noise_utterance_multiplier",
             "noise_min_samples",
+            "calibration_speech_floor",
             "frame_energy_default",
             "min_energy_default",
             "min_utterance_default",
@@ -239,6 +242,7 @@ struct TuningTests {
             "click_below_min",
             "trailing_silence_trim",
             "gap_below_silence",
+            "speech_over_noise_in_calibration",
           ])
     func goldenSegmentation(name: String) throws {
         let samples = try Self.loadWavSamples(name)
@@ -299,15 +303,16 @@ struct TuningTests {
         }
     }
 
-    @Test("poisoned calibration raises the gate and rejects the first word")
-    func poisonedCalibrationPinsTheDefect() throws {
-        // speech_during_calibration: speech fills the 1 s calibration
-        // window, so the median noise floor is measured on speech and the
-        // utterance gate rises to ~3x the speech RMS. The region is still
-        // segmented (that was the PR #1 bug — dropped frames), but the
-        // calibrated gate then rejects the buffer. Shared defect with the
-        // Python engine, pinned as-is by the corpus; see
-        // docs/ARCHITECTURE.md "Known shared defects".
+    @Test("speech in the calibration window aborts to the static gates — the first word survives")
+    func speechDuringCalibrationKeepsStaticGates() throws {
+        // speech_during_calibration pins the speech-aware calibration
+        // fix: speech fills the 1 s window, the speech frames are
+        // excluded from the noise median, too few quiet frames remain,
+        // and calibration aborts to the static gates. The region is
+        // segmented AND passes the energy gate. Before the fix the
+        // median was measured on speech, the utterance gate rose to ~3x
+        // the speech RMS, and the first word was silently rejected —
+        // the shared defect this fixture used to pin as-is.
         let samples = try Self.loadWavSamples("speech_during_calibration")
 
         var detector = UtteranceDetector(
@@ -318,19 +323,57 @@ struct TuningTests {
         var emitted: UtteranceDetector.Utterance?
         var i = 0
         while i + Self.frameLen <= samples.count {
-            if let utterance = detector.process(Array(samples[i..<i + Self.frameLen])) {
+            if let utterance = detector.process(Array(samples[i..<Self.frameLen + i])) {
                 emitted = utterance
             }
             i += Self.frameLen
         }
 
         let utterance = try #require(emitted)
-        #expect(detector.currentEnergyThreshold > 0.008,
-                "calibration did not raise the utterance gate")
+        // A window full of speech must abort calibration: the gates stay
+        // at the static floors — the median may never be measured on speech.
+        #expect(detector.currentEnergyThreshold == 0.008,
+                "a window full of speech must abort calibration to the static gates")
         let rms = TranscriptFilter.rms(utterance.samples)
-        #expect(rms < detector.currentEnergyThreshold, """
-            buffer RMS \(rms) should be rejected by the calibrated gate \
-            \(detector.currentEnergyThreshold) (the static floor would pass it)
+        #expect(rms >= detector.currentEnergyThreshold, """
+            buffer RMS \(rms) should pass the static gate \
+            \(detector.currentEnergyThreshold) — the first word must survive
+            """)
+    }
+
+    @Test("speech over noise excludes speech from the median but still adapts")
+    func speechOverNoiseRaisesGatesButExcludesSpeech() throws {
+        // speech_over_noise_in_calibration: fan-level noise then speech
+        // inside the window. The speech frames are excluded from the
+        // median, the noise frames raise the gates, and the utterance
+        // still clears the raised gate. A regression to "any speech →
+        // skip calibration" would leave the gates static and let the
+        // noise tail pass — this pins the exclusion mechanism itself.
+        let samples = try Self.loadWavSamples("speech_over_noise_in_calibration")
+
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        var emitted: UtteranceDetector.Utterance?
+        var i = 0
+        while i + Self.frameLen <= samples.count {
+            if let utterance = detector.process(Array(samples[i..<Self.frameLen + i])) {
+                emitted = utterance
+            }
+            i += Self.frameLen
+        }
+
+        let utterance = try #require(emitted)
+        // The quiet (noise) frames raise the gate — speech exclusion must
+        // not disable adaptation.
+        #expect(detector.currentEnergyThreshold > 0.008,
+                "the noise frames in the window must still raise the utterance gate")
+        let rms = TranscriptFilter.rms(utterance.samples)
+        #expect(rms >= detector.currentEnergyThreshold, """
+            buffer RMS \(rms) should pass the raised gate \
+            \(detector.currentEnergyThreshold)
             """)
     }
 }

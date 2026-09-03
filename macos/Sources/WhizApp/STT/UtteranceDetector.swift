@@ -72,9 +72,13 @@ struct UtteranceDetector {
         // are the static floors, exactly as in Python, until `applyCalibration`
         // raises them.
         //
-        // Speech during calibration does skew the measured noise floor, which is
-        // why the floor is a median rather than a mean — a few loud frames among
-        // ~30 do not move it.
+        // Speech during calibration used to skew the measured noise floor —
+        // the median was assumed robust against it, but a user who presses
+        // the hotkey and talks immediately fills the window with speech:
+        // the floor is then measured on speech, the utterance gate rises to
+        // ~3x the speech RMS, and the first word is silently dropped by the
+        // energy gate. `applyCalibration` therefore excludes speech-energy
+        // frames from the median (see calibrationSpeechFloor).
         if calibratedDuration < TranscriptFilter.noiseCalibrationDuration {
             calibrationSamples.append(energy)
             calibratedDuration += frameDuration
@@ -134,12 +138,18 @@ struct UtteranceDetector {
         isSpeaking = false
     }
 
-    /// Raise both gates proportionally to measured ambient noise, using the
-    /// median rather than the mean so a transient spike (or a word spoken
-    /// during calibration) does not skew the floor.
+    /// Raise both gates proportionally to measured ambient noise. Speech-aware:
+    /// frames at or above `calibrationSpeechFloor` are excluded first, and if
+    /// fewer than `noiseMinimumSamples` quiet frames remain, calibration
+    /// aborts leaving the static gates in force — the floor must never be
+    /// measured on speech.
     private mutating func applyCalibration() {
-        guard calibrationSamples.count >= TranscriptFilter.noiseMinimumSamples else { return }
-        let sorted = calibrationSamples.sorted()
+        let quiet = calibrationSamples.filter { $0 < TranscriptFilter.calibrationSpeechFloor }
+        guard quiet.count >= TranscriptFilter.noiseMinimumSamples else {
+            Log.audio.notice("noise calibration aborted: \(quiet.count) quiet frames — static gates stay in force")
+            return
+        }
+        let sorted = quiet.sorted()
         let noiseFloor = sorted[sorted.count / 2]
 
         frameThreshold = max(frameFloor, noiseFloor * TranscriptFilter.noiseFrameMultiplier)

@@ -29,7 +29,8 @@ What is asserted, per region (see expected.json):
 - ``rejected_by_energy_gate``: the whole-buffer RMS gate in
   ``_transcribe_and_inject``, evaluated against the padded buffer
   (what Python feeds the gate) and the CALIBRATED
-  ``_effective_min_energy`` (raised in noisy rooms/poisoned windows).
+  ``_effective_min_energy`` (raised in noisy rooms; speech-aware —
+  speech in the window is excluded, never measured).
 
 Not asserted (known divergences, documented in docs/ARCHITECTURE.md):
 - The min-utterance length gate: Python applies it to the padded
@@ -72,6 +73,7 @@ CASES = [
     "click_below_min",
     "trailing_silence_trim",
     "gap_below_silence",
+    "speech_over_noise_in_calibration",
 ]
 
 
@@ -396,25 +398,53 @@ def test_energy_gate_verdicts_match_expected(name: str) -> None:
     )
 
 
-def test_energy_gate_uses_calibrated_gate_per_case() -> None:
-    """The energy gate must use the calibrated gate, not the static floor.
+def test_calibration_with_speech_aborts_to_static_gates() -> None:
+    """Speech filling the calibration window must not poison the gates.
 
-    speech_during_calibration pins the poisoned-calibration defect: the
-    first word's buffer is rejected because the median is poisoned by
-    speech, raising _effective_min_energy above the utterance RMS. This
-    proves the engine actually applied the raised gate (the static
-    0.008 floor would have let the buffer through).
+    speech_during_calibration pins the speech-aware calibration fix: the
+    speech frames are excluded from the noise median, fewer than
+    _NOISE_MIN_SAMPLES quiet frames remain, and calibration aborts to the
+    static gates — so the first word is segmented AND passes the energy
+    gate. (Before the fix, the median was measured on speech, the gate rose
+    to ~3x the speech RMS, and the first word was silently rejected.)
     """
     engine, queued = _drive_buffers("speech_during_calibration")
 
     assert engine._noise_calibrated
-    assert engine._effective_min_energy > engine.s.min_energy, (
-        "calibration did not raise the utterance gate — the poisoned-median "
-        "defect this fixture pins requires the gate to rise above speech RMS"
+    assert engine._effective_min_energy == engine.s.min_energy, (
+        "a window full of speech must abort calibration to the static "
+        "utterance gate — the median may never be measured on speech"
     )
     assert len(queued) == 1
     rms = eng._rms_int16(queued[0])
-    assert rms < engine._effective_min_energy, (
-        f"buffer RMS {rms:.4f} should be rejected by the calibrated gate "
-        f"{engine._effective_min_energy:.4f} (the static floor would pass it)"
+    assert rms >= engine._effective_min_energy, (
+        f"buffer RMS {rms:.4f} should pass the static gate "
+        f"{engine._effective_min_energy:.4f} — the first word must survive"
+    )
+
+
+def test_calibration_with_speech_over_noise_excludes_speech() -> None:
+    """Mixed windows measure the floor on quiet frames only — and still
+    adapt.
+
+    speech_over_noise_in_calibration: fan-level noise followed by speech
+    inside the window. The speech frames are excluded from the median, the
+    noise frames raise both gates, and the utterance still passes because
+    the speech clears the raised gate. A regression to "any speech in the
+    window → skip calibration" would fail here (gates would stay static and
+    the noise tail would pass too), so this pins the exclusion mechanism
+    itself, not just the abort path.
+    """
+    engine, queued = _drive_buffers("speech_over_noise_in_calibration")
+
+    assert engine._noise_calibrated
+    assert engine._effective_min_energy > engine.s.min_energy, (
+        "the quiet (noise) frames in the window must still raise the "
+        "utterance gate — speech exclusion must not disable adaptation"
+    )
+    assert len(queued) == 1
+    rms = eng._rms_int16(queued[0])
+    assert rms >= engine._effective_min_energy, (
+        f"buffer RMS {rms:.4f} should pass the raised gate "
+        f"{engine._effective_min_energy:.4f}"
     )

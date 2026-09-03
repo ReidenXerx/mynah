@@ -49,6 +49,7 @@ def test_noise_calibration_constants_match_tuning(tuning: dict) -> None:
     assert eng._NOISE_FRAME_MULT == tuning["noise_frame_multiplier"]
     assert eng._NOISE_UTT_MULT == tuning["noise_utterance_multiplier"]
     assert eng._NOISE_MIN_SAMPLES == tuning["noise_min_samples"]
+    assert eng._CALIBRATION_SPEECH_FLOOR == tuning["calibration_speech_floor"]
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +115,7 @@ def test_tuning_toml_keys_are_expected(tuning: dict) -> None:
         "noise_frame_multiplier",
         "noise_utterance_multiplier",
         "noise_min_samples",
+        "calibration_speech_floor",
         "frame_energy_default",
         "min_energy_default",
         "min_utterance_default",

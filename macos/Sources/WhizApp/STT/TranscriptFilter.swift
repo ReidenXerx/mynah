@@ -36,6 +36,16 @@ enum TranscriptFilter {
     static let noiseUtteranceMultiplier: Double = 3.0  // ~10 dB above the floor
     static let noiseMinimumSamples = 5
 
+    /// Calibration frames at or above this RMS are speech, not noise —
+    /// excluded from the median regardless of the gates in force. An
+    /// absolute discrimination line, not a gate: the legacy measured
+    /// per-frame floor (0.03 ≈ -30 dB), between real MacBook-cooler
+    /// noise (~0.02) and quiet speech (~0.04). If fewer than
+    /// `noiseMinimumSamples` quiet frames remain, calibration aborts to
+    /// the static gates — the median must never be measured on speech
+    /// (that poisoned the floor and silently dropped the first word).
+    static let calibrationSpeechFloor: Double = 0.03
+
     /// Known Whisper hallucination phrases, lowercased.
     ///
     /// Fed silence or noise, Whisper emits training-data artifacts — mostly

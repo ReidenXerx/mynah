@@ -115,12 +115,24 @@ _MIN_ENERGY = 0.025
 #   frame gate      = max(_VAD_FRAME_ENERGY, noise_floor * _NOISE_FRAME_MULT)
 #   utterance gate   = max(_MIN_ENERGY,       noise_floor * _NOISE_UTT_MULT)
 # The static thresholds remain as floors — a quiet room keeps them, a
-# noisy room gets higher gates. The median (not mean) is robust against
-# transient spikes and brief speech during the calibration window.
+# noisy room gets higher gates.
 _NOISE_CALIBRATION_SECONDS = 1.0  # sample ambient noise for this long
 _NOISE_FRAME_MULT = 3.5           # frame gate ~11dB above noise floor
 _NOISE_UTT_MULT = 3.0             # utterance gate ~10dB above noise floor
-_NOISE_MIN_SAMPLES = 5            # need ≥this many frames to trust calibration
+_NOISE_MIN_SAMPLES = 5            # need ≥this many QUIET frames to trust calibration
+
+# Speech-aware calibration: a calibration frame with RMS at or above this
+# level is speech, not noise, and is EXCLUDED from the median. If fewer
+# than _NOISE_MIN_SAMPLES quiet frames remain in the window, calibration
+# aborts to the static gates for the session. The median alone was assumed
+# robust against "brief" speech in the window — but when the user presses
+# the hotkey and talks immediately, speech fills the window, the median is
+# measured on speech, and the utterance gate rises to ~3x the speech RMS,
+# silently dropping the first word. Pinned by the golden corpus's
+# speech_during_calibration case (the FIX, not the defect).
+# 0.03 ≈ -30dB — the legacy measured per-frame floor; between real
+# MacBook-cooler noise (~0.02) and quiet speech (~0.04).
+_CALIBRATION_SPEECH_FLOOR = 0.03
 
 # Known Whisper hallucination phrases (lowercased). When the model is fed
 # silence/noise it emits these training-data artifacts; we suppress them as
@@ -652,11 +664,14 @@ class DictationEngine:
     def _finish_noise_calibration(self) -> None:
         """Compute the ambient noise floor from collected calibration RMS values.
 
-        Uses the median (not mean) of per-frame RMS during the calibration
-        window — the median is robust against transient spikes and brief
-        speech that may occur during calibration. The resulting noise floor
-        raises the effective energy gates above the static floors so steady
-        background noise doesn't pass as speech.
+        Speech-aware: frames with RMS at or above _CALIBRATION_SPEECH_FLOOR
+        are speech, not noise, and are excluded from the median — speech in
+        the calibration window (user talks immediately) must not poison the
+        noise floor, which previously raised the utterance gate above the
+        speech RMS and silently dropped the first word. If fewer than
+        _NOISE_MIN_SAMPLES quiet frames remain, there is nothing to
+        measure noise from: calibration completes leaving the static gates
+        in force for the session.
 
         Called once from the audio callback after enough frames are collected.
         Safe to call multiple times — _noise_calibrated guards re-entry.
@@ -665,10 +680,17 @@ class DictationEngine:
             return
         self._noise_calibrated = True
         samples = self._noise_cal_rms
-        if not samples:
+        # Free the calibration buffer regardless of the path taken.
+        self._noise_cal_rms = []
+        quiet = [r for r in samples if r < _CALIBRATION_SPEECH_FLOOR]
+        if len(quiet) < _NOISE_MIN_SAMPLES:
+            # Window dominated by speech (or too short): keep static gates.
+            logger.info(
+                "Noise calibration aborted: %d/%d quiet frames; static gates stay in force",
+                len(quiet), len(samples),
+            )
             return
-        # Median RMS of the calibration window = ambient noise baseline.
-        sorted_rms = sorted(samples)
+        sorted_rms = sorted(quiet)
         n = len(sorted_rms)
         median = sorted_rms[n // 2] if n % 2 else (sorted_rms[n // 2 - 1] + sorted_rms[n // 2]) / 2
         # Raise the effective gates above the noise floor. The static floors
@@ -678,11 +700,10 @@ class DictationEngine:
         self._effective_frame_energy = frame_gate
         self._effective_min_energy = utt_gate
         logger.info(
-            "Adaptive noise floor calibrated: median RMS=%.4f, frame gate=%.4f, utterance gate=%.4f",
-            median, frame_gate, utt_gate,
+            "Adaptive noise floor calibrated: median RMS=%.4f (from %d quiet frames), "
+            "frame gate=%.4f, utterance gate=%.4f",
+            median, len(quiet), frame_gate, utt_gate,
         )
-        # Free the calibration buffer.
-        self._noise_cal_rms = []
 
     def _process_vad_frames(self, pcm: bytes, frame_bytes: int, frame_seconds: float) -> None:
         """Run VAD on PCM frames and manage utterance buffering/enqueuing."""

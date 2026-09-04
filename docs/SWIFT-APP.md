@@ -129,9 +129,9 @@ Supporting reasons:
 
 Commit `ea49da8` is the strongest data point, and it is about the *model*, not
 the runtime: 4-bit turbo produced "garbled mixed-language output on real speech"
-because turbo has only 4 decoder layers and quantizes badly. That is why
-`WhisperModel.preference` puts unquantized turbo first, unlike
-`models.py:PREFERENCE` which prefers `q5_0` for batch speed.
+because turbo has only 4 decoder layers and quantizes badly. That finding, and
+the user decision extending it to every quantized variant (NS-15), is why both
+`WhisperModel.preference` and `models.py:PREFERENCE` put unquantized first.
 
 Measured here, `ggml-large-v3-turbo-q5_0.bin` on an M4 Pro, 4 s of pink noise at
 amplitude 0.02 (roughly cooler-fan level):
@@ -220,10 +220,12 @@ above, so the reasoning and the evidence against it stay separately readable.
 13. **Opening Settings from a second Space switched the user to the Desktop**
    and left the window behind. The window now uses `.moveToActiveSpace` and is
    ordered in before the app is activated.
-14. **`models.py:PREFERENCE` prefers `q5_0` for batch.** Same model class
-   `ea49da8` found garbles Russian in dictation. q5_0 is milder than q4 and may
-   be fine, but the batch default now contradicts the dictation finding and
-   nobody has checked. Independent of this decision, worth testing.
+14. ~~**`models.py:PREFERENCE` prefers `q5_0` for batch.**~~ — **resolved**
+   (NS-15, 2026-09-03): unquantized always. The batch preference order now
+   puts unquantized variants first and every quantized sibling behind its
+   unquantized class, matching `WhisperModel.preference`. Quantized files
+   remain available for explicit use; `pick_best` never chooses one while
+   its unquantized class exists.
 
 ## Two-stage speech detection
 
@@ -264,9 +266,9 @@ The model is the same one the batch pipeline downloads via
 `whiz models list` sees what the app downloads and vice versa. This removed the
 last reason a dictation-only user needed the Python package installed.
 
-`WhisperModel.preference` puts **unquantized** turbo first, unlike
-`models.py:PREFERENCE` which prefers `q5_0` for batch speed. That is deliberate —
-see the evidence in Decision 1.
+`WhisperModel.preference` puts **unquantized** turbo first, matching
+`models.py:PREFERENCE` (NS-15: unquantized always — quantization corrupts
+transcription quality; see the evidence in Decision 1).
 
 Non-2xx responses are rejected before the file is moved into place. A 404 body is
 a perfectly valid small file, and without that check it lands on disk named
@@ -345,9 +347,10 @@ identifier.
    ```sh
    launchctl unload ~/Library/LaunchAgents/com.reidenxerx.whiz.dictate.plist
    ```
-2. **Get the right model.** `WhisperModel.preference` wants unquantized turbo;
-   without it the resolver silently falls back to `q5_0`, which commit `ea49da8`
-   warns about for Russian (open issue 6):
+2. **Get the right model.** NS-15: unquantized always. Without unquantized
+   turbo on disk the resolver falls back down the preference list — the
+   quantized fallbacks are explicitly informed last resorts (the q5_0
+   warning from commit `ea49da8` is in the open-issues log):
    ```sh
    whiz models download ggml-large-v3-turbo.bin
    ```

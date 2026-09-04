@@ -10,22 +10,21 @@ import Foundation
 /// One engine now means one model file.
 enum WhisperModel {
 
-    /// Preference order, and the reason it differs from `models.py:PREFERENCE`.
+    /// Preference order, aligned with `models.py:PREFERENCE` by NS-15.
     ///
-    /// The batch pipeline prefers `ggml-large-v3-turbo-q5_0.bin` for speed.
-    /// Dictation deliberately prefers the **unquantized** turbo first, because
-    /// commit ea49da8 found 4-bit turbo produced "garbled mixed-language output
-    /// on real speech" — turbo has only 4 decoder layers, so aggressive
-    /// quantization hurts it more than it hurts full large. q5_0 is milder than
-    /// q4 and is kept as a fallback, but it is not the default and has not been
-    /// validated for Russian.
+    /// Quantization corrupts transcription quality — commit ea49da8 recorded
+    /// 4-bit turbo producing "garbled mixed-language output on real speech"
+    /// (turbo's 4 decoder layers suffer most), and the user decision extends
+    /// it to every quantized variant. Unquantized models come first, every
+    /// `-q*` variant sits behind its unquantized class, and a quantized model
+    /// resolves only when nothing unquantized exists on disk.
     static let preference = [
         "ggml-large-v3-turbo.bin",
         "ggml-large-v3.bin",
+        "ggml-medium.bin",
         "ggml-large-v3-turbo-q8_0.bin",
         "ggml-large-v3-turbo-q5_0.bin",
         "ggml-large-v3-q5_0.bin",
-        "ggml-medium.bin",
     ]
 
     /// Mirrors `DEFAULT_MODEL_SEARCH_DIRS` in `whiz/config.py`.

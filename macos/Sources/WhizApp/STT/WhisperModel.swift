@@ -12,19 +12,22 @@ enum WhisperModel {
 
     /// Preference order, aligned with `models.py:PREFERENCE` by NS-15.
     ///
-    /// Quantization corrupts transcription quality — commit ea49da8 recorded
-    /// 4-bit turbo producing "garbled mixed-language output on real speech"
-    /// (turbo's 4 decoder layers suffer most), and the user decision extends
-    /// it to every quantized variant. Unquantized models come first, every
-    /// `-q*` variant sits behind its unquantized class, and a quantized model
-    /// resolves only when nothing unquantized exists on disk.
+    /// Grouped per class: the unquantized model first, then that class's
+    /// quantized variants best-quality-first (q8_0 before q5_0). A quantized
+    /// model resolves only when its own unquantized class is absent from
+    /// disk — quantization corrupts transcription quality (commit ea49da8
+    /// recorded 4-bit turbo producing "garbled mixed-language output on real
+    /// speech"), and a global unquantized-first batch let `tiny` outrank
+    /// `large-v3-turbo-q8_0`, which is never acceptable. `tiny` is excluded
+    /// entirely (useless quality); it still loads if configured explicitly.
+    /// Pinned by `WhisperModelTests.swift`.
     static let preference = [
         "ggml-large-v3-turbo.bin",
-        "ggml-large-v3.bin",
-        "ggml-medium.bin",
         "ggml-large-v3-turbo-q8_0.bin",
         "ggml-large-v3-turbo-q5_0.bin",
+        "ggml-large-v3.bin",
         "ggml-large-v3-q5_0.bin",
+        "ggml-medium.bin",
     ]
 
     /// Mirrors `DEFAULT_MODEL_SEARCH_DIRS` in `whiz/config.py`.
@@ -42,21 +45,24 @@ enum WhisperModel {
     }
 
     /// Resolve the model to load. An explicit `configured` path wins; otherwise
-    /// walk the preference order across every search directory.
-    static func resolve(configured: String) -> URL? {
+    /// walk the preference order across every search directory. `searchDirs`
+    /// lets the tests point resolution at a temp directory instead of mutating
+    /// static state (which would race under swift-testing's parallel runs);
+    /// production callers use the default.
+    static func resolve(configured: String, searchDirs: [URL] = searchDirectories) -> URL? {
         if !configured.isEmpty {
             let expanded = (configured as NSString).expandingTildeInPath
             let url = URL(fileURLWithPath: expanded)
             if FileManager.default.fileExists(atPath: url.path) { return url }
             // A bare filename in config, rather than a full path.
-            for directory in searchDirectories {
+            for directory in searchDirs {
                 let candidate = directory.appendingPathComponent(expanded)
                 if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
             }
             return nil
         }
         for name in preference {
-            for directory in searchDirectories {
+            for directory in searchDirs {
                 let candidate = directory.appendingPathComponent(name)
                 if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
             }

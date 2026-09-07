@@ -1985,6 +1985,7 @@ def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
         return 0
     monkeypatch.setattr(cli, "_run_live", fake_run)
     monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: False)
     monkeypatch.setattr(cli, "_service_plist_exists", lambda: True)
 
     # Stub the service module so uninstall/install don't touch launchd.
@@ -2014,6 +2015,7 @@ def test_upgrade_skips_extra_when_not_installed(monkeypatch):
     calls: list[list[str]] = []
     monkeypatch.setattr(cli, "_run_live", lambda cmd: calls.append(cmd) or 0)
     monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: False)
+    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: False)
     monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
     from whiz.dictate import setup as setup_mod
 
@@ -2033,10 +2035,36 @@ def test_upgrade_aborts_when_pipx_install_fails(monkeypatch):
 
     monkeypatch.setattr(cli, "_run_live", lambda cmd: mock.Mock(returncode=1))
     monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: False)
     monkeypatch.setattr(cli, "_service_plist_exists", lambda: True)
 
     rc = cli.cmd_upgrade(mock.Mock())
     assert rc == 1
+
+
+def test_upgrade_reinjects_diarize_extra_when_present(monkeypatch):
+    """The diarize extra (sherpa-onnx — possibly auto-installed by the
+    proactive setup) must survive `pipx install --force`: step 2b
+    re-injects whiz[diarize] whenever sherpa-onnx was importable before
+    the upgrade, and stays quiet (no surprise download) when it wasn't."""
+    from whiz import cli
+
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(cli, "_run_live", lambda cmd: calls.append(cmd) or 0)
+    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: False)
+    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: True)
+    monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
+    from whiz.dictate import setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+
+    rc = cli.cmd_upgrade(mock.Mock())
+    assert rc == 0
+    # The diarize extra was present → it gets re-injected after the reinstall.
+    assert any("inject" in c and "whiz[diarize]" in c for c in calls), calls
+    # The absent dictate extra is still skipped — no surprise downloads.
+    assert not any("whiz[dictate]" in c for c in calls), calls
 
 
 # ---------------------------------------------------------------------------

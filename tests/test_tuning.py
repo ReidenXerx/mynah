@@ -86,7 +86,12 @@ def test_dictate_settings_defaults_match_tuning(tuning: dict) -> None:
 
 
 def test_hallucination_phrases_match_tuning(tuning: dict) -> None:
-    assert eng._HALLUCINATION_PHRASES == frozenset(tuning["hallucination_phrases"])
+    assert eng._HALLUCINATION_ARTIFACTS == frozenset(tuning["hallucination_artifact_phrases"])
+    assert eng._HALLUCINATION_VOCAB == frozenset(tuning["hallucination_vocab_phrases"])
+    # The two modes must not share a phrase: a vocab word listed as an
+    # artifact would be substring-matched — exactly the CRITICAL the split
+    # exists to prevent.
+    assert not (eng._HALLUCINATION_ARTIFACTS & eng._HALLUCINATION_VOCAB)
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +124,8 @@ def test_tuning_toml_keys_are_expected(tuning: dict) -> None:
         "frame_energy_default",
         "min_energy_default",
         "min_utterance_default",
-        "hallucination_phrases",
+        "hallucination_artifact_phrases",
+        "hallucination_vocab_phrases",
     }
 
 

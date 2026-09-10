@@ -94,17 +94,27 @@ struct TuningTests {
         #expect(config.minUtterance == minUtterance)
     }
 
-    @Test("hallucination phrases match tuning.toml (set equality)")
+    @Test("hallucination phrases match tuning.toml (set equality, both arrays)")
     func hallucinationPhrasesMatchTuning() throws {
         let t = try Self.tuning()
-        guard case .stringArray(let phrases)? = t["hallucination_phrases"] else {
+        guard case .stringArray(let artifacts)? = t["hallucination_artifact_phrases"] else {
             throw FixtureError.malformed(
-                "tuning.toml: hallucination_phrases is not a string array — "
+                "tuning.toml: hallucination_artifact_phrases is not a string array — "
                 + "if this fails, FlatTOML lost the multi-line array")
         }
-        #expect(Set(phrases) == TranscriptFilter.hallucinationPhrases)
+        guard case .stringArray(let vocab)? = t["hallucination_vocab_phrases"] else {
+            throw FixtureError.malformed(
+                "tuning.toml: hallucination_vocab_phrases is not a string array")
+        }
+        #expect(Set(artifacts) == TranscriptFilter.hallucinationArtifactPhrases)
+        #expect(Set(vocab) == TranscriptFilter.hallucinationVocabPhrases)
         // Set equality would hide a duplicated entry in the file; count pins it.
-        #expect(phrases.count == TranscriptFilter.hallucinationPhrases.count)
+        #expect(artifacts.count == TranscriptFilter.hallucinationArtifactPhrases.count)
+        #expect(vocab.count == TranscriptFilter.hallucinationVocabPhrases.count)
+        // The two modes must not share a phrase: a vocab word listed as an
+        // artifact would be substring-matched — exactly the CRITICAL the
+        // split exists to prevent (mirror of tests/test_tuning.py).
+        #expect(Set(artifacts).isDisjoint(with: vocab))
     }
 
     @Test("tuning.toml parses with exactly the contract keys")
@@ -121,7 +131,8 @@ struct TuningTests {
             "frame_energy_default",
             "min_energy_default",
             "min_utterance_default",
-            "hallucination_phrases",
+            "hallucination_artifact_phrases",
+            "hallucination_vocab_phrases",
         ]
         #expect(Set(t.keys) == expected)
     }

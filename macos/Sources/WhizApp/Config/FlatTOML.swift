@@ -28,7 +28,16 @@ enum FlatTOML {
     /// matching how the Python side drops unknown keys instead of failing.
     static func parse(_ text: String) -> [String: Value] {
         var out: [String: Value] = [:]
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        // M7 (wave-1 audit): tolerate CRLF line endings (e.g. a config saved
+        // by a CRLF editor). Swift's `split(separator: "\n")` keeps the `\r`
+        // attached — as a grapheme "\r\n" — to each line, and the
+        // whitespace trim in the loop strips it as part of the surrounding
+        // whitespace. Splitting FIRST on the full grapheme makes that
+        // explicit and keeps lines ending in a lone `\r` intact too.
+        let lines = text
+            .split(separator: "\r\n", omittingEmptySubsequences: false)
+            .flatMap { $0.split(separator: "\r", omittingEmptySubsequences: false) }
+            .flatMap { $0.split(separator: "\n", omittingEmptySubsequences: false) }
             .map { $0.trimmingCharacters(in: .whitespaces) }
         var index = 0
         while index < lines.count {
@@ -116,8 +125,10 @@ enum FlatTOML {
         return nil
     }
 
-    /// Strip surrounding quotes and unescape `\\` and `\"` — the only two
-    /// escapes the Python writer emits.
+    /// Strip surrounding quotes and unescape — symmetric with the Python
+    /// writer's `_escape_toml_string` (backslash, quote, then `\n`/`\r`/`\t`
+    /// control chars). A control char that reaches the file as a raw byte
+    /// splits the line and loses the key (C1, wave-1 audit).
     private static func unquote(_ raw: String) -> String? {
         guard raw.count >= 2, raw.hasPrefix("\"") else { return nil }
         // Find the closing quote, honouring backslash escapes.
@@ -128,10 +139,25 @@ enum FlatTOML {
             let c = chars[i]
             if c == "\\", i + 1 < chars.count {
                 let next = chars[i + 1]
-                if next == "\\" || next == "\"" {
+                switch next {
+                case "\\", "\"":
                     out.append(next)
                     i += 2
                     continue
+                case "n":
+                    out.append("\n")
+                    i += 2
+                    continue
+                case "r":
+                    out.append("\r")
+                    i += 2
+                    continue
+                case "t":
+                    out.append("\t")
+                    i += 2
+                    continue
+                default:
+                    break  // not one of ours — fall through
                 }
             }
             if c == "\"" { return out }
@@ -212,6 +238,9 @@ enum FlatTOML {
         let escaped = s
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\t", with: "\\t")
         return "\"\(escaped)\""
     }
 }

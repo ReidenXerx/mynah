@@ -35,6 +35,28 @@ struct FlatTOMLTests {
         #expect(values["dictate_prompt"] == .string(#"say "hi" and \ then stop"#))
     }
 
+    @Test("unescapes the control chars the Python writer now emits (C1)")
+    func parsesControlCharEscapes() {
+        // whiz/config.py `_escape_toml_string` escapes \n/\r/\t since the
+        // wave-1 fix; previously a prompt containing a newline was written
+        // as a raw byte, the line split in two, and the key was lost or
+        // corrupted on BOTH sides (Swift's FlatTOML dropped the tail;
+        // Python's tomllib read the file fine until Swift re-emitted it).
+        let values = FlatTOML.parse(#"dictate_prompt = "line1\nline2\r\nline3\tend""#)
+        #expect(values["dictate_prompt"] == .string("line1\nline2\r\nline3\tend"))
+
+        // And the Swift writer's side of the contract: emit must re-escape.
+        let round = FlatTOML.parse(FlatTOML.emit(["dictate_prompt": .string("a\nb\tc\rd")]))
+        #expect(round["dictate_prompt"] == .string("a\nb\tc\rd"))
+    }
+
+    @Test("parses a document written with CRLF line endings (M7)")
+    func parsesCRLFDocument() {
+        let values = FlatTOML.parse("dictate_language = \"ru\"\r\ndictate_vad = true\r\n")
+        #expect(values["dictate_language"] == .string("ru"))
+        #expect(values["dictate_vad"] == .bool(true))
+    }
+
     @Test("parses string arrays, including empty ones")
     func parsesArrays() {
         let values = FlatTOML.parse("""
@@ -119,6 +141,21 @@ struct FlatTOMLTests {
             "model_dirs": .stringArray(["/one", "/two"]),
         ]
         #expect(FlatTOML.parse(FlatTOML.emit(original)) == original)
+    }
+
+    @Test("a multi-line prompt survives a full parse/emit round trip (C1)")
+    func roundTripsMultiLinePrompt() {
+        // The end-to-end failure: `whiz config set dictate_prompt='...'`
+        // with an embedded newline used to corrupt the file for Swift
+        // readers. The writer escapes, the parser unescapes, and a
+        // double round trip must be stable.
+        let original: [String: FlatTOML.Value] = [
+            "dictate_prompt": .string("Отвечай кратко.\nПервая строка.\r\nВторая."),
+        ]
+        let emitted = FlatTOML.emit(original)
+        let parsed = FlatTOML.parse(emitted)
+        #expect(parsed == original)
+        #expect(FlatTOML.parse(FlatTOML.emit(parsed)) == original)  // stable
     }
 }
 

@@ -46,21 +46,26 @@ enum TranscriptFilter {
     /// (that poisoned the floor and silently dropped the first word).
     static let calibrationSpeechFloor: Double = 0.03
 
-    /// Known Whisper hallucination phrases, lowercased.
+    /// Known Whisper hallucination phrases, lowercased — split into two
+    /// match modes over the trimmed, lowercased transcript (NS-6):
     ///
-    /// Fed silence or noise, Whisper emits training-data artifacts — mostly
-    /// Russian subtitle-credit boilerplate, since that is what dominates its
-    /// Russian training data. Matching is substring-based on the lowercased
-    /// transcript.
-    static let hallucinationPhrases: Set<String> = [
+    /// - `hallucinationArtifactPhrases` — distinctive training-data
+    ///   boilerplate. Matched by SUBSTRING: not plausible real dictation
+    ///   anywhere in an utterance.
+    /// - `hallucinationVocabPhrases` — ordinary single words that ARE
+    ///   plausible real dictation ("Отправь перевод на карту"). Matched
+    ///   only when the whole transcript EQUALS the phrase.
+    ///
+    /// Fed silence or noise, Whisper emits these artifacts — mostly Russian
+    /// subtitle-credit boilerplate, since that is what dominates its
+    /// Russian training data.
+    static let hallucinationArtifactPhrases: Set<String> = [
         "спасибо за субтитры",
         "субтитры создавал",
         "субтитры выполнил",
         "субтитры делал",
         "субтитры подготовил",
         "редактор субтитров",
-        "корректор",
-        "перевод",
         "продолжение следует",
         "спасибо за просмотр",
         "спасибо за внимание",
@@ -70,11 +75,18 @@ enum TranscriptFilter {
         "amara.org",
         "расскажите о себе",
         // Observed specifically on MacBook cooler/fan noise.
-        "субтитры",
         "следите за обновлениями",
         "оставайтесь с нами",
         "не забудьте подписаться",
         "вы можете поддержать",
+    ]
+
+    /// Ordinary vocabulary — whole-utterance equality only. A dictation
+    /// containing one of these words as part of a longer phrase must pass.
+    static let hallucinationVocabPhrases: Set<String> = [
+        "субтитры",
+        "перевод",
+        "корректор",
     ]
 
     /// RMS amplitude of normalised float samples, 0...1.
@@ -89,6 +101,12 @@ enum TranscriptFilter {
     static func isHallucination(_ text: String) -> Bool {
         let normalized = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         if normalized.isEmpty { return true }
-        return hallucinationPhrases.contains { normalized.contains($0) }
+        // Artifacts match by substring anywhere; vocab words match only as
+        // the whole utterance (substring matching there silently dropped
+        // real speech — the wave-1 audit's CRITICAL).
+        if hallucinationArtifactPhrases.contains(where: { normalized.contains($0) }) {
+            return true
+        }
+        return hallucinationVocabPhrases.contains(normalized)
     }
 }

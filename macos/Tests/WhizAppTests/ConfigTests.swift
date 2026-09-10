@@ -159,7 +159,7 @@ struct FlatTOMLTests {
     }
 }
 
-@Suite("WhizConfig")
+@Suite("WhizConfig", .serialized)
 struct WhizConfigTests {
 
     @Test("defaults match whiz/config.py")
@@ -188,6 +188,66 @@ struct WhizConfigTests {
         let config = WhizConfig.from(FlatTOML.parse(#"dictate_vad = "yes""#))
         #expect(config.vad)  // default, not a crash
         #expect(config.language == "ru")
+    }
+
+    // MARK: - Load reporting (M10)
+
+    /// `WhizConfig.path` honours `WHIZ_CONFIG_DIR`, exactly as `whiz/config.py`
+    /// does — that is what isolates these tests from the real config and from
+    /// each other (swift-testing runs them in parallel, so two tests must never
+    /// share a directory). `setUnsetEnvironmentVariable` is unavailable on the
+    /// macOS 13 SDK, hence the manual set/restore.
+    private func withIsolatedConfigDir(_ body: () throws -> Void) rethrows {
+        let previous = ProcessInfo.processInfo.environment["WHIZ_CONFIG_DIR"]
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("whiz-config-tests-\(UUID().uuidString)")
+        setenv("WHIZ_CONFIG_DIR", dir.path, 1)
+        defer {
+            if let previous { setenv("WHIZ_CONFIG_DIR", previous, 1) }
+            else { unsetenv("WHIZ_CONFIG_DIR") }
+            try? FileManager.default.removeItem(at: dir)
+        }
+        try body()
+    }
+
+    @Test("an absent config file means defaults, with no error")
+    func absentFileIsSilentDefaults() {
+        withIsolatedConfigDir {
+            let (config, error) = WhizConfig.loadReporting()
+            #expect(config == WhizConfig())
+            #expect(error == nil)
+        }
+    }
+
+    @Test("an unreadable config file still yields defaults, but reports the failure")
+    func unreadableFileIsReported() throws {
+        try withIsolatedConfigDir {
+            // A directory where the config file should be reads as EISDIR —
+            // a real read failure, not "no file yet".
+            try FileManager.default.createDirectory(
+                at: WhizConfig.path, withIntermediateDirectories: true)
+            let (config, error) = WhizConfig.loadReporting()
+            #expect(config == WhizConfig())  // app still works on defaults
+            guard case .unreadable(let path, _)? = error else {
+                Issue.record("expected an unreadable error, got \(String(describing: error))")
+                return
+            }
+            #expect(path == WhizConfig.path.path)
+        }
+    }
+
+    @Test("a valid file loads cleanly with no error")
+    func cleanReadHasNoError() throws {
+        try withIsolatedConfigDir {
+            try FileManager.default.createDirectory(
+                at: WhizConfig.directory, withIntermediateDirectories: true)
+            try FlatTOML.emit(["dictate_language": .string("uk"), "dictate_vad": .bool(false)])
+                .write(to: WhizConfig.path, atomically: true, encoding: .utf8)
+            let (config, error) = WhizConfig.loadReporting()
+            #expect(error == nil)
+            #expect(config.language == "uk")
+            #expect(!config.vad)
+        }
     }
 
     @Test("saving preserves keys owned by the Python side")

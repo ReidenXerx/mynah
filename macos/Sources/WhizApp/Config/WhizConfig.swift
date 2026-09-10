@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Typed access to `~/.config/whiz/config.toml`, shared with the Python CLI.
 ///
@@ -70,14 +71,54 @@ struct WhizConfig: Equatable {
 
     // MARK: - Load
 
+    /// What went wrong when reading the config file, if anything (M10).
+    ///
+    /// A MISSING file is normal — first launch — and defaults apply silently.
+    /// An UNREADABLE one (permissions, I/O error, a truncated read) used to be
+    /// swallowed into exactly the same "silently reset to defaults", which
+    /// made every saved setting quietly vanish while the app kept running as
+    /// if nothing had happened. Callers keep the defaults so the app still
+    /// works, but they surface this so the user can fix the file.
+    ///
+    /// Deliberately not the parse layer: FlatTOML is lossy by design (an
+    /// invalid key drops that key only), so a partially-parsed file still
+    /// yields the keys that did parse — which beats resetting everything.
+    /// The Python reader makes the same split (a corrupt file raises, a
+    /// missing file means defaults).
+    enum ConfigReadError: Error {
+        case unreadable(path: String, underlying: String)
+    }
+
     /// Load from disk, falling back to defaults for anything absent or of the
     /// wrong type. Never throws — a corrupt config should start the app with
-    /// defaults, not prevent it from launching.
+    /// defaults, not prevent it from launching. Use `loadReporting()` to
+    /// distinguish "no file" (fine) from "file unreadable" (defaults apply,
+    /// but the failure must be surfaced).
     static func load() -> WhizConfig {
-        guard let text = try? String(contentsOf: path, encoding: .utf8) else {
-            return WhizConfig()
+        loadReporting().config
+    }
+
+    /// The outcome of a config read: the config plus what, if anything, went
+    /// wrong on the way in. `error == nil` means either a clean read or a
+    /// file that simply does not exist yet.
+    static func loadReporting() -> (config: WhizConfig, error: ConfigReadError?) {
+        do {
+            let text = try String(contentsOf: path, encoding: .utf8)
+            return (from(FlatTOML.parse(text)), nil)
+        } catch let readError {
+            // ENOENT (and its domain) is "no file yet" — defaults, no
+            // complaint. Everything else (permissions, I/O, decoding) is a
+            // real read failure and must not pass silently.
+            let ns = readError as NSError
+            if ns.domain == NSCocoaErrorDomain, ns.code == NSFileReadNoSuchFileError {
+                return (WhizConfig(), nil)
+            }
+            let failure = ConfigReadError.unreadable(
+                path: path.path, underlying: readError.localizedDescription)
+            Logger(subsystem: "com.reidenxerx.whiz", category: "config")
+                .error("config.toml unreadable — using defaults: \(readError.localizedDescription, privacy: .public)")
+            return (WhizConfig(), failure)
         }
-        return from(FlatTOML.parse(text))
     }
 
     static func from(_ values: [String: FlatTOML.Value]) -> WhizConfig {

@@ -93,7 +93,17 @@ final class SessionController: ObservableObject {
         // Re-read the config file so edits made since launch — from the
         // settings window, `whiz dictate set`, or a text editor — take effect on
         // the next dictation instead of requiring a restart.
-        config = WhizConfig.load()
+        let (loaded, loadError) = WhizConfig.loadReporting()
+        config = loaded
+        if let loadError {
+            // M10: an unreadable config used to become a silent reset to
+            // defaults — the user's settings vanish with no visible cause.
+            // Defaults still apply (the app must keep working), but the
+            // failure is surfaced like every other one.
+            Log.session.error(
+                "config.toml unreadable — dictation settings reset to defaults")
+            lastError = Self.configReadErrorMessage(loadError)
+        }
 
         // Load before claiming the session is live, so a missing model surfaces
         // immediately rather than after the user has spoken a whole sentence
@@ -114,15 +124,27 @@ final class SessionController: ObservableObject {
         }
         // Ask for the microphone before starting capture. Granting it while
         // the engine is already running yields silence for the whole session.
-        guard !Task.isCancelled else {
-            Log.session.notice("session start cancelled")
+        // The prompt can stay open for a long while — the user may also cancel
+        // the session (press the hotkey again, quit the app) while it is up, so
+        // re-check cancellation on the other side of the await too, and treat
+        // "Don't Allow" as a deny, not as "carry on into a dead session".
+        guard await Permissions.requestMicrophone() else {
+            if Task.isCancelled {
+                Log.session.notice("session start cancelled during the microphone prompt")
+            } else {
+                Log.session.error("microphone permission denied")
+                lastError = "Microphone access is required. Enable whiz in "
+                    + "System Settings → Privacy & Security → Microphone."
+            }
             state = .idle
             return
         }
-        guard await Permissions.requestMicrophone() else {
-            Log.session.error("microphone permission denied")
-            lastError = "Microphone access is required. Enable whiz in "
-                + "System Settings → Privacy & Security → Microphone."
+        // A cancel that landed while the permission prompt was up must not
+        // start capture on the other side of it — the old code only checked
+        // cancellation before the prompt, so "cancel" brought the session up
+        // anyway a moment later.
+        guard !Task.isCancelled else {
+            Log.session.notice("session start cancelled after the microphone prompt")
             state = .idle
             return
         }
@@ -144,6 +166,11 @@ final class SessionController: ObservableObject {
             try capture.start { [weak self] samples, level in
                 // Audio thread. Hop to the main actor before touching state.
                 Task { @MainActor in self?.ingest(samples, level: level) }
+            } onConfigurationChange: { [weak self] in
+                // Device change (BT connect/disconnect, default-mic switch):
+                // rebuild the stream, or the converter sits dead and the
+                // session silently captures nothing (M6).
+                Task { @MainActor in self?.handleCaptureConfigurationChange() }
             }
             Log.session.notice("session started")
         } catch {
@@ -151,6 +178,32 @@ final class SessionController: ObservableObject {
             lastError = error.localizedDescription
             isSessionActive = false
             state = .idle
+        }
+    }
+
+    /// A device change invalidated the capture graph. Rebuild it; if the
+    /// rebuild fails, end the session and surface the error rather than
+    /// pretending a dead stream is a live one.
+    private func handleCaptureConfigurationChange() {
+        guard isSessionActive else { return }
+        do {
+            try capture.restart()
+            Log.audio.notice("capture stream rebuilt after a device change")
+        } catch {
+            Log.audio.error(
+                "capture restart failed: \(error.localizedDescription, privacy: .public)")
+            lastError = "Microphone changed and capture could not restart: "
+                + error.localizedDescription
+            endSession()
+        }
+    }
+
+    private static func configReadErrorMessage(_ error: WhizConfig.ConfigReadError) -> String {
+        switch error {
+        case .unreadable(let path, let underlying):
+            return "config.toml could not be read — dictation settings were reset "
+                + "to defaults. \(underlying). Fix or delete the file, then restart "
+                + "whiz: \(path)"
         }
     }
 
@@ -210,6 +263,7 @@ final class SessionController: ObservableObject {
         var updated = config
         mutate(&updated)
         guard updated != config else { return }
+        let oldVAD = config.vad
         config = updated
         do {
             try updated.save()
@@ -217,7 +271,44 @@ final class SessionController: ObservableObject {
             Log.session.error("could not save config: \(error.localizedDescription, privacy: .public)")
             lastError = "Could not save settings: \(error.localizedDescription)"
         }
+        // M5: the VAD check is a per-utterance decision made against the
+        // `vad` actor, so a toggle flip can apply to the session in flight —
+        // nothing about it is session-scoped the way the detector's energy
+        // calibration is. Cheap to apply, so apply it live instead of
+        // silently ignoring the toggle until the next session.
+        if updated.vad != oldVAD, isSessionActive {
+            Task { await applyVADSetting() }
+        }
     }
+
+    /// Bring the live session's VAD state in line with `config.vad`:
+    /// load/unload the Silero detector as needed. Runs detached so a cold
+    /// VAD load (small, but not free) never blocks the settings UI.
+    private func applyVADSetting() async {
+        guard isSessionActive else { return }
+        if config.vad {
+            if vad != nil { return }
+            await loadVADModel()
+            if vad == nil {
+                // Degrade is surfaced through `isVADDegraded`/`lastError`,
+                // but say it here too — this log line is the one a user
+                // debugging "why didn't my toggle do anything" will read.
+                Log.session.notice(
+                    "VAD toggle is ON but no Silero model could be loaded — loudness-only rejection for this session")
+            }
+        } else {
+            await vad?.unload()
+            vad = nil
+            isVADDegraded = false
+            Log.session.notice("VAD disabled for the live session")
+        }
+    }
+
+    /// Whether the energy gates alone are deciding what counts as speech for
+    /// the *current* session: true when `dictate_vad` is on but no Silero
+    /// detector could be loaded. Surfaced so the VAD toggle reading "on" does
+    /// not silently mean "loudness-only rejection" (M5).
+    @Published private(set) var isVADDegraded = false
 
     /// Re-read permission state. Called on a timer from `AppDelegate`.
     func refreshPermissions() {
@@ -312,7 +403,19 @@ final class SessionController: ObservableObject {
     // MARK: - Model lifecycle
 
     private func ensureModelLoaded() async throws {
-        if let whisper, await whisper.isLoaded { return }
+        if let whisper, await whisper.isLoaded {
+            // A session starting while the models sit warm from the last one:
+            // the VAD state must still match the config — the toggle may have
+            // been flipped while idle (M5).
+            if config.vad, vad == nil {
+                await loadVADModel()
+            } else if !config.vad, vad != nil {
+                await vad?.unload()
+                vad = nil
+                isVADDegraded = false
+            }
+            return
+        }
         guard let modelURL = WhisperModel.resolve(configured: config.model) else {
             throw WhisperError.noModelFound
         }
@@ -322,19 +425,42 @@ final class SessionController: ObservableObject {
 
         // Optional: dictation still works without it, just with cruder
         // noise rejection. A missing model must not block a session.
+        if config.vad, vad == nil {
+            await loadVADModel()
+        }
+    }
+
+    /// Load the Silero VAD if the config asks for it and it is not loaded.
+    ///
+    /// Optional in the sense that a failed load must not block a session —
+    /// but it must not be *silent* either (M5): the toggle reads ON while
+    /// the app degrades to energy-gates-only, which from the outside is
+    /// "whiz stopped rejecting fans". So a missing or broken model marks
+    /// `isVADDegraded` and surfaces a complaint the user can act on.
+    private func loadVADModel() async {
         guard config.vad, vad == nil else { return }
         guard let vadURL = WhisperModel.resolveVAD() else {
             Log.stt.notice(
                 "no Silero VAD model — energy gates only; get it with: whiz models download-vad")
+            isVADDegraded = true
+            lastError = "Reject non-speech is ON but the Silero model is missing — "
+                + "only loudness gates are active. Download it in Settings → "
+                + "Recognition (0.8 MB), or run: whiz models download-vad"
             return
         }
         let detector = SileroVAD(modelURL: vadURL)
         do {
             try await detector.load()
             vad = detector
+            isVADDegraded = false
+            if lastError?.contains("Silero") == true { lastError = nil }
             Log.stt.notice("Silero VAD loaded: \(vadURL.lastPathComponent, privacy: .public)")
         } catch {
             Log.stt.error("Silero VAD failed to load: \(error.localizedDescription, privacy: .public)")
+            isVADDegraded = true
+            lastError = "Reject non-speech is ON but Silero failed to load — "
+                + "only loudness gates are active. \(error.localizedDescription) "
+                + "Try re-downloading it in Settings → Recognition."
         }
     }
 

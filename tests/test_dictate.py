@@ -2074,7 +2074,9 @@ def test_upgrade_parser_registered():
 
 def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
     """cmd_upgrade re-runs pipx install, re-injects the extra if present,
-    restarts the service if installed, and re-verifies — the full dance."""
+    restarts the service if installed, and re-verifies — the full dance.
+    The verification runs checks ONLY (M12): setup() is called with
+    install_service=False so an upgrade never adds a new login service."""
     from whiz import cli
 
     calls: list[list[str]] = []
@@ -2093,10 +2095,14 @@ def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
     monkeypatch.setattr(service_mod, "uninstall", lambda: 0)
     monkeypatch.setattr(service_mod, "install", lambda: 0)
 
-    # Stub setup to return ok.
+    # Stub setup to return ok — and record the call (M12): the upgrade's
+    # verification must run checks ONLY, never install the LaunchAgent via
+    # setup()'s install_service default.
     from whiz.dictate import setup as setup_mod
 
-    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+    setup_calls: list[dict] = []
+    monkeypatch.setattr(setup_mod, "setup",
+                         lambda **kw: setup_calls.append(kw) or 0)
 
     args = mock.Mock()
     rc = cli.cmd_upgrade(args)
@@ -2104,11 +2110,15 @@ def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
     # pipx install --force + pipx inject were both called.
     assert any("install" in c and "--force" in c for c in calls), calls
     assert any("inject" in c and "whiz[dictate]" in c for c in calls), calls
+    # M12: verify-only — setup() must never auto-install the login service.
+    assert setup_calls == [{"install_service": False}]
 
 
 def test_upgrade_skips_extra_when_not_installed(monkeypatch):
     """If the dictate extra was never installed, upgrade skips the inject step
-    so a transcription-only user isn't surprised by a 1.6 GB mlx download."""
+    so a transcription-only user isn't surprised by a 1.6 GB mlx download —
+    and skips the verification setup entirely (M12): its step-0 auto-inject
+    would re-attempt exactly that download at the last mile."""
     from whiz import cli
 
     calls: list[list[str]] = []
@@ -2118,13 +2128,19 @@ def test_upgrade_skips_extra_when_not_installed(monkeypatch):
     monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
     from whiz.dictate import setup as setup_mod
 
-    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+    setup_calls: list[dict] = []
+    monkeypatch.setattr(setup_mod, "setup",
+                         lambda **kw: setup_calls.append(kw) or 0)
 
     rc = cli.cmd_upgrade(mock.Mock())
     assert rc == 0
     # pipx install happened, but NO inject call.
     assert any("install" in c for c in calls)
     assert not any("inject" in c for c in calls), calls
+    # M12: with the extra absent, the verification setup is skipped too —
+    # its step-0 auto-inject would re-attempt the exact 1.6 GB install
+    # step 2 chose to skip.
+    assert setup_calls == []
 
 
 def test_upgrade_aborts_when_pipx_install_fails(monkeypatch):
@@ -2156,7 +2172,7 @@ def test_upgrade_reinjects_diarize_extra_when_present(monkeypatch):
     monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
     from whiz.dictate import setup as setup_mod
 
-    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+    monkeypatch.setattr(setup_mod, "setup", lambda **kw: 0)
 
     rc = cli.cmd_upgrade(mock.Mock())
     assert rc == 0

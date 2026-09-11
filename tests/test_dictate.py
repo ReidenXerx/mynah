@@ -136,7 +136,8 @@ def _loud_pcm(seconds: float, amp: int = 20000) -> bytes:
 
     The engine's energy gate skips near-silent audio, so tests that expect
     transcription to proceed need realistic-energy audio, not zeros.
-    ``amp`` defaults to 20000/32767 ≈ 0.61 — well above the _MIN_ENERGY floor.
+    ``amp`` defaults to 20000/32767 ≈ 0.61 — well above the configured
+    min-energy floor (``DictateSettings.min_energy``).
     """
     n = int(WHISPER_SAMPLE_RATE * seconds)
     return array("h", (amp if i % 2 else -amp for i in range(n))).tobytes()
@@ -473,6 +474,41 @@ def test_toggle_session_starts_then_ends():
     assert indicator.hidden is True
 
 
+def test_start_session_survives_cold_load_failure():
+    """H6 (wave-1): a cold STT load failure must not strand the session as
+    reserved-"transcribing" with no capture threads — the user would speak
+    into a dead session with a stuck indicator. It must unwind to idle so
+    the next hotkey press retries cleanly."""
+
+    class _FlakySTT(FakeSTT):
+        def __init__(self):
+            super().__init__()
+            self.load_failures_left = 1
+
+        def load(self):
+            if self.load_failures_left:
+                self.load_failures_left -= 1
+                raise RuntimeError("model file missing")
+            super().load()
+
+    stt = _FlakySTT()
+    indicator = FakeIndicator()
+    engine = _make_engine(stt=stt, indicator=indicator)
+    engine._start_session()
+    # Fully unwound: session inactive, indicator back at idle (and hidden —
+    # idle_visible defaults False here), no capture threads left running.
+    assert engine._session_active is False
+    assert indicator.states[-1] == "idle"
+    assert indicator.hidden is True
+    assert engine._capture_thread is None
+    # The next press retries the load and succeeds — not stranded.
+    engine._start_session()
+    assert engine._session_active is True
+    assert indicator.states[-1] == "listening"
+    assert engine._capture_thread is not None
+    engine._end_session()
+
+
 # ---------------------------------------------------------------------------
 # Transcription routing
 # ---------------------------------------------------------------------------
@@ -498,7 +534,7 @@ def test_transcribe_and_inject_skips_too_short():
     stt = FakeSTT(text="x")
     injector = FakeInjector()
     engine = _make_engine(stt=stt, injector=injector)
-    # 0.05s — below the 0.35s minimum.
+    # 0.05s — below the 0.25s minimum (``DictateSettings.min_utterance``).
     pcm = _loud_pcm(0.05)
     engine._transcribe_and_inject(pcm, np)
     assert injector.typed == []
@@ -575,6 +611,69 @@ def test_transcribe_and_inject_suppresses_to_be_continued():
     pcm = _loud_pcm(1.0)
     engine._transcribe_and_inject(pcm, np)
     assert injector.typed == []
+
+
+def test_transcribe_and_inject_passes_vocab_word_in_longer_utterance():
+    """C2 (wave-1 CRITICAL): vocabulary words match only as the WHOLE
+    utterance — a real dictation CONTAINING one must be typed. Substring
+    matching here silently ate "Отправь перевод на карту"."""
+    import numpy as np
+
+    stt = FakeSTT(text="Отправь перевод на карту")
+    injector = FakeInjector()
+    engine = _make_engine(stt=stt, injector=injector)
+    pcm = _loud_pcm(1.0)
+    engine._transcribe_and_inject(pcm, np)
+    assert injector.typed == ["Отправь перевод на карту"]
+
+
+def test_transcribe_and_inject_suppresses_bare_vocab_word():
+    """C2: the same ordinary word AS THE WHOLE utterance is a hallucination
+    (Whisper emitted exactly it on noise). Match on the trimmed, lowercased
+    transcript — NS-6."""
+    import numpy as np
+
+    stt = FakeSTT(text="перевод")
+    injector = FakeInjector()
+    engine = _make_engine(stt=stt, injector=injector)
+    pcm = _loud_pcm(1.0)
+    engine._transcribe_and_inject(pcm, np)
+    assert injector.typed == []
+
+    # Whitespace and case must not rescue it.
+    stt2 = FakeSTT(text="  Перевод  ")
+    injector2 = FakeInjector()
+    engine2 = _make_engine(stt=stt2, injector=injector2)
+    engine2._transcribe_and_inject(pcm, np)
+    assert injector2.typed == []
+
+
+def test_transcribe_and_inject_survives_injection_failure():
+    """H2 (wave-1): an injection failure must not kill the transcribe worker
+    — the next utterance is still transcribed and typed."""
+    import numpy as np
+
+    calls = {"n": 0}
+
+    class _FlakyInjector(FakeInjector):
+        def type_text(self, text):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("accessibility revoked mid-session")
+            super().type_text(text)
+
+    stt = FakeSTT(text="привет")
+    injector = _FlakyInjector()
+    indicator = FakeIndicator()
+    engine = _make_engine(stt=stt, injector=injector, indicator=indicator)
+    pcm = _loud_pcm(1.0)
+    engine._transcribe_and_inject(pcm, np)  # must not raise
+    assert injector.typed == []
+    assert indicator.states[-1] == "listening"
+    # The worker survived: the next utterance goes through.
+    engine._transcribe_and_inject(pcm, np)
+    assert injector.typed == ["привет"]
+    assert indicator.states[-1] == "listening"
 
 
 # ---------------------------------------------------------------------------
@@ -1975,7 +2074,9 @@ def test_upgrade_parser_registered():
 
 def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
     """cmd_upgrade re-runs pipx install, re-injects the extra if present,
-    restarts the service if installed, and re-verifies — the full dance."""
+    restarts the service if installed, and re-verifies — the full dance.
+    The verification runs checks ONLY (M12): setup() is called with
+    install_service=False so an upgrade never adds a new login service."""
     from whiz import cli
 
     calls: list[list[str]] = []
@@ -1994,10 +2095,14 @@ def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
     monkeypatch.setattr(service_mod, "uninstall", lambda: 0)
     monkeypatch.setattr(service_mod, "install", lambda: 0)
 
-    # Stub setup to return ok.
+    # Stub setup to return ok — and record the call (M12): the upgrade's
+    # verification must run checks ONLY, never install the LaunchAgent via
+    # setup()'s install_service default.
     from whiz.dictate import setup as setup_mod
 
-    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+    setup_calls: list[dict] = []
+    monkeypatch.setattr(setup_mod, "setup",
+                         lambda **kw: setup_calls.append(kw) or 0)
 
     args = mock.Mock()
     rc = cli.cmd_upgrade(args)
@@ -2005,11 +2110,15 @@ def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
     # pipx install --force + pipx inject were both called.
     assert any("install" in c and "--force" in c for c in calls), calls
     assert any("inject" in c and "whiz[dictate]" in c for c in calls), calls
+    # M12: verify-only — setup() must never auto-install the login service.
+    assert setup_calls == [{"install_service": False}]
 
 
 def test_upgrade_skips_extra_when_not_installed(monkeypatch):
     """If the dictate extra was never installed, upgrade skips the inject step
-    so a transcription-only user isn't surprised by a 1.6 GB mlx download."""
+    so a transcription-only user isn't surprised by a 1.6 GB mlx download —
+    and skips the verification setup entirely (M12): its step-0 auto-inject
+    would re-attempt exactly that download at the last mile."""
     from whiz import cli
 
     calls: list[list[str]] = []
@@ -2019,13 +2128,19 @@ def test_upgrade_skips_extra_when_not_installed(monkeypatch):
     monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
     from whiz.dictate import setup as setup_mod
 
-    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+    setup_calls: list[dict] = []
+    monkeypatch.setattr(setup_mod, "setup",
+                         lambda **kw: setup_calls.append(kw) or 0)
 
     rc = cli.cmd_upgrade(mock.Mock())
     assert rc == 0
     # pipx install happened, but NO inject call.
     assert any("install" in c for c in calls)
     assert not any("inject" in c for c in calls), calls
+    # M12: with the extra absent, the verification setup is skipped too —
+    # its step-0 auto-inject would re-attempt the exact 1.6 GB install
+    # step 2 chose to skip.
+    assert setup_calls == []
 
 
 def test_upgrade_aborts_when_pipx_install_fails(monkeypatch):
@@ -2057,7 +2172,7 @@ def test_upgrade_reinjects_diarize_extra_when_present(monkeypatch):
     monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
     from whiz.dictate import setup as setup_mod
 
-    monkeypatch.setattr(setup_mod, "setup", lambda: 0)
+    monkeypatch.setattr(setup_mod, "setup", lambda **kw: 0)
 
     rc = cli.cmd_upgrade(mock.Mock())
     assert rc == 0
@@ -2744,8 +2859,9 @@ def test_noise_calibration_empty_samples_no_crash():
 
 def test_vad_uses_effective_frame_energy():
     """_process_vad_frames must use the adaptive _effective_frame_energy, not
-    the static _VAD_FRAME_ENERGY. In a noisy room, a frame just above the
-    static floor but below the adaptive floor should be classified as silence."""
+    the static settings floor (``DictateSettings.frame_energy``). In a noisy
+    room, a frame just above the static floor but below the adaptive floor
+    should be classified as silence."""
     engine = _make_engine()
     engine._start_session()
     # Simulate a noisy-room calibration so the adaptive floor is raised.

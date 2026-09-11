@@ -80,42 +80,26 @@ DEFAULT_RUSSIAN_PROMPT = (
 # longer = more natural but adds latency before text appears.
 _UTTERANCE_SILENCE = 0.8
 
-# Per-frame energy floor (normalized 0.0–1.0). Frames below this amplitude
-# are treated as silence BEFORE VAD even sees them — webrtcvad can classify
-# steady low-level noise (fan, keyboard, HVAC) as speech, which produces
-# utterances that pass the whole-buffer RMS gate but are still garbage.
-# This floor short-circuits those frames so they never start/extend an
-# utterance. 0.03 ≈ -30dB — above typical Mac mic room noise and MacBook
-# cooler/fan noise, below quiet speech. This is the STATIC floor; the
-# adaptive noise floor (measured at session start) can raise it further.
-_VAD_FRAME_ENERGY = 0.03
-
 # How often (seconds) the run loops poll the stop event.
 _TICK = 0.05
 
-# Minimum utterance length (seconds) to bother transcribing — sub-0.35s
-# blips are noise/clicks/breaths, not speech.
-_MIN_UTTERANCE_SECONDS = 0.35
-
-# Minimum RMS energy (0.0–1.0, normalized int16) for an utterance to be
-# transcribed. Below this the audio is silence or noise — Whisper is known
-# to hallucinate training-data boilerplate ("субтитры создавал…",
-# "продолжение следует…") on near-silent input, so we skip it entirely.
-# 0.025 ≈ -32dB — above typical Mac mic room noise floor and MacBook cooler
-# noise. This is the STATIC floor; the adaptive noise floor can raise it.
-_MIN_ENERGY = 0.025
+# NOTE: the static energy floors (per-frame RMS, whole-utterance RMS,
+# minimum utterance length) live in DictateSettings, resolved from
+# whiz/config.py (dictate_frame_energy / dictate_min_energy /
+# dictate_min_utterance) and pinned against tuning/tuning.toml. There are
+# no module-level copies; the adaptive calibration raises them at session
+# start via _effective_frame_energy / _effective_min_energy.
 
 # Adaptive noise floor — measure ambient noise at session start (first
 # ~1.0s of audio) and raise the energy gates proportionally. The static
-# thresholds above are tuned for a quiet room; in a noisy environment
+# floors in DictateSettings are tuned for a quiet room; in a noisy environment
 # (fan, HVAC, MacBook cooler, open window) steady background noise exceeds
 # them and webrtcvad misclassifies it as speech, seeding hallucination-prone
 # utterances. The adaptive floor uses the median RMS of the calibration
 # window as the noise baseline and sets:
 #   frame gate      = max(s.frame_energy, noise_floor * _NOISE_FRAME_MULT)
 #   utterance gate  = max(s.min_energy,   noise_floor * _NOISE_UTT_MULT)
-# (the session settings' static floors — s.frame_energy / s.min_energy —
-# not the legacy module constants above).
+# (the session settings' static floors — s.frame_energy / s.min_energy).
 # The static thresholds remain as floors — a quiet room keeps them, a
 # noisy room gets higher gates.
 _NOISE_CALIBRATION_SECONDS = 1.0  # sample ambient noise for this long
@@ -139,8 +123,18 @@ _CALIBRATION_SPEECH_FLOOR = 0.03
 # Known Whisper hallucination phrases (lowercased). When the model is fed
 # silence/noise it emits these training-data artifacts; we suppress them as
 # a safety net even if the energy gate misses (e.g. low-but-audible fan
-# noise that VAD misclassifies as speech).
-_HALLUCINATION_PHRASES = frozenset(
+# noise that VAD misclassifies as speech). Two match modes over the
+# trimmed, lowercased transcript (NS-6):
+#
+# _HALLUCINATION_ARTIFACTS — distinctive boilerplate. Matched by SUBSTRING:
+# these strings are not plausible real dictation anywhere in an utterance.
+#
+# _HALLUCINATION_VOCAB — ordinary single words that ARE plausible real
+# dictation ("Отправь перевод на карту"). Matched only when the whole
+# transcript EQUALS the phrase — a hallucination IS the entire output.
+# Substring matching here silently dropped real speech; the wave-1 audit
+# recorded it as a CRITICAL.
+_HALLUCINATION_ARTIFACTS = frozenset(
     p.lower()
     for p in (
         "спасибо за субтитры",
@@ -149,8 +143,6 @@ _HALLUCINATION_PHRASES = frozenset(
         "субтитры делал",
         "субтитры подготовил",
         "редактор субтитров",
-        "корректор",
-        "перевод",
         "продолжение следует",
         "спасибо за просмотр",
         "спасибо за внимание",
@@ -160,11 +152,19 @@ _HALLUCINATION_PHRASES = frozenset(
         "amara.org",
         "расскажите о себе",
         # Additional artifacts observed on MacBook cooler/fan noise:
-        "субтитры",
         "следите за обновлениями",
         "оставайтесь с нами",
         "не забудьте подписаться",
         "вы можете поддержать",
+    )
+)
+_HALLUCINATION_VOCAB = frozenset(
+    p.lower()
+    for p in (
+        # Ordinary vocabulary — whole-utterance equality only.
+        "субтитры",
+        "перевод",
+        "корректор",
     )
 )
 
@@ -454,7 +454,31 @@ class DictationEngine:
         if need_load:
             self._set_state("transcribing")
             self.indicator.show()
-            self.stt.load()
+            try:
+                self.stt.load()
+            except Exception as e:  # noqa: BLE001
+                # A cold-load failure (missing/corrupt model, download
+                # error) must not leave the session reserved in
+                # "transcribing" with no capture threads running — the
+                # user would speak into a dead session with a stuck
+                # indicator (H6, wave-1 audit). Recover to idle so the
+                # next hotkey press retries cleanly.
+                print(
+                    f"STT model failed to load: {e}\n"
+                    "The session was not started. Check the model setting "
+                    "(whiz dictate config) and press the hotkey to retry.",
+                    file=sys.stderr,
+                )
+                logger.warning("Cold STT load failed", exc_info=True)
+                with self._state_lock:
+                    self._session_active = False
+                self._set_state("idle")
+                if self.s.idle_visible:
+                    self.indicator.show()
+                else:
+                    self.indicator.hide()
+                self._schedule_idle_unload()
+                return
         self._set_state("listening")
         self.indicator.show()
         with self._state_lock:
@@ -799,17 +823,35 @@ class DictationEngine:
             logger.warning("Transcription failed: %s", e)
             self._set_state("listening")
             return
-        if text.strip():
+        text_norm = text.strip().lower()
+        if text_norm:
             # Hallucination safety net: suppress known Whisper training-data
             # artifacts that slip through when the audio is just above the
-            # energy floor (e.g. steady fan/keyboard noise).
-            text_lower = text.lower()
-            if any(marker in text_lower for marker in _HALLUCINATION_PHRASES):
-                logger.debug("Suppressing hallucination: %s", text)
+            # energy floor (e.g. steady fan/keyboard noise). Two match modes
+            # over the trimmed, lowercased transcript (NS-6): distinctive
+            # artifact phrases match by SUBSTRING; ordinary vocabulary words
+            # ("перевод") match only when they ARE the whole utterance —
+            # substring matching there silently dropped real speech
+            # ("Отправь перевод на карту"), the wave-1 CRITICAL.
+            if (
+                any(marker in text_norm for marker in _HALLUCINATION_ARTIFACTS)
+                or text_norm in _HALLUCINATION_VOCAB
+            ):
+                logger.warning("Suppressing hallucination: %r", text)
                 self._set_state("listening")
                 return
             logger.debug("Injecting text: %s", text)
-            self.injector.type_text(text)
+            try:
+                self.injector.type_text(text)
+            except Exception as e:  # noqa: BLE001
+                # An injection failure (Accessibility revoked, target app
+                # gone, ...) must never propagate: this runs on the
+                # transcribe worker thread, and an unwrapped raise kills
+                # the loop — every later utterance would be transcribed
+                # and silently dropped with the pill stuck on
+                # "listening" (H2, wave-1 audit). Warn and keep the
+                # worker alive.
+                logger.warning("Text injection failed: %s", e)
         self._set_state("listening")
 
     # ---------- run loops ----------

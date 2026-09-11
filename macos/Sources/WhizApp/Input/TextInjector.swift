@@ -69,8 +69,15 @@ enum TextInjector {
         // version left it clobbered too, but it is a real papercut.
         pasteboard.clearContents()
         let wrote = pasteboard.setString(text, forType: .string)
-        // Separates "the clipboard write failed" from "the paste keystroke did
-        // not land" — otherwise both look identical from the outside.
+        if !wrote {
+            // Posting ⌘V after a failed write pastes whatever the clipboard
+            // held before — in a dictation app that is *someone else's text*
+            // arriving where the user's speech should be. Skipping the paste
+            // is a silent failure, so log it loudly; there is nothing safer
+            // to fall back to for non-ASCII text (keystrokes cannot emit it).
+            Log.ui.error("injection aborted: clipboard write failed — text NOT injected")
+            return
+        }
         Log.ui.notice("pasteboard write: \(wrote, privacy: .public)")
 
         // Let the clipboard write settle before the paste reads it.

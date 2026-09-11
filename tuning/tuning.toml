@@ -3,9 +3,9 @@
 # One source of truth for the dictate segmentation pipeline's constants:
 # energy floors, adaptive-noise calibration, utterance shaping, and the
 # Whisper hallucination phrase list. Python (`whiz/dictate/engine.py`),
-# Swift (`macos/Sources/WhizApp/...`), and the Rust core all hardcode
-# these values in their own language, and tests in all three assert that
-# their constants match this file:
+# Swift (`macos/Sources/WhizApp/...`), and the Rust core (when it exists)
+# all hardcode these values in their own language, and tests pin their
+# constants against this file:
 #
 #   python: tests/test_tuning.py
 #   swift:  macos/Tests/WhizAppTests/TuningTests.swift
@@ -86,20 +86,30 @@ min_utterance_default = 0.25
 #
 # Fed silence or noise, Whisper emits training-data artifacts — mostly
 # Russian subtitle-credit boilerplate, since that is what dominates its
-# Russian training data. Matching is substring-based on the lowercased
-# transcript, in every implementation. Keep in sync with
-# `_HALLUCINATION_PHRASES` in whiz/dictate/engine.py and
-# `TranscriptFilter.hallucinationPhrases`. Order is irrelevant; the
-# lists must contain exactly the same members.
-hallucination_phrases = [
+# Russian training data. The list is split into two match modes:
+#
+# hallucination_artifact_phrases — distinctive boilerplate. Matched by
+# SUBSTRING against the lowercased transcript: these strings are not
+# plausible real dictation anywhere in an utterance.
+#
+# hallucination_vocab_phrases — single ordinary words ("перевод",
+# "субтитры", "корректор") that ARE plausible real dictation. Matched
+# only when the whole (trimmed, lowercased) transcript EQUALS the
+# phrase — a hallucination IS the entire output. Substring matching here
+# silently dropped real speech ("Отправь перевод на карту" vanished);
+# the wave-1 audit recorded it as a CRITICAL.
+#
+# Both implementations (engine.py `_HALLUCINATION_ARTIFACTS` /
+# `_HALLUCINATION_VOCAB` and TranscriptFilter.swift) apply the same two
+# modes; tests in both suites pin the split (tests/test_tuning.py,
+# macos/Tests/WhizAppTests/TuningTests.swift).
+hallucination_artifact_phrases = [
     "спасибо за субтитры",
     "субтитры создавал",
     "субтитры выполнил",
     "субтитры делал",
     "субтитры подготовил",
     "редактор субтитров",
-    "корректор",
-    "перевод",
     "продолжение следует",
     "спасибо за просмотр",
     "спасибо за внимание",
@@ -109,9 +119,16 @@ hallucination_phrases = [
     "amara.org",
     "расскажите о себе",
     # Additional artifacts observed on MacBook cooler/fan noise:
-    "субтитры",
     "следите за обновлениями",
     "оставайтесь с нами",
     "не забудьте подписаться",
     "вы можете поддержать",
+]
+
+hallucination_vocab_phrases = [
+    # Ordinary vocabulary — whole-utterance equality only. A dictation
+    # containing one of these words as part of a longer phrase must pass.
+    "субтитры",
+    "перевод",
+    "корректор",
 ]

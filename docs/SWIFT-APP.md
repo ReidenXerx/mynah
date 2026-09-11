@@ -95,7 +95,7 @@ The criterion was reuse: which engine preserves the tuning already paid for in
 |---|---|---|
 | large-v3-turbo, unquantized | commit `ea49da8` | Yes — identical OpenAI weights, ggml build |
 | Russian anti-censorship prompt | `DEFAULT_RUSSIAN_PROMPT` | Yes — `whisper_full_params.initial_prompt` |
-| 25-phrase hallucination blocklist | `engine.py` | Yes — **verified**, see below |
+| 21-phrase hallucination blocklist (hybrid: artifacts substring, vocab whole-equality — NS-6) | `engine.py` | Yes — **verified**, see below |
 | Energy gates + adaptive noise floor | `engine.py` | Yes — pre-STT, engine-agnostic |
 | VAD segmentation | `vad.py` | Yes, and whisper.cpp 1.9.2 ships Silero VAD natively |
 

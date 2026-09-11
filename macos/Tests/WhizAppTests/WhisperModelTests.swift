@@ -51,11 +51,25 @@ struct WhisperModelTests {
                 seen.append(cls)
             }
         }
-        #expect(seen == ["large-v3-turbo", "large-v3", "medium"])
+        // All five NS-15 classes, entry-for-entry with models.py:PREFERENCE —
+        // the list previously stopped at medium while Python's grew to 11
+        // entries (see AliasResolutionTests.autoPickCoversAllClasses).
+        #expect(seen == ["large-v3-turbo", "large-v3", "medium", "small", "base"])
         // Within the turbo class, q8_0 (higher quality) ranks ahead of q5_0.
         let q8 = order.firstIndex(of: "ggml-large-v3-turbo-q8_0.bin")
         let q5 = order.firstIndex(of: "ggml-large-v3-turbo-q5_0.bin")
         #expect(q8! < q5!)
+    }
+
+    @Test("medium-q5_0 ranks ahead of small — per-class ordering continues down the list")
+    func mediumAheadOfSmall() {
+        // The wave-1 extension added small/base classes; this pins that the
+        // ordering rule (classes rank large-v3-turbo > large-v3 > medium >
+        // small > base) holds beyond the original three.
+        #expect(WhisperModel.preference.firstIndex(of: "ggml-medium-q5_0.bin")!
+                < WhisperModel.preference.firstIndex(of: "ggml-small.bin")!)
+        #expect(WhisperModel.preference.firstIndex(of: "ggml-small-q5_0.bin")!
+                < WhisperModel.preference.firstIndex(of: "ggml-base.bin")!)
     }
 
     @Test("turbo-q8_0 outranks everything after its class — tiny must never win")

@@ -30,6 +30,12 @@ struct UtteranceDetector {
     private let sampleRate: Double
     private var buffer: [Float] = []
     private var silentDuration: Double = 0
+    /// Continuous silence since the last speech frame, for auto-stop
+    /// (M1, wave-2) — engine.py's `_continuous_silence`. Distinct from
+    /// `silentDuration`, which counts trailing silence inside an open
+    /// utterance: this one accumulates even when nobody ever spoke, which
+    /// is the auto-stop case (user walked away without talking).
+    private var silenceSinceSpeech: Double = 0
     private var isSpeaking = false
 
     // Adaptive noise floor, measured over the first second of a session.
@@ -54,6 +60,18 @@ struct UtteranceDetector {
 
     /// The utterance energy gate, raised if the room turned out to be noisy.
     var currentEnergyThreshold: Double { utteranceThreshold }
+
+    /// Continuous silence in seconds since the last speech frame (M1,
+    /// wave-2) — the input to SessionController's auto-stop, mirroring
+    /// engine.py's `_continuous_silence`. Internal (not private) so the
+    /// controller and the tests can read it.
+    var continuousSilence: Double { silenceSinceSpeech }
+
+    /// Whether an utterance is currently open (a speech frame was seen and
+    /// silence has not closed it yet). Auto-stop must not fire mid-utterance
+    /// — engine.py's `not _in_speech` guard — so the controller reads this
+    /// alongside `continuousSilence`.
+    var isCurrentlySpeaking: Bool { isSpeaking }
 
     /// Feed one buffer of samples. Returns an utterance when silence closes one.
     mutating func process(_ frame: [Float]) -> Utterance? {
@@ -90,9 +108,17 @@ struct UtteranceDetector {
         if energy >= frameThreshold {
             isSpeaking = true
             silentDuration = 0
+            silenceSinceSpeech = 0
             buffer.append(contentsOf: frame)
             return nil
         }
+
+        // Below the frame gate: silence. It accumulates into the auto-stop
+        // counter whether or not an utterance is open (engine.py accumulates
+        // its `_continuous_silence` on every below-gate frame and resets it
+        // only on speech) — the utterance-close path below consumes
+        // `silentDuration`, this counter feeds auto-stop.
+        silenceSinceSpeech += frameDuration
 
         guard isSpeaking else { return nil }
 
@@ -142,7 +168,9 @@ struct UtteranceDetector {
     /// frames at or above `calibrationSpeechFloor` are excluded first, and if
     /// fewer than `noiseMinimumSamples` quiet frames remain, calibration
     /// aborts leaving the static gates in force — the floor must never be
-    /// measured on speech.
+    /// measured on speech. Since wave-2 (M13) the median's *contribution* is
+    /// also capped at `calibrationSpeechFloor`, mirroring engine.py — see the
+    /// comment at the gate arithmetic below.
     private mutating func applyCalibration() {
         let quiet = calibrationSamples.filter { $0 < TranscriptFilter.calibrationSpeechFloor }
         guard quiet.count >= TranscriptFilter.noiseMinimumSamples else {
@@ -157,8 +185,21 @@ struct UtteranceDetector {
         let n = sorted.count
         let noiseFloor = n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2
 
-        frameThreshold = max(frameFloor, noiseFloor * TranscriptFilter.noiseFrameMultiplier)
-        utteranceThreshold = max(utteranceFloor, noiseFloor * TranscriptFilter.noiseUtteranceMultiplier)
+        // Cap the calibration contribution at the speech floor (M13,
+        // wave-2), mirroring engine.py: a calibrated gate above the
+        // speech/noise discrimination line would demand speech louder than
+        // speech, and no static floor setting could counter it (the floors
+        // are minimums — max() keeps whatever calibration produces; a
+        // measured fan median of 0.02 used to put the frame gate at 0.07,
+        // above normal talking at ~0.05-0.06 RMS, and lowering
+        // frame_energy changed nothing). The cap clamps the CONTRIBUTION,
+        // not the whole max, so a user floor above the cap applies exactly
+        // as set; and it cannot misfire: the median is measured only on
+        // quiet frames (below the floor), so the contribution only ever
+        // rises toward the cap from below.
+        let cap = TranscriptFilter.calibrationSpeechFloor
+        frameThreshold = max(frameFloor, min(noiseFloor * TranscriptFilter.noiseFrameMultiplier, cap))
+        utteranceThreshold = max(utteranceFloor, min(noiseFloor * TranscriptFilter.noiseUtteranceMultiplier, cap))
         // os_log interpolation is an autoclosure and cannot capture `self`
         // inside a mutating method, so read the values into locals first.
         let frame = frameThreshold

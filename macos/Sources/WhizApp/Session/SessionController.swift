@@ -235,8 +235,30 @@ final class SessionController: ObservableObject {
 
     private func ingest(_ samples: [Float], level: Double) {
         self.level = level
-        guard let utterance = detector.process(samples) else { return }
+        guard let utterance = detector.process(samples) else {
+            checkAutoStop()
+            return
+        }
         enqueue(utterance)
+    }
+
+    /// Auto-stop on prolonged silence (M1, wave-2): end the session after
+    /// `dictate_auto_stop_silence` seconds of continuous silence with no
+    /// utterance open. Python's engine has honored the key since wave-1
+    /// (its `_process_vad_frames` sets `_end_session_requested`); the Swift
+    /// port used to round-trip the config value without ever reading it,
+    /// so the setting silently did nothing here. Unlike Python — whose
+    /// audio callback must not block, so it only sets a flag — this runs
+    /// on the main actor after the thread hop, so it can call
+    /// `endSession()` directly. `endSession()` is idempotent, so a frame
+    /// delivered by an in-flight hop after the stop is harmless.
+    private func checkAutoStop() {
+        guard config.autoStopSilence > 0,
+              !detector.isCurrentlySpeaking,
+              detector.continuousSilence >= config.autoStopSilence else { return }
+        Log.session.notice(
+            "auto-stop: \(self.detector.continuousSilence, format: .fixed(precision: 1))s of silence — ending session")
+        endSession()
     }
 
     private func makeDetector() -> UtteranceDetector {

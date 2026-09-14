@@ -67,7 +67,32 @@ noise_min_samples = 5
 # noise at/above this level can no longer be calibrated against (energy
 # alone cannot tell it from speech) — VAD and the hallucination filter
 # own that regime instead.
+#
+# Since wave-2 (M13) it also CAPS the calibrated gates: the median's
+# contribution to the effective frame/utterance gates never rises above
+# this line, so a calibrated gate can never demand speech louder than
+# speech and a user-set floor above it always takes effect (engine.py,
+# UtteranceDetector.swift, and tuning/golden/generate.py all apply it).
 calibration_speech_floor = 0.03
+
+# --- Whisper decoder anti-hallucination thresholds (W2-M12) ---
+#
+# Applied by the STT providers at decode time, stricter than Whisper's
+# defaults. Python: whiz/dictate/providers/mlx.py (NO_SPEECH_THRESHOLD /
+# LOGPROB_THRESHOLD). Swift: WhisperEngine.swift sets the same pair on
+# whisper.cpp (no_speech_thold / logprob_thold). mlx additionally applies
+# hallucination_silence_threshold=2.0, which whisper.cpp has no equivalent
+# for — a documented divergence, see docs/ARCHITECTURE.md.
+
+# Probability above which a segment is treated as speech when the model
+# hesitates between silence and speech. Whisper default 0.6; 0.35 skips
+# segments the model is even moderately confident are silence, instead
+# of emitting training-data boilerplate on near-silent audio.
+whisper_no_speech_threshold = 0.35
+# Average log-probability below which a decoded segment is rejected as
+# low confidence — hallucinations on noise typically have poor log
+# probabilities. Whisper default -1.0.
+whisper_logprob_threshold = -0.5
 
 # --- Config defaults (must match whiz/config.py and WhizConfig.swift) ---
 

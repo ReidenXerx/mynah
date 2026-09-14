@@ -46,6 +46,17 @@ DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 # Whisper's native sample rate. The engine must deliver audio at this rate.
 WHISPER_SAMPLE_RATE = 16000
 
+# Decoder anti-hallucination thresholds (W2-M12), pinned against
+# tuning/tuning.toml (whisper_no_speech_threshold /
+# whisper_logprob_threshold) by tests/test_tuning.py. Named module
+# constants — not literals inline in transcribe() — so the pin has
+# something to point at. The Swift WhisperEngine applies the same pair
+# to whisper.cpp (no_speech_thold / logprob_thold);
+# hallucination_silence_threshold below is mlx-only (whisper.cpp has no
+# equivalent — documented divergence, docs/ARCHITECTURE.md).
+NO_SPEECH_THRESHOLD = 0.35
+LOGPROB_THRESHOLD = -0.5
+
 
 class MlxWhisperProvider(STTProvider):
     """Speech-to-text via mlx-whisper (Apple MLX, Metal GPU)."""
@@ -116,14 +127,15 @@ class MlxWhisperProvider(STTProvider):
             # hallucinated phrase biases the next utterance toward similar
             # content, compounding hallucinations across utterances.
             condition_on_previous_text=False,
-            # Anti-hallucination tuning (all stricter than Whisper defaults):
+            # Anti-hallucination tuning (all stricter than Whisper defaults),
+            # pinned against tuning/tuning.toml (W2-M12):
             # Lower no_speech_threshold (0.6→0.35): skip segments the model
             # is even moderately confident are silence, instead of emitting
             # training-data boilerplate on near-silent audio.
-            no_speech_threshold=0.35,
+            no_speech_threshold=NO_SPEECH_THRESHOLD,
             # Raise logprob_threshold (-1.0→-0.5): reject low-confidence segments
             # (hallucinations on noise typically have poor log probabilities).
-            logprob_threshold=-0.5,
+            logprob_threshold=LOGPROB_THRESHOLD,
             # Enable Whisper's built-in hallucination detector: when the model
             # loops/repeats in a silent region, skip forward by this many
             # seconds instead of transcribing the repetition.

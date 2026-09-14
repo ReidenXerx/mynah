@@ -12,6 +12,7 @@ Run with: pytest tests/test_dictate.py
 from __future__ import annotations
 
 import sys
+import threading
 import types
 from array import array
 from pathlib import Path
@@ -1355,6 +1356,215 @@ def test_cmd_config_set_accepts_valid_dictate_trigger(tmp_path, monkeypatch):
     assert cfg.load().dictate_trigger == "ptt"
 
 
+# W2-M16: provider-selection keys validate against the live registry at BOTH
+# entry points — a typo used to be accepted and silently fell back to
+# auto-detect, hiding the mistake.
+
+
+def test_cmd_config_set_rejects_unknown_stt_provider(tmp_path, monkeypatch):
+    """`whiz config set dictate_stt_provider=mlxx` must be rejected — a typo
+    must not silently degrade to auto-detect."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="dictate_stt_provider=mlxx")
+    with pytest.raises(SystemExit):
+        cli.cmd_config_set(args)
+
+
+def test_cmd_dictate_set_rejects_unknown_stt_provider(tmp_path, monkeypatch):
+    """The friendly entry point enforces the same validation: `whiz dictate
+    set stt_provider=mlxx` must be rejected, not saved."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="stt_provider=mlxx")
+    with pytest.raises(SystemExit):
+        cli.cmd_dictate_set(args)
+
+
+def test_cmd_dictate_set_rejects_unknown_injector(tmp_path, monkeypatch):
+    """The injector key validates too (not just STT)."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="injector=maac")
+    with pytest.raises(SystemExit):
+        cli.cmd_dictate_set(args)
+
+
+def test_cmd_dictate_set_accepts_empty_provider_as_auto(tmp_path, monkeypatch):
+    """Empty string stays valid at both entry points — it means auto-detect."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="stt_provider=")
+    rc = cli.cmd_dictate_set(args)
+    assert rc == 0
+    assert cfg.load().dictate_stt_provider == ""
+
+
+def test_cmd_dictate_set_accepts_known_provider(tmp_path, monkeypatch):
+    """A registered name is accepted — `mac` is registered in the injector
+    table on every platform (the name check never constructs the provider,
+    so this does not import pyobjc)."""
+    from whiz import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="injector=mac")
+    rc = cli.cmd_dictate_set(args)
+    assert rc == 0
+    assert cfg.load().dictate_injector == "mac"
+
+
+# W2-H2: a rumps/pyobjc failure under the LaunchAgent must exit rc=1, not
+# rc=0 — KeepAlive turns a rc=0 exit into an invisible relaunch loop while
+# `whiz dictate service status` keeps reporting healthy.
+
+
+def test_run_with_appkit_exits_1_when_menu_bar_fails_under_service(monkeypatch):
+    """With WHIZ_DICTATE_SERVICE=1, menu_bar requested, and no menu bar
+    created (rumps import fails inside MacMenuBar.setup), run() must
+    exit 1 so the LastExitStatus churn is visible."""
+    monkeypatch.setenv("WHIZ_DICTATE_SERVICE", "1")
+    indicator = FakeIndicator()
+    engine = _make_engine(
+        indicator=indicator,
+        settings=eng.DictateSettings(
+            language="ru", initial_prompt="x", idle_timeout=0,
+            auto_stop_silence=0, hotkey="x", trigger="toggle",
+            vad_enabled=False, show_indicator=False, menu_bar=True,
+        ),
+    )
+    injector = FakeInjector()
+    engine.injector = injector
+    monkeypatch.setattr(eng, "_is_macos", lambda: True)
+    # _setup_menu_bar imports MacMenuBar but the provider's setup() fails to
+    # create it (rumps missing) → self._menu_bar stays None.
+    monkeypatch.setattr(engine, "_setup_menu_bar", lambda: None)
+    rc = engine.run()
+    assert rc == 1
+
+
+def test_run_with_appkit_terminal_fallback_returns_0(monkeypatch):
+    """Without the service env key (a terminal run), the degraded
+    hotkey-only fallback stays: rc=0 — the user can see the situation and
+    Ctrl+C out of it."""
+    monkeypatch.delenv("WHIZ_DICTATE_SERVICE", raising=False)
+    indicator = FakeIndicator()
+    engine = _make_engine(
+        indicator=indicator,
+        settings=eng.DictateSettings(
+            language="ru", initial_prompt="x", idle_timeout=0,
+            auto_stop_silence=0, hotkey="x", trigger="toggle",
+            vad_enabled=False, show_indicator=False, menu_bar=True,
+        ),
+    )
+    monkeypatch.setattr(eng, "_is_macos", lambda: True)
+    monkeypatch.setattr(engine, "_setup_menu_bar", lambda: None)
+    # The fallback loop must terminate: preset the stop event so the plain
+    # fallback while-loop exits immediately.
+    engine._stop_event.set()
+    rc = engine.run()
+    assert rc == 0
+
+
+# W2-M10: idle_timeout=0 means "never unload" — the sentinel-default
+# resolution must let an explicit zero reach the engine (the old or-chain
+# `float(overrides.get("idle_timeout") or config.dictate_idle_timeout)` made
+# a configured/overridden 0 unreachable).
+
+
+def test_resolve_settings_idle_timeout_zero_override_wins():
+    """An explicit --idle-timeout=0 override must win over any config value."""
+    config = cfg.Config()
+    config.dictate_idle_timeout = 45
+    s = eng.resolve_settings(config, idle_timeout=0)
+    assert s.idle_timeout == 0
+
+
+def test_resolve_settings_idle_timeout_zero_config_wins():
+    """A configured dictate_idle_timeout=0 must reach the settings unchanged —
+    not silently replaced by the built-in default 45."""
+    config = cfg.Config()
+    config.dictate_idle_timeout = 0
+    s = eng.resolve_settings(config)
+    assert s.idle_timeout == 0
+
+
+# W2-H1: the zombie-session race — an old session's teardown must not poison
+# the new session's queue/worker when start races a slow end.
+
+
+def test_end_session_racing_new_start_does_not_poison_new_queue():
+    """The W2-H1 core scenario: _end_session snapshots queue+threads under
+    its first lock, a new _start_session swaps them mid-teardown, and the
+    flush sentinel must land on the SNAPSHOT (old) queue — the new
+    session's worker never sees it and stays alive to process its own
+    utterances."""
+    engine = _make_engine()
+    engine._start_session()
+    old_queue = engine._utterance_queue
+    old_worker = engine._transcribe_thread
+
+    # Race: end the old session on a background thread (its transcribe
+    # join is what a real slow teardown blocks on), and start the new one
+    # as soon as the end has claimed the session. The generation counter
+    # increments past the old one; the old teardown's snapshot releases
+    # the old worker, never the new one.
+    end_thread = threading.Thread(target=engine._end_session)
+    end_thread.start()
+    _wait_until(lambda: not engine._session_active, msg="session not ended")
+    engine._start_session()
+    new_queue = engine._utterance_queue
+    new_worker = engine._transcribe_thread
+    assert new_queue is not old_queue
+    assert new_worker is not old_worker
+
+    # The new session must be fully functional: its worker consumes its own
+    # queue, and the old session's sentinel never reaches it.
+    new_queue.put(_loud_pcm(2.0))
+    end_thread.join(timeout=5)
+    assert not end_thread.is_alive()
+    # New worker alive, old worker gone.
+    _wait_until(lambda: not old_worker.is_alive(), msg="old worker exited")
+    # The new queue got no sentinel: its worker still runs.
+    assert new_worker.is_alive()
+    # End the new session cleanly.
+    engine._end_session()
+    assert not new_worker.is_alive()
+
+
+# W2-M6: a per-utterance transcribe failure must be loud, not silent.
+
+
+def test_transcribe_failure_surfaces_on_stderr_and_worker_survives(monkeypatch, capsys):
+    """FakeSTT raising on transcribe: the utterance is lost, but stderr
+    carries the complaint and the worker stays alive for later utterances
+    (previously it vanished silently — user speaks, nothing types, no
+    diagnostic anywhere)."""
+    stt = FakeSTT(text="привет")
+    injector = FakeInjector()
+    engine = _make_engine(stt=stt, injector=injector)
+
+    def _failing_transcribe(audio, sample_rate, language, initial_prompt):
+        raise RuntimeError("model exploded")
+
+    stt.transcribe = _failing_transcribe
+    engine._transcribe_and_inject(_loud_pcm(2.0), __import__("numpy"))
+    captured = capsys.readouterr()
+    assert "Transcription failed" in captured.err
+    assert "model exploded" in captured.err
+    # The worker state machine recovered to listening, ready for the next
+    # utterance (no stuck 'transcribing' pill).
+    assert engine._indicator_state == "listening"
+
+
 def test_default_russian_prompt_has_no_duplicate_words():
     """The bias prompt should not repeat tokens (was: 'ебать' twice)."""
     seen = set()
@@ -1622,6 +1832,55 @@ def test_service_uninstall_removes_plist(monkeypatch, tmp_path):
     assert rc == 0
     assert not plist.exists()
     assert any(c[:2] == ["launchctl", "unload"] for c in calls), calls
+
+
+def test_service_plist_emits_service_env_on_every_path(monkeypatch):
+    """W2-M14: the generated plist must set WHIZ_DICTATE_SERVICE=1 on
+    every argv path. engine.py's `_run_with_appkit` reads it to decide
+    between rc=0 (which KeepAlive silently turns into a relaunch loop)
+    and rc=1 on a menu-bar failure — the env key is only load-bearing if
+    the agent process actually receives it, whichever binary resolution
+    won."""
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
+    monkeypatch.setattr(service.shutil, "which", lambda _name: None)
+    monkeypatch.delenv("WHIZ_CONFIG_DIR", raising=False)
+
+    # Path 3: python -m whiz fallback — the previously bare path.
+    xml = service.build_plist()
+    assert "EnvironmentVariables" in xml
+    assert "WHIZ_DICTATE_SERVICE" in xml
+
+
+def test_service_plist_passes_through_whiz_config_dir(monkeypatch, tmp_path):
+    """W2-M14: WHIZ_CONFIG_DIR set in the installer's environment is
+    emitted into the plist. whiz.config reads it at import, so a custom
+    config dir used for the CLI must survive into the agent."""
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    monkeypatch.setenv("WHIZ_CONFIG_DIR", str(tmp_path))
+
+    xml = service.build_plist()
+    assert "WHIZ_CONFIG_DIR" in xml
+    assert str(tmp_path) in xml
+    assert "WHIZ_DICTATE_SERVICE" in xml
+
+
+def test_service_plist_omits_whiz_config_dir_when_unset(monkeypatch):
+    """W2-M14 flip side: with no custom config dir, the key is absent from
+    the plist — an empty-string WHIZ_CONFIG_DIR would be worse than none
+    (config.py treats the empty string as a real override)."""
+    from whiz.dictate import service
+
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    monkeypatch.delenv("WHIZ_CONFIG_DIR", raising=False)
+
+    xml = service.build_plist()
+    assert "WHIZ_CONFIG_DIR" not in xml
 
 
 def test_service_uninstall_when_not_installed(monkeypatch, tmp_path):
@@ -2630,12 +2889,16 @@ def test_noise_calibration_quiet_room_keeps_static_floor():
 # stream.
 
 
-def test_noise_calibration_noisy_room_raises_gates():
-    """In a noisy room the measured noise floor exceeds the static thresholds,
-    so the effective gates are raised proportionally (noise_floor * mult).
-    Note the amplitude: fan/HVAC levels (~0.02), which sit BELOW
-    _CALIBRATION_SPEECH_FLOOR — noise at or above that floor is speech by
-    definition and no longer calibratable (see the speech-aware tests below)."""
+def test_noise_calibration_noisy_room_gates_capped_at_speech_floor():
+    """A fan-level median (0.02) would put the frame gate at 0.07 — above
+    normal speech (~0.05-0.06 RMS) and above the calibration speech floor.
+    Since M13 (wave-2) the median's CONTRIBUTION is capped at
+    _CALIBRATION_SPEECH_FLOOR, so the gate rises only to the discrimination
+    line: still above the static floors (the room IS noisy), but never
+    demanding speech louder than speech. The amplitude: fan/HVAC levels
+    (~0.02) sit BELOW _CALIBRATION_SPEECH_FLOOR — noise at or above that
+    floor is speech by definition and no longer calibratable (see the
+    speech-aware tests below)."""
     engine = _make_engine()
     engine._start_session()
     # Simulate ~0.6s of fan-noise audio: steady fan/HVAC noise.
@@ -2645,13 +2908,40 @@ def test_noise_calibration_noisy_room_raises_gates():
         engine._noise_cal_rms.append(noisy_rms)
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
-    # The adaptive gate should be noise_floor * mult, above the static floor.
-    expected_frame = noisy_rms * eng._NOISE_FRAME_MULT  # 0.07
-    expected_utt = noisy_rms * eng._NOISE_UTT_MULT       # 0.06
-    assert abs(engine._effective_frame_energy - expected_frame) < 0.001
-    assert abs(engine._effective_min_energy - expected_utt) < 0.001
+    # The uncapped product (0.02 * 3.5 = 0.07) exceeds the speech floor,
+    # so the cap is what decides here: both gates land exactly on it.
+    assert noisy_rms * eng._NOISE_FRAME_MULT > eng._CALIBRATION_SPEECH_FLOOR
+    assert engine._effective_frame_energy == eng._CALIBRATION_SPEECH_FLOOR
+    assert engine._effective_min_energy == eng._CALIBRATION_SPEECH_FLOOR
     assert engine._effective_frame_energy > engine.s.frame_energy
     assert engine._effective_min_energy > engine.s.min_energy
+    engine._end_session()
+
+
+def test_noise_calibration_cap_does_not_lower_user_floor():
+    """The cap clamps the median's CONTRIBUTION, not the whole max(): a
+    user floor set above the cap applies exactly as set. Capping the whole
+    max instead — min(max(floor, median*mult), cap) — would silently LOWER
+    a user-set floor to 0.03, breaking the "floors are minimums" invariant
+    the config docs promise."""
+    engine = _make_engine(
+        settings=eng.DictateSettings(
+            language="ru", initial_prompt="x", idle_timeout=45,
+            auto_stop_silence=10, hotkey="x", trigger="toggle",
+            vad_enabled=True, show_indicator=True,
+            frame_energy=0.04, min_energy=0.04,
+        ),
+    )
+    engine._start_session()
+    # Fan-level frames are quiet relative to the 0.03 speech floor, so
+    # they feed the median; their capped contribution (0.03) loses to the
+    # user floors (0.04).
+    for _ in range(20):
+        engine._noise_cal_rms.append(0.02)
+    engine._finish_noise_calibration()
+    assert engine._noise_calibrated is True
+    assert engine._effective_frame_energy == 0.04
+    assert engine._effective_min_energy == 0.04
     engine._end_session()
 
 
@@ -2697,28 +2987,33 @@ def test_noise_calibration_spikes_do_not_inflate_noise_floor():
     outright (_CALIBRATION_SPEECH_FLOOR), and the quiet frames' MEDIAN —
     not their mean — sets the floor. The quiet frames are deliberately
     non-uniform and the spikes numerous: with uniform quiet frames the
-    pre-fix median-of-everything passed too (18 uniform values put the
-    middle pair below the spikes), and a mean-over-quiet would give
-    0.0175, not the 0.02 median these inputs must produce."""
+    pre-fix median-of-everything passed too, and a mean-over-quiet would
+    give a different gate than the median these inputs must produce.
+
+    Since M13 the quiet amplitudes also stay under the cap: at the old
+    fan levels the capped gate is identical whether the median is
+    poisoned or not, and the test would pin nothing. Median 0.004 ->
+    gates 0.014/0.012; a mean-over-quiet (0.0035) would give
+    0.01225/0.0105."""
     engine = _make_engine()
     engine._start_session()
     # 8 quiet frames (2 low + 6 higher — non-uniform, so median != mean)
     # and 12 speech-level spikes (sustained clatter during cal).
     for _ in range(2):
-        engine._noise_cal_rms.append(0.01)
+        engine._noise_cal_rms.append(0.002)
     for _ in range(6):
-        engine._noise_cal_rms.append(0.02)
+        engine._noise_cal_rms.append(0.004)
     for _ in range(6):
         engine._noise_cal_rms.append(0.20)  # spike — speech-level, excluded
     for _ in range(6):
         engine._noise_cal_rms.append(0.25)  # spike — speech-level, excluded
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
-    # Median of the 8 quiet frames = 0.02 (their mean would be 0.0175);
+    # Median of the 8 quiet frames = 0.004 (their mean would be 0.0035);
     # the 12 spikes never enter it. Including the spikes (the pre-fix
-    # behavior) would put the middle pair at 0.20 and the gates at 0.70.
-    expected_frame = 0.02 * eng._NOISE_FRAME_MULT  # 0.07
-    expected_utt = 0.02 * eng._NOISE_UTT_MULT      # 0.06
+    # behavior) would put the middle pair at 0.20 and the gates at the cap.
+    expected_frame = 0.004 * eng._NOISE_FRAME_MULT  # 0.014
+    expected_utt = 0.004 * eng._NOISE_UTT_MULT      # 0.012
     assert abs(engine._effective_frame_energy - expected_frame) < 0.001
     assert abs(engine._effective_min_energy - expected_utt) < 0.001
     assert engine._effective_frame_energy > engine.s.frame_energy
@@ -2748,37 +3043,42 @@ def test_noise_calibration_speech_in_window_aborts_to_static():
 def test_noise_calibration_mixed_window_excludes_speech():
     """A mixed window (noise + speech) measures the floor on the quiet
     (noise) frames only: the gates rise on the noise AND the speech is
-    excluded from the median."""
+    excluded from the median. The noise level stays under the cap (M13):
+    at the old fan-level 0.02 both the clean and the poisoned medians cap
+    to the same gate and the exclusion would be invisible — without it
+    the median of all 20 frames here is 0.032, above the cap."""
     engine = _make_engine()
     engine._start_session()
-    # 10 fan-level noise frames (below the speech floor) + 10 speech frames.
+    # 10 quiet noise frames (below the speech floor) + 10 speech frames.
     for _ in range(10):
-        engine._noise_cal_rms.append(0.02)
+        engine._noise_cal_rms.append(0.004)
     for _ in range(10):
         engine._noise_cal_rms.append(0.06)  # speech — excluded
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
-    # Median over the 10 quiet frames = 0.02.
-    expected_frame = 0.02 * eng._NOISE_FRAME_MULT  # 0.07
-    expected_utt = 0.02 * eng._NOISE_UTT_MULT       # 0.06
+    # Median over the 10 quiet frames = 0.004 -> gates 0.014/0.012.
+    expected_frame = 0.004 * eng._NOISE_FRAME_MULT
+    expected_utt = 0.004 * eng._NOISE_UTT_MULT
     assert abs(engine._effective_frame_energy - expected_frame) < 0.001
     assert abs(engine._effective_min_energy - expected_utt) < 0.001
     engine._end_session()
 
 
 def test_noise_calibration_all_quiet_window_unchanged():
-    """An all-quiet window behaves exactly as before the speech-aware change:
-    every frame is below the speech floor, the median runs over all of them,
-    and the gates rise on the measured noise."""
+    """An all-quiet window behaves exactly as before the speech-aware and
+    cap changes: every frame is below the speech floor, the median runs
+    over all of them, and the gates rise on the measured noise. The level
+    (0.008) keeps the product under the cap (M13), so this pins the
+    proportional arithmetic, not the cap."""
     engine = _make_engine()
     engine._start_session()
     for _ in range(20):
-        engine._noise_cal_rms.append(0.01)  # below the 0.03 speech floor
+        engine._noise_cal_rms.append(0.008)  # below the 0.03 speech floor
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
-    # Median 0.01 -> gates 0.035 / 0.03, both above the static floors.
-    assert abs(engine._effective_frame_energy - 0.01 * eng._NOISE_FRAME_MULT) < 0.001
-    assert abs(engine._effective_min_energy - 0.01 * eng._NOISE_UTT_MULT) < 0.001
+    # Median 0.008 -> gates 0.028 / 0.024, both above the static floors.
+    assert abs(engine._effective_frame_energy - 0.008 * eng._NOISE_FRAME_MULT) < 0.001
+    assert abs(engine._effective_min_energy - 0.008 * eng._NOISE_UTT_MULT) < 0.001
     engine._end_session()
 
 
@@ -2786,18 +3086,20 @@ def test_noise_calibration_min_quiet_frames_still_calibrates():
     """The abort boundary is >=: exactly noise_min_samples (5) quiet
     frames must still calibrate. A regression flipping the guard to a
     strict comparison would abort here and leave the static gates in
-    force — pinning the boundary the corpus cannot see."""
+    force — pinning the boundary the corpus cannot see. The quiet level
+    (0.004) also keeps the raised gate uncapped (M13) and above the
+    static floors, so the multiplier arithmetic stays pinned too."""
     engine = _make_engine()
     engine._start_session()
     for _ in range(5):
-        engine._noise_cal_rms.append(0.02)  # quiet
+        engine._noise_cal_rms.append(0.004)  # quiet
     for _ in range(15):
         engine._noise_cal_rms.append(0.06)  # speech — excluded
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
-    # Median of the 5 quiet frames = 0.02.
-    assert abs(engine._effective_frame_energy - 0.02 * eng._NOISE_FRAME_MULT) < 0.001
-    assert abs(engine._effective_min_energy - 0.02 * eng._NOISE_UTT_MULT) < 0.001
+    # Median of the 5 quiet frames = 0.004 -> gates 0.014/0.012.
+    assert abs(engine._effective_frame_energy - 0.004 * eng._NOISE_FRAME_MULT) < 0.001
+    assert abs(engine._effective_min_energy - 0.004 * eng._NOISE_UTT_MULT) < 0.001
     engine._end_session()
 
 
@@ -2823,22 +3125,24 @@ def test_noise_calibration_even_count_median_averages_middle_pair():
     """With an even number of quiet frames the median is the AVERAGE of
     the two middle values (engine.py's convention). The quiet frames are
     non-uniform so the two middle values differ: an upper-middle-element
-    convention (Swift's pre-alignment behavior) would give 0.02 ->
-    gates 0.07/0.06 instead of 0.015 -> 0.0525/0.045."""
+    convention (Swift's pre-alignment behavior) would give 0.008 ->
+    gates 0.028/0.024 instead of 0.006 -> 0.021/0.018. The amplitudes
+    stay under the cap (M13): at the old 0.01/0.02 levels both
+    conventions cap to the speech floor and the test would pin nothing."""
     engine = _make_engine()
     engine._start_session()
-    # 8 quiet frames: 4 low + 4 higher. Sorted middles: 0.01 and 0.02.
+    # 8 quiet frames: 4 low + 4 higher. Sorted middles: 0.004 and 0.008.
     for _ in range(4):
-        engine._noise_cal_rms.append(0.01)
+        engine._noise_cal_rms.append(0.004)
     for _ in range(4):
-        engine._noise_cal_rms.append(0.02)
+        engine._noise_cal_rms.append(0.008)
     for _ in range(12):
         engine._noise_cal_rms.append(0.06)  # speech — excluded
     engine._finish_noise_calibration()
     assert engine._noise_calibrated is True
-    # Median = (0.01 + 0.02) / 2 = 0.015 — averaged, not upper-middle.
-    expected_frame = 0.015 * eng._NOISE_FRAME_MULT  # 0.0525
-    expected_utt = 0.015 * eng._NOISE_UTT_MULT     # 0.045
+    # Median = (0.004 + 0.008) / 2 = 0.006 — averaged, not upper-middle.
+    expected_frame = 0.006 * eng._NOISE_FRAME_MULT  # 0.021
+    expected_utt = 0.006 * eng._NOISE_UTT_MULT      # 0.018
     assert abs(engine._effective_frame_energy - expected_frame) < 0.001
     assert abs(engine._effective_min_energy - expected_utt) < 0.001
     engine._end_session()
@@ -2861,16 +3165,19 @@ def test_vad_uses_effective_frame_energy():
     """_process_vad_frames must use the adaptive _effective_frame_energy, not
     the static settings floor (``DictateSettings.frame_energy``). In a noisy
     room, a frame just above the static floor but below the adaptive floor
-    should be classified as silence."""
+    should be classified as silence. The calibration noise stays under the
+    cap (M13): a fan-level median caps the gate AT the speech floor and a
+    0.03 frame then sits exactly ON it — indistinguishable in floats. A
+    0.008 median keeps the arithmetic proportional (gate 0.028)."""
     engine = _make_engine()
     engine._start_session()
     # Simulate a noisy-room calibration so the adaptive floor is raised.
     for _ in range(20):
-        engine._noise_cal_rms.append(0.02)
+        engine._noise_cal_rms.append(0.008)
     engine._finish_noise_calibration()
-    # Now a frame with RMS ~0.03 would pass the static floor (0.010) but
-    # should be rejected by the adaptive floor (0.02*3.5=0.07).
-    assert engine._effective_frame_energy > 0.03
+    # Now a frame with RMS ~0.02 would pass the static floor (0.010) but
+    # should be rejected by the adaptive floor (0.008*3.5=0.028).
+    assert engine._effective_frame_energy > 0.02
 
     class _AlwaysSpeechVad:
         available = True
@@ -2879,9 +3186,9 @@ def test_vad_uses_effective_frame_energy():
             return True  # would say "speech" if it got the chance
 
     engine._vad = _AlwaysSpeechVad()
-    # Generate a frame with RMS ~0.03 (below adaptive floor, above static).
+    # Generate a frame with RMS ~0.02 (below adaptive floor, above static).
     n = 480
-    amp = int(0.03 * 32767)  # ~983
+    amp = int(0.02 * 32767)  # ~655
     frame = array("h", (amp if i % 2 else -amp for i in range(n))).tobytes()
     frame_bytes = 960
     frame_seconds = frame_bytes / 2 / WHISPER_SAMPLE_RATE

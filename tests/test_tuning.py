@@ -52,6 +52,17 @@ def test_noise_calibration_constants_match_tuning(tuning: dict) -> None:
     assert eng._CALIBRATION_SPEECH_FLOOR == tuning["calibration_speech_floor"]
 
 
+def test_whisper_decoder_thresholds_match_tuning(tuning: dict) -> None:
+    """W2-M12: the decoder anti-hallucination thresholds live in
+    tuning.toml and every engine pins against it — the mlx provider here,
+    WhisperEngine.swift in the Swift TuningTests mirror. Both are
+    deliberately stricter than the Whisper defaults (0.6 / -1.0)."""
+    from whiz.dictate.providers.mlx import LOGPROB_THRESHOLD, NO_SPEECH_THRESHOLD
+
+    assert NO_SPEECH_THRESHOLD == tuning["whisper_no_speech_threshold"]
+    assert LOGPROB_THRESHOLD == tuning["whisper_logprob_threshold"]
+
+
 # ---------------------------------------------------------------------------
 # Config defaults — whiz/config.py and DictateSettings
 # ---------------------------------------------------------------------------
@@ -126,6 +137,8 @@ def test_tuning_toml_keys_are_expected(tuning: dict) -> None:
         "min_utterance_default",
         "hallucination_artifact_phrases",
         "hallucination_vocab_phrases",
+        "whisper_no_speech_threshold",
+        "whisper_logprob_threshold",
     }
 
 

@@ -150,12 +150,17 @@ def _ensure_runner() -> str | None:
         except OSError:
             return None
 
-    # Sanity check: the runner must start and find whiz via PYTHONPATH. If
-    # it can't import whiz, don't use it — fall back to the plain script.
+    # Sanity check: the runner must start and find whiz via PYTHONPATH —
+    # and not just the top-level package: `whiz dictate` immediately
+    # imports whiz.dictate.engine, so an install where that module (or
+    # its imports) breaks must fall back to the plain script HERE (L5,
+    # wave-2) instead of yielding a LaunchAgent that crash-loops on
+    # launch. The heavy deps (mlx_whisper, sounddevice, pynput) stay lazy
+    # inside functions, so this probe stays cheap.
     env = os.environ.copy()
     env["PYTHONPATH"] = site
     probe = subprocess.run(
-        [str(runner), "-c", "import whiz"],
+        [str(runner), "-c", "import whiz.dictate.engine"],
         capture_output=True, text=True, check=False, timeout=15,
         env=env,
     )
@@ -175,18 +180,34 @@ def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
     the current interpreter so the agent still works when whiz is installed
     editable or run from a venv without the console script.
 
+    Env vars emitted on EVERY argv path (M14, wave-2):
+
+    - ``WHIZ_DICTATE_SERVICE=1`` — marks the process as running under
+      launchd. engine.py's ``_run_with_appkit`` reads it to decide
+      between returning 0 (which KeepAlive silently turns into a
+      relaunch loop) and returning 1 on a menu-bar setup failure, so
+      the agent must actually receive it whichever argv path resolved.
+    - ``WHIZ_CONFIG_DIR`` — passed through when set in the installer's
+      environment: whiz.config reads it at import, so a custom config
+      dir used for the CLI must survive into the agent too.
+
     Returns ``(argv, env_vars)`` where ``env_vars`` is a dict to emit as
     the plist's ``EnvironmentVariables`` key (empty dict when no override
     is needed).
     """
+    env: dict[str, str] = {"WHIZ_DICTATE_SERVICE": "1"}
+    config_dir = os.environ.get("WHIZ_CONFIG_DIR")
+    if config_dir:
+        env["WHIZ_CONFIG_DIR"] = config_dir
     runner = _ensure_runner()
     if runner:
         site = _venv_site_packages() or ""
-        return [runner, "-m", "whiz"], {"PYTHONPATH": site}
+        env["PYTHONPATH"] = site
+        return [runner, "-m", "whiz"], env
     which = shutil.which("whiz")
     if which:
-        return [which], {}
-    return [sys.executable, "-m", "whiz"], {}
+        return [which], env
+    return [sys.executable, "-m", "whiz"], env
 
 
 def build_plist() -> str:

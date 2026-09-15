@@ -25,6 +25,21 @@ actor WhisperEngine {
     /// Whisper is trained on 16 kHz mono.
     static let sampleRate: Double = 16_000
 
+    /// Decoder anti-hallucination thresholds (W2-M12), pinned against
+    /// tuning/tuning.toml (`whisper_no_speech_threshold` /
+    /// `whisper_logprob_threshold`) by TuningTests — the same pair Python's
+    /// mlx provider applies (`mlx.py`'s `NO_SPEECH_THRESHOLD` /
+    /// `LOGPROB_THRESHOLD`). Both are stricter than whisper.cpp's defaults
+    /// (0.6 / -1.0): skip segments the model is even moderately confident
+    /// are silence, and reject low-confidence decodes — hallucinations on
+    /// noise typically have poor log probabilities. Internal (not private)
+    /// so the pin tests can read them. mlx additionally passes
+    /// `hallucination_silence_threshold=2.0`, for which whisper.cpp has no
+    /// equivalent parameter — a documented divergence
+    /// (docs/ARCHITECTURE.md, "Known divergences").
+    static let noSpeechThreshold: Float = 0.35
+    static let logprobThreshold: Float = -0.5
+
     init(modelURL: URL) {
         self.modelURL = modelURL
     }
@@ -95,6 +110,12 @@ actor WhisperEngine {
         // Suppress non-speech tokens: [MUSIC], [SOUND] and similar. A cheap
         // extra layer under the hallucination filter.
         params.suppress_nst = true
+        // Anti-hallucination decoder thresholds (W2-M12) — see the
+        // constants above. whisper.cpp's defaults (0.6 / -1.0) accept far
+        // more silence and low-confidence output than the mlx provider's
+        // tuning; the tuning contract pins both sides to the same values.
+        params.no_speech_thold = Self.noSpeechThreshold
+        params.logprob_thold = Self.logprobThreshold
 
         // `whisper_full` does not copy these strings, so they must outlive the
         // call. Holding them in Swift `String`s and passing pointers into a

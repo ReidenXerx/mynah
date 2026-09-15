@@ -41,6 +41,7 @@ Threading:
 from __future__ import annotations
 
 import logging
+import os
 import queue
 import sys
 import threading
@@ -252,7 +253,10 @@ def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
     return DictateSettings(
         language=(overrides.get("language") or config.dictate_language or "ru"),
         initial_prompt=prompt,
-        idle_timeout=float(overrides.get("idle_timeout") or config.dictate_idle_timeout or 45),
+        # 0 is a meaningful value ("never unload") — use the sentinel-default
+        # pattern like auto_stop_silence below, not an or-chain, or a
+        # configured/overridden 0 can never win (W2-M10).
+        idle_timeout=float(overrides.get("idle_timeout", config.dictate_idle_timeout)),
         auto_stop_silence=float(
             overrides.get("auto_stop_silence", config.dictate_auto_stop_silence)
         ),
@@ -307,6 +311,12 @@ class DictationEngine:
         # acted on by the run loop OFF the audio thread (the callback must
         # not call _end_session, which joins threads and can block).
         self._end_session_requested = False
+        # Session generation counter (W2-H1): incremented each time
+        # _start_session actually launches a session's threads. _end_session
+        # snapshots it and refuses to mutate shared session state when a
+        # newer session started mid-teardown — the zombie-session race
+        # where a stale end poisoned the NEW session's queue/worker.
+        self._session_generation = 0
         # Idle timeout: after a session ends, unload the model after this long.
         self._idle_timer: threading.Timer | None = None
         # Background threads.
@@ -504,16 +514,25 @@ class DictationEngine:
             self._noise_calibrated = False
             self._effective_frame_energy = self.s.frame_energy
             self._effective_min_energy = self.s.min_energy
-            # Start the transcribe worker (drains the utterance queue).
+            # Claim a new session generation and bind the worker/capture
+            # threads to THIS session's objects (W2-H1): the transcribe loop
+            # receives the queue object as an argument (never re-reads
+            # self._utterance_queue mid-loop) and the capture loop receives
+            # the generation, so a teardown racing this start can neither
+            # poison nor steal the new session's queue/threads.
+            self._session_generation += 1
+            generation = self._session_generation
             self._utterance_queue = queue.Queue()
             self._transcribe_thread = threading.Thread(
-                target=self._transcribe_loop, daemon=True
+                target=self._transcribe_loop,
+                args=(self._utterance_queue,),
+                daemon=True,
             )
             self._transcribe_thread.start()
             # Start capturing audio.
             self._capturing = True
             self._capture_thread = threading.Thread(
-                target=self._capture_loop, daemon=True
+                target=self._capture_loop, args=(generation,), daemon=True
             )
             self._capture_thread.start()
         print(
@@ -528,14 +547,25 @@ class DictationEngine:
         holding ``_state_lock``. Stops the capture stream FIRST and joins the
         capture thread, so the audio callback is no longer mutating
         ``_utterance_buffer`` before we flush it — closing the two-writer race.
+
+        Generation-aware (W2-H1): the session's queue and threads are
+        snapshotted under the first lock. If a NEW session starts while this
+        teardown is joining threads (user re-arms the hotkey during the
+        ≤30s transcribe join, or two menu-bar clicks race), the snapshots
+        belong to the OLD session — the flush sentinel goes to the SNAPSHOT
+        queue (releasing the old worker) and never to the new session's, and
+        none of the new session's state (buffer, thread refs, indicator,
+        idle timer) is touched.
         """
         with self._state_lock:
             if not self._session_active:
                 return
             self._session_active = False
             self._capturing = False
+            generation = self._session_generation
             capture_thread = self._capture_thread
             transcribe_thread = self._transcribe_thread
+            utterance_queue = self._utterance_queue
 
         # Join the capture thread OFF the lock (it polls _capturing every
         # _TICK). Once joined, its sounddevice stream is closed and the audio
@@ -550,22 +580,36 @@ class DictationEngine:
             capture_thread.join(timeout=5.0)
 
         with self._state_lock:
-            self._capture_thread = None
-            # Now safe to flush the buffer — the audio callback is gone.
-            if self._utterance_buffer:
-                self._utterance_queue.put(b"".join(self._utterance_buffer))
-                self._utterance_buffer.clear()
-                self._in_speech = False
-                self._silence_frames = 0
-            # Tell the transcribe worker to drain and exit after remaining work.
-            self._utterance_queue.put(_FLUSH_SENTINEL)
+            superseded = self._session_generation != generation
+            if not superseded:
+                self._capture_thread = None
+                # Now safe to flush the buffer — the audio callback is gone.
+                if self._utterance_buffer:
+                    utterance_queue.put(b"".join(self._utterance_buffer))
+                    self._utterance_buffer.clear()
+                    self._in_speech = False
+                    self._silence_frames = 0
+            # Tell the transcribe worker to drain and exit after remaining
+            # work. ALWAYS the snapshot queue: a concurrent _start_session
+            # has already swapped self._utterance_queue to the new session's,
+            # and a sentinel landing THERE would kill the new worker
+            # instantly (the W2-H1 zombie).
+            utterance_queue.put(_FLUSH_SENTINEL)
 
         # Wait for the transcribe worker to finish pending utterances (off the
         # lock — this can take a while for long trailing utterances).
         if transcribe_thread and transcribe_thread.is_alive():
             transcribe_thread.join(timeout=30.0)
         with self._state_lock:
-            self._transcribe_thread = None
+            if self._session_generation == generation:
+                self._transcribe_thread = None
+        # A newer session started during our teardown: it owns the indicator,
+        # the idle timer, and the user-facing notices now. Our worker was
+        # drained above; leave without touching its state.
+        with self._state_lock:
+            superseded = self._session_generation != generation
+        if superseded:
+            return
         self._set_state("idle")
         # When the idle badge is visible, keep the dimmed indicator on screen
         # after a session ends instead of hiding it — so the service always
@@ -602,14 +646,22 @@ class DictationEngine:
 
     # ---------- audio capture + VAD ----------
 
-    def _capture_loop(self) -> None:
+    def _capture_loop(self, generation: int | None = None) -> None:
         """Background thread: open the mic stream and feed the audio callback.
 
         The sounddevice callback runs on its own audio thread and must not
         block. It only buffers frames, runs VAD, computes the indicator
         level, and enqueues completed utterances. Transcription happens on
         the separate ``_transcribe_loop`` thread.
+
+        ``generation`` binds this loop to the session that started it
+        (W2-H1): once a newer session starts, this loop and its audio
+        callback stop touching shared state instead of feeding the new
+        session's buffer/queue. ``None`` binds to the current generation
+        (direct/test calls).
         """
+        if generation is None:
+            generation = self._session_generation
         try:
             import sounddevice as sd
         except ImportError:
@@ -628,7 +680,9 @@ class DictationEngine:
 
         def callback(indata, frames, time_info, status):  # noqa: ARG001
             """sounddevice stream callback — runs on the audio thread."""
-            if not self._capturing:
+            # Generation guard (W2-H1): a stale stream (its join timed out)
+            # must not feed a newer session's buffer/queue.
+            if not self._capturing or self._session_generation != generation:
                 return
             import numpy as np
 
@@ -665,7 +719,11 @@ class DictationEngine:
                 blocksize=frame_samples,
                 callback=callback,
             ):
-                while self._capturing and not self._stop_event.is_set():
+                while (
+                    self._capturing
+                    and not self._stop_event.is_set()
+                    and self._session_generation == generation
+                ):
                     sd.sleep(int(_TICK * 1000))
         except Exception as e:  # noqa: BLE001
             print(f"Microphone error: {e}", file=sys.stderr)
@@ -677,13 +735,21 @@ class DictationEngine:
                     file=sys.stderr,
                 )
             self._stop_event.set()
-            # Clean up the session (hide indicator, flush) off the audio thread.
-            self._end_session()
+            # Clean up the session (hide indicator, flush) off the audio
+            # thread — unless a newer session already started (W2-H1): a
+            # stale stream erroring late must not end IT.
+            if self._session_generation == generation:
+                self._end_session()
             return
         # The stream closed (hotkey toggle/PTT release stopped us) OR auto-stop
         # set the flag. Auto-stop must end the session here — off the audio thread,
-        # so we don't block the sounddevice callback on a thread join.
-        if self._end_session_requested and not self._stop_event.is_set():
+        # so we don't block the sounddevice callback on a thread join. The flag
+        # belongs to THIS session's generation only.
+        if (
+            self._end_session_requested
+            and not self._stop_event.is_set()
+            and self._session_generation == generation
+        ):
             self._end_session_requested = False
             self._end_session()
 
@@ -698,6 +764,12 @@ class DictationEngine:
         _NOISE_MIN_SAMPLES quiet frames remain, there is nothing to
         measure noise from: calibration completes leaving the static gates
         in force for the session.
+
+        The raised gates cap the calibration contribution at
+        _CALIBRATION_SPEECH_FLOOR (M13, wave-2) — the speech/noise
+        discrimination line: a calibrated gate above it would demand
+        speech louder than speech, and no frame_energy/min_energy setting
+        could ever take effect against it.
 
         Called once from the audio callback after enough frames are collected.
         Safe to call multiple times — _noise_calibrated guards re-entry.
@@ -720,9 +792,26 @@ class DictationEngine:
         n = len(sorted_rms)
         median = sorted_rms[n // 2] if n % 2 else (sorted_rms[n // 2 - 1] + sorted_rms[n // 2]) / 2
         # Raise the effective gates above the noise floor. The static floors
-        # remain as minimums — a quiet room keeps them.
-        frame_gate = max(self.s.frame_energy, median * _NOISE_FRAME_MULT)
-        utt_gate = max(self.s.min_energy, median * _NOISE_UTT_MULT)
+        # remain as minimums — a quiet room keeps them — and the CALIBRATION
+        # CONTRIBUTION is capped at _CALIBRATION_SPEECH_FLOOR (M13, wave-2):
+        # the floor is the speech/noise discrimination line, so a gate above
+        # it would demand speech LOUDER than speech — a measured fan median
+        # of 0.02 put the frame gate at 0.07 and silently discarded normal
+        # talking (~0.05-0.06 RMS), and lowering frame_energy changed nothing
+        # because max() kept the calibrated floor dominant. Capping the
+        # median's contribution (not the whole max) keeps the static floors
+        # as true minimums: a user floor above the cap applies exactly as
+        # set. The cap cannot misfire — the median is measured only on
+        # quiet frames (below the floor), so the contribution only ever
+        # rises toward the cap from below.
+        frame_gate = max(
+            self.s.frame_energy,
+            min(median * _NOISE_FRAME_MULT, _CALIBRATION_SPEECH_FLOOR),
+        )
+        utt_gate = max(
+            self.s.min_energy,
+            min(median * _NOISE_UTT_MULT, _CALIBRATION_SPEECH_FLOOR),
+        )
         self._effective_frame_energy = frame_gate
         self._effective_min_energy = utt_gate
         logger.info(
@@ -786,12 +875,20 @@ class DictationEngine:
 
     # ---------- transcription worker ----------
 
-    def _transcribe_loop(self) -> None:
-        """Worker thread: drain the utterance queue, transcribe, inject."""
+    def _transcribe_loop(self, utterance_queue: queue.Queue | None = None) -> None:
+        """Worker thread: drain the utterance queue, transcribe, inject.
+
+        Bound to the session's OWN queue object (W2-H1): never re-reads
+        ``self._utterance_queue`` mid-loop, so a session started after this
+        one can neither steal this worker's input nor have its queue
+        poisoned by an old session's flush sentinel.
+        """
         import numpy as np
 
+        if utterance_queue is None:
+            utterance_queue = self._utterance_queue
         while True:
-            item = self._utterance_queue.get()
+            item = utterance_queue.get()
             if item is _FLUSH_SENTINEL:
                 break
             self._transcribe_and_inject(item, np)
@@ -820,7 +917,13 @@ class DictationEngine:
                 initial_prompt=self.s.initial_prompt,
             )
         except Exception as e:  # noqa: BLE001
-            logger.warning("Transcription failed: %s", e)
+            # The utterance is lost either way — but vanishing silently
+            # leaves the user speaking into a session that types nothing,
+            # with no diagnostic anywhere (W2-M6). Be loud: stderr lands in
+            # the LaunchAgent log under launchd and in the terminal
+            # otherwise. The worker stays alive for later utterances.
+            print(f"Transcription failed, utterance dropped: {e}", file=sys.stderr)
+            logger.warning("Transcription failed", exc_info=True)
             self._set_state("listening")
             return
         text_norm = text.strip().lower()
@@ -926,14 +1029,36 @@ class DictationEngine:
         thing the old manual ``NSApplication.run()`` + background watcher
         couldn't provide.
         """
-        try:
-            from whiz.dictate.providers.macos_rumps import MacMenuBar
-        except ImportError:
-            # No rumps/pyobjc — fall back to the plain loop (no menu bar).
-            return self._run_plain()
+        # NOTE: the import below cannot raise ImportError on rumps —
+        # macos_rumps defers `import rumps` inside MacMenuBar.setup(). The
+        # reachable rumps-missing signal is `self._menu_bar is None` after
+        # _setup_menu_bar() (checked below).
+        from whiz.dictate.providers.macos_rumps import MacMenuBar  # noqa: F401
 
         # Create the rumps-based menu bar (sets up NSStatusItem + NSMenu).
         self._setup_menu_bar()
+        if (
+            self.s.menu_bar
+            and self._menu_bar is None
+            and os.environ.get("WHIZ_DICTATE_SERVICE") == "1"
+        ):
+            # Menu bar requested but not created (rumps/pyobjc missing or
+            # broken — see the setup warning in the log). Under the
+            # LaunchAgent the menu bar is the service's ONLY UI
+            # (Start/Stop/Quit); a silent hotkey-only fallback looks healthy
+            # in `whiz dictate service status` while KeepAlive relaunches it
+            # uselessly. Exit 1 so the LastExitStatus churn is visible
+            # (W2-H2). In a terminal the degraded mode is visible and
+            # interactive — the plain-loop fallback stays.
+            print(
+                "rumps/pyobjc unavailable — the dictation service cannot show "
+                "its menu bar, so it will not start. Reinstall the dictate "
+                "extra, then reinstall the service:\n"
+                "  pipx inject whiz 'whiz[dictate]' --force\n"
+                "  whiz dictate service uninstall && whiz dictate service install",
+                file=sys.stderr,
+            )
+            return 1
 
         # Set up the floating pill indicator in rumps' before_start event —
         # fires on the main thread after NSApplication.sharedApplication()

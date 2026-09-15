@@ -3,10 +3,15 @@ import SwiftUI
 /// The settings window contents.
 ///
 /// Only exposes settings the Swift app actually honours. `dictate_trigger`
-/// (push-to-talk) and `dictate_auto_stop_silence` exist in the config file and
-/// are implemented in the Python engine, but not here yet — showing controls for
-/// them would be worse than omitting them, because a switch that silently does
-/// nothing is indistinguishable from a bug.
+/// (push-to-talk) exists in the config file and is implemented in the Python
+/// engine, but not here yet — showing a control for it would be worse than
+/// omitting it, because a switch that silently does nothing is
+/// indistinguishable from a bug.
+///
+/// `dictate_auto_stop_silence` is honored here since wave-2 (M1):
+/// SessionController ends the session after the configured silence. It has
+/// no dedicated control in this window — set it with
+/// `whiz dictate set silence=<seconds>`.
 ///
 /// Edits write to `~/.config/whiz/config.toml` immediately, preserving the keys
 /// the Python CLI owns. Most take effect on the next dictation session; the ones

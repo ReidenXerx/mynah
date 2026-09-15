@@ -194,7 +194,10 @@ def reference_speech_regions(
 
     Calibration follows engine.py exactly: per-frame RMS is collected
     for the first int(cal_window / frame_seconds) + 1 frames, then the
-    median raises both gates; frames are NOT dropped during calibration
+    median raises both gates (the median's contribution capped at
+    CAL_SPEECH_FLOOR — engine.py never lets a calibrated gate demand
+    speech louder than speech, M13); frames are NOT dropped during
+    calibration
     and the frame that completes the window is itself measured against
     the resulting gates (raised, or static when calibration aborts).
     Speech-aware, like engine.py: calibration frames with RMS >=
@@ -278,8 +281,16 @@ def reference_speech_regions(
                     s = sorted(quiet)
                     n = len(s)
                     median = s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
-                    eff_frame_gate = max(frame_energy, median * FRAME_MULT)
-                    eff_utt_gate = max(min_energy, median * UTT_MULT)
+                    # Capped at CAL_SPEECH_FLOOR like engine.py (M13, wave-2):
+                    # the median's contribution never crosses the speech/noise
+                    # line, and the static floors stay minimums — a user floor
+                    # above the cap applies exactly as set.
+                    eff_frame_gate = max(
+                        frame_energy, min(median * FRAME_MULT, CAL_SPEECH_FLOOR)
+                    )
+                    eff_utt_gate = max(
+                        min_energy, min(median * UTT_MULT, CAL_SPEECH_FLOOR)
+                    )
 
         if energy >= eff_frame_gate:
             if not in_speech:

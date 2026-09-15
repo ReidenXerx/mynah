@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import tempfile
 import threading
 from typing import TYPE_CHECKING, Any
@@ -263,26 +264,53 @@ class MacMenuBar:
                         save(Config())
                     except Exception:  # noqa: BLE001
                         logger.debug("could not create config file", exc_info=True)
-                subprocess.run(["/usr/bin/open", str(path)], check=False, timeout=5)
+                res = subprocess.run(
+                    ["/usr/bin/open", str(path)],
+                    check=False, timeout=5, capture_output=True, text=True,
+                )
+                if res.returncode != 0:
+                    # `open` failed (W2-L3): say so instead of swallowing the
+                    # rc — stderr lands in the LaunchAgent log under launchd
+                    # and in the terminal otherwise.
+                    detail = (res.stderr or res.stdout or "").strip()
+                    logger.warning(
+                        "open config failed (rc=%s): %s", res.returncode, detail
+                    )
+                    print(
+                        f"Could not open {path}: `open` exited {res.returncode}"
+                        + (f" ({detail})" if detail else ""),
+                        file=sys.stderr,
+                    )
             except Exception:  # noqa: BLE001
-                logger.debug("open config failed", exc_info=True)
+                logger.warning("open config failed", exc_info=True)
 
         threading.Thread(target=_open, daemon=True).start()
 
     def _on_about(self, sender):  # noqa: ARG002
-        """About whiz → print version/model/hotkey to stderr."""
+        """About whiz → alert with version/model/hotkey (stderr fallback).
+
+        A bare stderr print is useless under the LaunchAgent — there is no
+        terminal, so the user clicked About and nothing visibly happened
+        (W2-L2). Show a modal alert instead; stderr stays as the fallback for
+        headless/no-rumps contexts.
+        """
         try:
             from whiz import __version__
 
             engine = self._engine
             model = getattr(engine.stt, "_model_ref", "?")
-            print(
-                f"whiz {__version__} — dictate\n"
-                f"  model:  {model}\n"
-                f"  hotkey: {engine.s.hotkey}\n"
-                f"  mode:   {engine.s.trigger}",
-                file=__import__("sys").stderr,
+            message = (
+                f"model:  {model}\n"
+                f"hotkey: {engine.s.hotkey}\n"
+                f"mode:   {engine.s.trigger}"
             )
+            try:
+                import rumps
+
+                rumps.alert(f"whiz {__version__} — dictate", message)
+            except Exception:  # noqa: BLE001
+                logger.debug("about alert failed; falling back to stderr", exc_info=True)
+                print(f"whiz {__version__} — dictate\n{message}", file=sys.stderr)
         except Exception:  # noqa: BLE001
             logger.debug("about failed", exc_info=True)
 

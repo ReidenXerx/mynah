@@ -73,6 +73,8 @@ struct TuningTests {
         let minSamples = try Self.number(t, "noise_min_samples")
         let calSpeechFloor = try Self.number(t, "calibration_speech_floor")
         let trailingPadding = try Self.number(t, "trailing_padding")
+        let noSpeech = try Self.number(t, "whisper_no_speech_threshold")
+        let logprob = try Self.number(t, "whisper_logprob_threshold")
         #expect(TranscriptFilter.utteranceSilence == utteranceSilence)
         #expect(TranscriptFilter.noiseCalibrationDuration == calDuration)
         #expect(TranscriptFilter.noiseFrameMultiplier == frameMult)
@@ -80,6 +82,15 @@ struct TuningTests {
         #expect(Double(TranscriptFilter.noiseMinimumSamples) == minSamples)
         #expect(TranscriptFilter.calibrationSpeechFloor == calSpeechFloor)
         #expect(UtteranceDetector.trailingPadding == trailingPadding)
+        // WhisperEngine's decoder thresholds (W2-M12) — the Swift half of
+        // the pair mlx.py applies. Static stored properties on an actor are
+        // nonisolated, so reading them needs no await. Compare in FLOAT
+        // space: WhisperEngine's constants are Float (whisper.cpp's API),
+        // and Float(0.35) widened to Double is 0.3499999940…, which is NOT
+        // the Double literal 0.35 — an exact == in Double space can never
+        // pass even when both sides mean the same value.
+        #expect(WhisperEngine.noSpeechThreshold == Float(noSpeech))
+        #expect(WhisperEngine.logprobThreshold == Float(logprob))
     }
 
     @Test("WhizConfig defaults match tuning.toml")
@@ -133,6 +144,8 @@ struct TuningTests {
             "min_utterance_default",
             "hallucination_artifact_phrases",
             "hallucination_vocab_phrases",
+            "whisper_no_speech_threshold",
+            "whisper_logprob_threshold",
         ]
         #expect(Set(t.keys) == expected)
     }
@@ -422,9 +435,11 @@ struct TuningTests {
         // Swift used to take the upper-middle element for even counts while
         // engine.py averages the two middle values — a divergence the golden
         // corpus cannot see (every fixture's quiet frames are uniform).
-        // 10 frames at 1/128 + 10 at 1/64: the two middle values differ, and
-        // the median must be their average (3/256), not the upper-middle
-        // element (1/64).
+        // The amplitudes stay well under the calibration cap (M13): with
+        // fan-level inputs both conventions cap at the speech floor and
+        // the test would pin nothing. 10 frames at 1/1024 + 10 at 1/128:
+        // the two middle values differ, and the median must be their
+        // average (9/2048), not the upper-middle element (1/128).
         var detector = UtteranceDetector(
             sampleRate: Self.sampleRate,
             frameFloor: 0.010,
@@ -435,13 +450,13 @@ struct TuningTests {
         // calibration in production. 20 non-uniform quiet frames, then 14
         // speech frames (0.0625 >= calibrationSpeechFloor — excluded).
         for i in 0..<20 {
-            _ = detector.process(Self.constantFrame(i % 2 == 0 ? 0.0078125 : 0.015625))
+            _ = detector.process(Self.constantFrame(i % 2 == 0 ? 0.0009765625 : 0.0078125))
         }
         for _ in 20..<34 {
             _ = detector.process(Self.constantFrame(0.0625))
         }
-        // Median = (1/128 + 1/64) / 2 = 3/256; utterance gate = 3/256 * 3.
-        #expect(detector.currentEnergyThreshold == (0.0078125 + 0.015625) / 2 * 3.0)
+        // Median = (1/1024 + 1/128) / 2 = 9/2048; utterance gate = 9/2048 * 3.
+        #expect(detector.currentEnergyThreshold == (0.0009765625 + 0.0078125) / 2 * 3.0)
     }
 
     @Test("exactly noiseMinimumSamples quiet frames still calibrates")
@@ -449,19 +464,22 @@ struct TuningTests {
         // The abort boundary is >= noiseMinimumSamples: the minimum count of
         // quiet frames must still adapt. A regression to a strict >
         // comparison — the mirror of engine.py's guard flipping < to <= —
-        // would abort here and leave the static gates in force.
+        // would abort here and leave the static gates in force. The quiet
+        // amplitude (1/128) keeps the raised gate under the calibration
+        // cap (M13) so this still pins the multiplier arithmetic, not the
+        // cap.
         var detector = UtteranceDetector(
             sampleRate: Self.sampleRate,
             frameFloor: 0.010,
             utteranceFloor: 0.008)
 
         for _ in 0..<5 {
-            _ = detector.process(Self.constantFrame(0.015625))  // quiet
+            _ = detector.process(Self.constantFrame(0.0078125))  // quiet
         }
         for _ in 5..<34 {
             _ = detector.process(Self.constantFrame(0.0625))    // speech
         }
-        #expect(detector.currentEnergyThreshold == 0.015625 * 3.0,
+        #expect(detector.currentEnergyThreshold == 0.0078125 * 3.0,
                 "5 quiet frames is exactly noiseMinimumSamples — must adapt")
     }
 
@@ -483,5 +501,91 @@ struct TuningTests {
         }
         #expect(detector.currentEnergyThreshold == 0.008,
                 "4 quiet frames < noiseMinimumSamples — calibration must abort")
+    }
+
+    // MARK: - Calibration cap (M13, wave-2)
+
+    @Test("a noisy median's gate contribution caps at the speech floor")
+    func calibratedGateCapsAtSpeechFloor() throws {
+        // A measured fan-level median (1/64 = 0.015625, the level recorded in
+        // docs/SWIFT-APP.md for a MacBook under load) would raise the
+        // utterance gate to 3/64 ≈ 0.047 — above the speech floor, i.e. a
+        // gate demanding speech louder than speech, which no static floor
+        // setting could counter because the floors are minimums. engine.py
+        // measured exactly this failure for real: median 0.02 → frame gate
+        // 0.07, silently discarding normal talking at ~0.05-0.06 RMS while
+        // lowering frame_energy changed nothing.
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        for _ in 0..<20 {
+            _ = detector.process(Self.constantFrame(0.015625))  // fan level
+        }
+        for _ in 20..<34 {
+            _ = detector.process(Self.constantFrame(0.0625))    // speech — excluded
+        }
+        #expect(detector.currentEnergyThreshold == TranscriptFilter.calibrationSpeechFloor,
+                "the median's contribution must cap at the speech floor, not 0.015625 * 3")
+    }
+
+    @Test("a user floor above the cap applies exactly as set")
+    func userFloorAboveCapTakesEffect() throws {
+        // The cap clamps the median's CONTRIBUTION, not the whole max():
+        // with a user utterance floor of 1/32 above the cap and a
+        // fan-level median, the gate is the user floor — capping the whole
+        // max() instead would silently LOWER a user-set floor to 0.03,
+        // breaking the "floors are minimums" invariant the config docs
+        // promise.
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.03125,
+            utteranceFloor: 0.03125)
+
+        // 1/64 is quiet relative to these floors and under the speech
+        // floor, so it feeds the median; its contribution caps at 0.03,
+        // which the user floor exceeds.
+        for _ in 0..<34 {
+            _ = detector.process(Self.constantFrame(0.015625))
+        }
+        #expect(detector.currentEnergyThreshold == 0.03125,
+                "a user floor above the cap must win — floors are minimums")
+    }
+
+    // MARK: - Auto-stop silence accumulation (M1, wave-2)
+
+    @Test("continuous silence accumulates and resets on speech")
+    func continuousSilenceFeedsAutoStop() throws {
+        // SessionController's auto-stop reads `continuousSilence` and
+        // `isCurrentlySpeaking` — engine.py's `_continuous_silence` and
+        // `not _in_speech`. The counter must grow on every below-gate
+        // frame INCLUDING silence while nobody ever spoke (the walked-away
+        // case auto-stop exists for), and reset only on a speech frame.
+        var detector = UtteranceDetector(
+            sampleRate: Self.sampleRate,
+            frameFloor: 0.010,
+            utteranceFloor: 0.008)
+
+        // 10 silent frames: ~0.3s accumulated, no utterance open.
+        for _ in 0..<10 {
+            _ = detector.process(Self.constantFrame(0.0))
+        }
+        #expect(abs(detector.continuousSilence - 0.3) < 0.001)
+        #expect(!detector.isCurrentlySpeaking)
+
+        // A speech frame resets the accumulator and opens an utterance.
+        _ = detector.process(Self.constantFrame(0.0625))
+        #expect(detector.isCurrentlySpeaking)
+        #expect(detector.continuousSilence == 0)
+
+        // Silence while the utterance is open still accumulates (auto-stop
+        // waits for the utterance to close via `isCurrentlySpeaking`, not by
+        // freezing this counter) — engine.py behaves the same.
+        for _ in 0..<5 {
+            _ = detector.process(Self.constantFrame(0.0))
+        }
+        #expect(detector.isCurrentlySpeaking)
+        #expect(abs(detector.continuousSilence - 0.15) < 0.001)
     }
 }

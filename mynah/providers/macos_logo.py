@@ -1,8 +1,8 @@
-"""Mynah's mark, drawn as a vector — the bird head with the beak open mid-word.
+"""Mynah's mark, drawn as a vector — the round-headed bird with the stubby bill.
 
-The same geometry as `MynahLogo` in the Swift app and `docs/assets/mynah-glyph.svg`:
-one unit-square path, traced from the same drawing, so the three are the same
-bird rather than three drifting copies of one. Vector rather than an image
+The same geometry as `MynahLogo` in the Swift app and
+`docs/assets/mynah-glyph.svg`: the coordinates are GENERATED from one source, so
+the copies cannot drift apart. Vector rather than an image
 asset, because a pipx install ships no resources — and because it stays crisp
 from a 16px menu bar item up to the pill.
 
@@ -19,7 +19,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Where the eye sits, in the same unit square, and how big it is.
-_EYE = (0.551, 0.344, 0.043)
+_EYE = (0.5385, 0.4904, 0.1154)
 
 
 def draw_mynah_logo(appkit: Any, rect: Any, color: Any) -> None:
@@ -44,36 +44,33 @@ def draw_mynah_logo(appkit: Any, rect: Any, color: Any) -> None:
             return NSPoint(ox + x * side, oy + (1.0 - y) * side)
 
         path = appkit.NSBezierPath.alloc().init()
-        # crest
-        path.moveToPoint_(at(0.3594, 0.1602))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.3789, 0.043), at(0.3359, 0.1133), at(0.3438, 0.0703))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.4375, 0.1367), at(0.3828, 0.0859), at(0.4023, 0.1172))
+        # the head
+        path.moveToPoint_(at(0.6731, 0.4615))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.4231, 0.2115), at(0.6635, 0.3269), at(0.5673, 0.2212))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.0673, 0.5481), at(0.2308, 0.2019), at(0.0673, 0.3558))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.2885, 0.875), at(0.0673, 0.7019), at(0.1538, 0.8269))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.625, 0.8077), at(0.4135, 0.9231), at(0.5481, 0.8942))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.6731, 0.4615), at(0.6635, 0.7212), at(0.6779, 0.5865))
         path.closePath()
-        # head and shoulder
-        path.moveToPoint_(at(0.4062, 0.1562))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.7109, 0.4453), at(0.5781, 0.1562), at(0.7109, 0.2812))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.6953, 0.5352), at(0.7109, 0.4766), at(0.707, 0.5078))
-        path.lineToPoint_(at(0.7812, 0.5508))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.793, 0.5977), at(0.8047, 0.5547), at(0.8125, 0.582))
-        path.lineToPoint_(at(0.6758, 0.6953))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.5, 0.7578), at(0.6289, 0.7344), at(0.5664, 0.7578))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.1797, 0.4453), at(0.3203, 0.7578), at(0.1797, 0.6211))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.4062, 0.1562), at(0.1797, 0.2695), at(0.2266, 0.1562))
+        # the crest, three feathers
+        path.moveToPoint_(at(0.3173, 0.2404))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.3462, 0.0577), at(0.2788, 0.1538), at(0.2885, 0.0962))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.4327, 0.2019), at(0.3558, 0.125), at(0.3846, 0.1731))
         path.closePath()
-        # beak, open mid-word
-        path.moveToPoint_(at(0.6797, 0.375))
-        path.lineToPoint_(at(0.9219, 0.3984))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.9336, 0.4297), at(0.9375, 0.3984), at(0.9453, 0.418))
-        path.lineToPoint_(at(0.8789, 0.4766))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.8516, 0.4805), at(0.8711, 0.4844), at(0.8594, 0.4844))
-        path.lineToPoint_(at(0.6797, 0.4219))
+        path.moveToPoint_(at(0.4519, 0.1923))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.5288, 0.0481), at(0.4327, 0.1058), at(0.4615, 0.0577))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.5577, 0.2115), at(0.5192, 0.1154), at(0.5288, 0.1635))
         path.closePath()
-        path.moveToPoint_(at(0.6875, 0.4766))
-        path.lineToPoint_(at(0.8906, 0.5078))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.8906, 0.5352), at(0.9062, 0.5117), at(0.9062, 0.5312))
-        path.lineToPoint_(at(0.7734, 0.5664))
-        path.curveToPoint_controlPoint1_controlPoint2_(at(0.7539, 0.5586), at(0.7656, 0.5703), at(0.7578, 0.5664))
-        path.lineToPoint_(at(0.6875, 0.5))
+        path.moveToPoint_(at(0.2404, 0.2885))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.1923, 0.125), at(0.1731, 0.2308), at(0.1538, 0.1731))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.3077, 0.2404), at(0.2212, 0.1827), at(0.2596, 0.2212))
+        path.closePath()
+        # the bill: short, straight, blunt
+        path.moveToPoint_(at(0.6635, 0.4231))
+        path.lineToPoint_(at(0.8942, 0.4904))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.8942, 0.5673), at(0.9327, 0.5048), at(0.9327, 0.5529))
+        path.lineToPoint_(at(0.6635, 0.625))
+        path.curveToPoint_controlPoint1_controlPoint2_(at(0.6635, 0.4231), at(0.6442, 0.5577), at(0.6442, 0.4904))
         path.closePath()
 
         # the eye, as a hole in the silhouette

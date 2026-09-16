@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mynah · say it, and it types where you are</title>
+<meta name="description" content="Mynah is local voice dictation for Linux and macOS: press a key, talk, and your words land in whatever window has focus — as you pause, not when you stop. Nothing leaves your machine.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="mynah · say it, and it types where you are">
+<meta property="og:description" content="Press a key, talk, and the words land in the window you are already in — as you pause, not when you stop. Local speech, no account, no API key.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://duduphudu.app/mynah/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='52' fill='%23F5B301'/%3E%3Cpath fill-rule='evenodd' fill='%230C0B0E' d='M92.01 41.01 C85.99 29.00 88.01 18.00 97.00 11.01 C98.00 21.99 102.99 30.00 112.00 35.00 Z M103.99 39.99 C147.99 39.99 181.99 71.99 181.99 114.00 C181.99 122.01 180.99 130.00 178.00 137.01 L199.99 141.00 C206.00 142.00 208.00 148.99 203.01 153.01 L173.00 178.00 C161.00 188.01 145.00 194.00 128.00 194.00 C82.00 194.00 46.00 159.00 46.00 114.00 C46.00 68.99 58.01 39.99 103.99 39.99 Z M174.00 96.00 L236.01 101.99 C240.00 101.99 242.00 107.01 239.00 110.00 L225.00 122.01 C223.00 124.01 220.01 124.01 218.01 123.01 L174.00 108.01 Z M176.00 122.01 L227.99 130.00 C231.99 131.00 231.99 135.99 227.99 137.01 L197.99 145.00 C195.99 146.00 194.00 145.00 193.00 143.00 L176.00 128.00 Z M130 88a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500&family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400..700&display=swap">
+<style>
+  :root {
+    --paper: #FBF7EF;
+    --ground: #F4EFE4;
+    --surface: #FFFCF6;
+    --sunk: #EDE6D8;
+    --ink: #17150F;
+    --muted: #6A6152;
+    --rule: #DDD4C2;
+    --chip: #E9E1D1;
+    --bird: #0C0B0E;
+    --saffron: #A96B00;
+    --saffron-bright: #F5B301;
+    --beak: #C2551A;
+    --typed: #14705C;
+    --display: "Fraunces", Georgia, serif;
+    --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "Azeret Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #17161B;
+      --ground: #100F13;
+      --surface: #1B1A21;
+      --sunk: #151419;
+      --ink: #F3EFE6;
+      --muted: #9C948A;
+      --rule: #2C2A33;
+      --chip: #22212A;
+      --bird: #F3EFE6;
+      --saffron: #F5B301;
+      --saffron-bright: #F5B301;
+      --beak: #FF8A3D;
+      --typed: #3FBF9A;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #17161B; --ground: #100F13; --surface: #1B1A21; --sunk: #151419;
+    --ink: #F3EFE6; --muted: #9C948A; --rule: #2C2A33; --chip: #22212A;
+    --bird: #F3EFE6; --saffron: #F5B301; --saffron-bright: #F5B301; --beak: #FF8A3D; --typed: #3FBF9A;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.62 var(--body);
+    padding-inline: 20px;
+    padding-block: 0 72px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1040px; margin: 0 auto; }
+  p { margin: 0 0 14px; max-width: 64ch; }
+  a { color: var(--saffron); text-underline-offset: .18em; }
+  a:focus-visible { outline: 2px solid var(--saffron); outline-offset: 3px; border-radius: 4px; }
+  code { font-family: var(--mono); font-size: .84em; background: var(--chip); padding: .1em .38em; border-radius: 5px; overflow-wrap: anywhere; }
+  b, strong { font-weight: 700; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .label { font: 500 11.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; padding-block: 18px; border-bottom: 1px solid var(--rule); }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font: 600 1.34rem/1 var(--display); font-variation-settings: "opsz" 24, "SOFT" 40; letter-spacing: -.01em; }
+  .brand svg { width: 30px; height: 30px; }
+  .nav-links { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 13px/1.5 var(--mono); }
+  .nav-links a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; }
+  .nav-links a:hover { color: var(--saffron); border-color: currentColor; }
+
+  .hero { display: grid; gap: 34px; padding-block: 58px 34px; align-items: center; }
+  @media (min-width: 900px) { .hero { grid-template-columns: minmax(0, 1fr) 320px; } }
+  h1 {
+    font-family: var(--display);
+    font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 1;
+    font-weight: 600;
+    font-size: clamp(2.6rem, 6.4vw, 4.4rem);
+    line-height: 1.02;
+    letter-spacing: -.022em;
+    margin: 0 0 18px;
+    max-width: 16ch;
+    text-wrap: balance;
+  }
+  h1 em { font-style: italic; color: var(--saffron); }
+  .lede { font-size: clamp(1.02rem, 1.5vw, 1.16rem); color: var(--muted); max-width: 52ch; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 0; }
+  .button { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 999px; border: 1px solid var(--ink); color: var(--ink); text-decoration: none; font: 600 .94rem/1 var(--body); }
+  .button.primary { background: var(--ink); color: var(--paper); font-family: var(--mono); font-weight: 500; position: relative; cursor: pointer; }
+  .button.primary .copied { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 999px; background: var(--saffron-bright); color: #17150F; opacity: 0; transition: opacity .16s ease; }
+  .button.primary.done .copied { opacity: 1; }
+  .button:hover { border-color: var(--saffron); color: var(--saffron); }
+  .button.primary:hover { background: var(--saffron-bright); border-color: var(--saffron-bright); color: #17150F; }
+  .button:focus-visible { outline: 2px solid var(--saffron); outline-offset: 3px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; }
+  .facts li { font: 500 11.5px/1 var(--mono); letter-spacing: .03em; padding: 8px 12px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+
+  .hero-bird { margin: 0; display: grid; justify-items: center; gap: 12px; }
+  .hero-bird svg { width: min(320px, 78vw); height: auto; }
+  .hero-bird figcaption { font: 400 12px/1.5 var(--mono); color: var(--muted); text-align: center; }
+  .say path { opacity: .3; animation: say 3.6s ease-in-out infinite; }
+  .say-2 { animation-delay: .22s; }
+  @keyframes say { 0%, 10% { opacity: .3; transform: translateX(-3px); } 32% { opacity: 1; transform: none; } 64% { opacity: .62; } 86%, 100% { opacity: .3; transform: translateX(-3px); } }
+  @media (prefers-reduced-motion: reduce) { .say path { animation: none; opacity: .8; } }
+
+  section { padding-block: 46px; border-top: 1px solid var(--rule); }
+  h2 { font: 600 clamp(1.7rem, 3.4vw, 2.4rem)/1.12 var(--display); font-variation-settings: "opsz" 72, "SOFT" 30, "WONK" 1; letter-spacing: -.018em; margin: 0 0 16px; max-width: 24ch; text-wrap: balance; }
+  h3 { font: 700 1rem/1.35 var(--body); margin: 0 0 6px; }
+  .section-lede { color: var(--muted); max-width: 62ch; }
+  .section-lede b { color: var(--ink); }
+  .two { display: grid; gap: 26px; }
+  @media (min-width: 880px) { .two { grid-template-columns: 1fr 1fr; gap: 36px; align-items: start; } }
+
+  .states { display: grid; gap: 18px; margin-top: 28px; }
+  @media (min-width: 760px) { .states { grid-template-columns: repeat(3, 1fr); } }
+  .state { border: 1px solid var(--rule); border-radius: 16px; background: var(--surface); padding: 22px; }
+  .pill { display: inline-flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--rule); margin-bottom: 16px; }
+  .pill-bird { width: 22px; height: 22px; }
+  .pill-level { width: 45px; height: 28px; }
+  .state p { color: var(--muted); font-size: .94rem; margin: 0; }
+
+  .tape { margin: 28px 0 0; border: 1px solid var(--rule); border-radius: 16px; background: var(--surface); padding: 24px; overflow: hidden; }
+  .tape svg { width: 100%; height: auto; display: block; }
+  .tape figcaption { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between; font: 500 11.5px/1.5 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+  .typed { font: 500 12px var(--mono); fill: var(--typed); }
+
+  pre { margin: 20px 0 0; padding: 18px 20px; background: var(--sunk); border: 1px solid var(--rule); border-radius: 12px; overflow-x: auto; font: 400 13px/1.7 var(--mono); }
+  pre .cmd { color: var(--saffron); }
+  pre .dim { color: var(--muted); }
+  pre .ok { color: var(--typed); }
+  blockquote { margin: 22px 0 0; padding: 16px 20px; border-left: 3px solid var(--saffron); background: var(--surface); border-radius: 0 12px 12px 0; color: var(--muted); }
+  blockquote b { color: var(--ink); }
+
+  .scroll { overflow-x: auto; margin-top: 26px; }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: .94rem; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th { font: 500 11.5px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  tbody th { font-weight: 500; }
+  td.shared { color: var(--typed); background: color-mix(in srgb, var(--typed) 9%, transparent); border-radius: 8px; }
+  .settings td:first-child { font-family: var(--mono); font-size: .86rem; }
+
+  .note { font-size: .88rem; color: var(--muted); }
+  .footer { border-top: 1px solid var(--rule); padding-top: 26px; margin-top: 46px; display: flex; flex-wrap: wrap; gap: 14px 26px; justify-content: space-between; align-items: baseline; font-size: .9rem; color: var(--muted); }
+  .footer a { color: var(--muted); }
+  .footer a:hover { color: var(--saffron); }
+  .footer-links { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--mono); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="nav">
+  <a class="brand" href="#top">
+    <svg viewBox="0 0 256 256" aria-hidden="true">
+      <path fill-rule="evenodd" fill="var(--bird)" d="M92.01 41.01 C85.99 29.00 88.01 18.00 97.00 11.01 C98.00 21.99 102.99 30.00 112.00 35.00 Z M103.99 39.99 C147.99 39.99 181.99 71.99 181.99 114.00 C181.99 122.01 180.99 130.00 178.00 137.01 L199.99 141.00 C206.00 142.00 208.00 148.99 203.01 153.01 L173.00 178.00 C161.00 188.01 145.00 194.00 128.00 194.00 C82.00 194.00 46.00 159.00 46.00 114.00 C46.00 68.99 58.01 39.99 103.99 39.99 Z M174.00 96.00 L236.01 101.99 C240.00 101.99 242.00 107.01 239.00 110.00 L225.00 122.01 C223.00 124.01 220.01 124.01 218.01 123.01 L174.00 108.01 Z M176.00 122.01 L227.99 130.00 C231.99 131.00 231.99 135.99 227.99 137.01 L197.99 145.00 C195.99 146.00 194.00 145.00 193.00 143.00 L176.00 128.00 Z M130 88a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z"/>
+    </svg>
+    mynah
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#session">A session</a>
+    <a href="#pause">As you pause</a>
+    <a href="#tuned">Tuned</a>
+    <a href="#local">Local</a>
+    <a href="#platforms">Where it runs</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/ReidenXerx/mynah">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+
+<section class="hero" style="border-top: 0;">
+  <div>
+    <p class="label">mynah · the bird that repeats what it hears</p>
+    <h1>Say it. It types <em>where you are</em>.</h1>
+    <p class="lede">Press a key and talk. Your words land in whatever window has focus — a commit message, a chat, a form — <b>as you pause, not when you stop.</b> The speech never leaves the machine you are sitting at.</p>
+    <div class="cta">
+      <button class="button primary" type="button" data-copy="pipx install git+https://github.com/ReidenXerx/mynah.git">
+        <span>pipx install …/mynah.git</span><span class="copied" aria-hidden="true">copied</span>
+      </button>
+      <a class="button" href="https://github.com/ReidenXerx/mynah">Read the source</a>
+      <a class="button" href="#install">Install</a>
+    </div>
+    <ul class="facts">
+      <li>no account · no API key</li>
+      <li>macOS today · Linux in progress</li>
+      <li>MIT</li>
+    </ul>
+  </div>
+  <figure class="hero-bird">
+    <svg viewBox="0 0 300 256" role="img" aria-label="Mynah's mark: the bird in profile, beak open mid-word.">
+      <path d="M92.01 41.01 C85.99 29.00 88.01 18.00 97.00 11.01 C98.00 21.99 102.99 30.00 112.00 35.00 Z" fill="var(--bird)"/>
+      <path d="M103.99 39.99 C147.99 39.99 181.99 71.99 181.99 114.00 C181.99 122.01 180.99 130.00 178.00 137.01 L199.99 141.00 C206.00 142.00 208.00 148.99 203.01 153.01 L173.00 178.00 C161.00 188.01 145.00 194.00 128.00 194.00 C82.00 194.00 46.00 159.00 46.00 114.00 C46.00 68.99 58.01 39.99 103.99 39.99 Z" fill="var(--bird)"/>
+      <path d="M174.00 96.00 L236.01 101.99 C240.00 101.99 242.00 107.01 239.00 110.00 L225.00 122.01 C223.00 124.01 220.01 124.01 218.01 123.01 L174.00 108.01 Z" fill="var(--beak)"/>
+      <path d="M176.00 122.01 L227.99 130.00 C231.99 131.00 231.99 135.99 227.99 137.01 L197.99 145.00 C195.99 146.00 194.00 145.00 193.00 143.00 L176.00 128.00 Z" fill="var(--beak)" opacity=".88"/>
+      <circle cx="141" cy="88" r="14" fill="var(--paper)"/>
+      <circle cx="145" cy="89" r="6.5" fill="var(--bird)"/>
+      <g class="say" fill="none" stroke="var(--saffron)" stroke-width="9" stroke-linecap="round">
+        <path class="say-1" d="M250 96c7 11 7 26 0 37"/>
+        <path class="say-2" d="M272 82c11 17 11 42 0 59"/>
+      </g>
+    </svg>
+    <figcaption>the bird that says back what it hears</figcaption>
+  </figure>
+</section>
+
+<section id="session">
+  <p class="label">What it is like</p>
+  <h2>Three states, and only one of them is on screen</h2>
+  <p class="section-lede">There is no window to arrange and no app to switch to. A pill shows what Mynah is doing, the menu bar or tray item carries start, stop and quit, and the rest of the time you are simply typing — with your voice.</p>
+  <div class="states">
+      <article class="state">
+        <div class="pill" style="--state: var(--muted)">
+          <svg class="pill-bird" viewBox="0 0 256 256" aria-hidden="true">
+            <path fill-rule="evenodd" fill="var(--muted)" d="M92.01 41.01 C85.99 29.00 88.01 18.00 97.00 11.01 C98.00 21.99 102.99 30.00 112.00 35.00 Z M103.99 39.99 C147.99 39.99 181.99 71.99 181.99 114.00 C181.99 122.01 180.99 130.00 178.00 137.01 L199.99 141.00 C206.00 142.00 208.00 148.99 203.01 153.01 L173.00 178.00 C161.00 188.01 145.00 194.00 128.00 194.00 C82.00 194.00 46.00 159.00 46.00 114.00 C46.00 68.99 58.01 39.99 103.99 39.99 Z M174.00 96.00 L236.01 101.99 C240.00 101.99 242.00 107.01 239.00 110.00 L225.00 122.01 C223.00 124.01 220.01 124.01 218.01 123.01 L174.00 108.01 Z M176.00 122.01 L227.99 130.00 C231.99 131.00 231.99 135.99 227.99 137.01 L197.99 145.00 C195.99 146.00 194.00 145.00 193.00 143.00 L176.00 128.00 Z M130 88a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z"/>
+          </svg>
+          <svg class="pill-level" viewBox="0 0 45 28" aria-hidden="true"><rect x="0" y="11" width="5" height="6" rx="2.5" fill="var(--muted)" opacity="0.45"/><rect x="9" y="11" width="5" height="6" rx="2.5" fill="var(--muted)" opacity="0.45"/><rect x="18" y="11" width="5" height="6" rx="2.5" fill="var(--muted)" opacity="0.45"/><rect x="27" y="11" width="5" height="6" rx="2.5" fill="var(--muted)" opacity="0.45"/><rect x="36" y="11" width="5" height="6" rx="2.5" fill="var(--muted)" opacity="0.45"/></svg>
+        </div>
+        <h3>idle</h3>
+        <p>the hotkey is armed, nothing is listening</p>
+      </article>
+      <article class="state">
+        <div class="pill" style="--state: var(--saffron)">
+          <svg class="pill-bird" viewBox="0 0 256 256" aria-hidden="true">
+            <path fill-rule="evenodd" fill="var(--saffron)" d="M92.01 41.01 C85.99 29.00 88.01 18.00 97.00 11.01 C98.00 21.99 102.99 30.00 112.00 35.00 Z M103.99 39.99 C147.99 39.99 181.99 71.99 181.99 114.00 C181.99 122.01 180.99 130.00 178.00 137.01 L199.99 141.00 C206.00 142.00 208.00 148.99 203.01 153.01 L173.00 178.00 C161.00 188.01 145.00 194.00 128.00 194.00 C82.00 194.00 46.00 159.00 46.00 114.00 C46.00 68.99 58.01 39.99 103.99 39.99 Z M174.00 96.00 L236.01 101.99 C240.00 101.99 242.00 107.01 239.00 110.00 L225.00 122.01 C223.00 124.01 220.01 124.01 218.01 123.01 L174.00 108.01 Z M176.00 122.01 L227.99 130.00 C231.99 131.00 231.99 135.99 227.99 137.01 L197.99 145.00 C195.99 146.00 194.00 145.00 193.00 143.00 L176.00 128.00 Z M130 88a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z"/>
+          </svg>
+          <svg class="pill-level" viewBox="0 0 45 28" aria-hidden="true"><rect x="0" y="10" width="5" height="8" rx="2.5" fill="var(--saffron)" opacity="1"/><rect x="9" y="5" width="5" height="18" rx="2.5" fill="var(--saffron)" opacity="1"/><rect x="18" y="1" width="5" height="26" rx="2.5" fill="var(--saffron)" opacity="1"/><rect x="27" y="6" width="5" height="16" rx="2.5" fill="var(--saffron)" opacity="1"/><rect x="36" y="9" width="5" height="10" rx="2.5" fill="var(--saffron)" opacity="1"/></svg>
+        </div>
+        <h3>listening</h3>
+        <p>your level, live — this is the only thing on screen</p>
+      </article>
+      <article class="state">
+        <div class="pill" style="--state: var(--beak)">
+          <svg class="pill-bird" viewBox="0 0 256 256" aria-hidden="true">
+            <path fill-rule="evenodd" fill="var(--beak)" d="M92.01 41.01 C85.99 29.00 88.01 18.00 97.00 11.01 C98.00 21.99 102.99 30.00 112.00 35.00 Z M103.99 39.99 C147.99 39.99 181.99 71.99 181.99 114.00 C181.99 122.01 180.99 130.00 178.00 137.01 L199.99 141.00 C206.00 142.00 208.00 148.99 203.01 153.01 L173.00 178.00 C161.00 188.01 145.00 194.00 128.00 194.00 C82.00 194.00 46.00 159.00 46.00 114.00 C46.00 68.99 58.01 39.99 103.99 39.99 Z M174.00 96.00 L236.01 101.99 C240.00 101.99 242.00 107.01 239.00 110.00 L225.00 122.01 C223.00 124.01 220.01 124.01 218.01 123.01 L174.00 108.01 Z M176.00 122.01 L227.99 130.00 C231.99 131.00 231.99 135.99 227.99 137.01 L197.99 145.00 C195.99 146.00 194.00 145.00 193.00 143.00 L176.00 128.00 Z M130 88a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z"/>
+          </svg>
+          <svg class="pill-level" viewBox="0 0 45 28" aria-hidden="true"><rect x="0" y="10" width="5" height="8" rx="2.5" fill="var(--beak)" opacity="1"/><rect x="9" y="5" width="5" height="18" rx="2.5" fill="var(--beak)" opacity="1"/><rect x="18" y="1" width="5" height="26" rx="2.5" fill="var(--beak)" opacity="1"/><rect x="27" y="6" width="5" height="16" rx="2.5" fill="var(--beak)" opacity="1"/><rect x="36" y="9" width="5" height="10" rx="2.5" fill="var(--beak)" opacity="1"/></svg>
+        </div>
+        <h3>transcribing</h3>
+        <p>you paused; that utterance is going into the app</p>
+      </article>
+  </div>
+  <p class="note" style="margin-top: 18px;">The model stays warm for 45 seconds after you finish, so back-to-back dictation is instant. Then it unloads, and Mynah costs nothing until the next time you press the key.</p>
+</section>
+
+<section id="pause">
+  <p class="label">The difference</p>
+  <h2>Text lands in the gaps, not at the end</h2>
+  <p class="section-lede">Most dictation tools wait until you stop talking, hand the whole recording to a model and paste the result. Mynah splits what you say into <b>utterances</b> and types each one the moment you pause — so a long thought arrives in pieces you can watch, and a short one arrives immediately.</p>
+
+  <figure class="tape">
+    <figcaption><span>one session · four utterances</span><span>typed as they close</span></figcaption>
+    <svg viewBox="0 0 880 104" role="img" aria-label="Four bursts of speech, each typed into the window during the pause that follows it.">
+      <rect x="0.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="6.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="12.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="18.0" y="8.6" width="3.2" height="34.7" rx="1.6" fill="var(--saffron)"/><rect x="24.0" y="6.9" width="3.2" height="38.3" rx="1.6" fill="var(--saffron)"/><rect x="30.0" y="6.1" width="3.2" height="39.9" rx="1.6" fill="var(--saffron)"/><rect x="36.0" y="3.9" width="3.2" height="44.3" rx="1.6" fill="var(--saffron)"/><rect x="42.0" y="6.9" width="3.2" height="38.2" rx="1.6" fill="var(--saffron)"/><rect x="48.0" y="4.2" width="3.2" height="43.7" rx="1.6" fill="var(--saffron)"/><rect x="54.0" y="17.5" width="3.2" height="17.0" rx="1.6" fill="var(--saffron)"/><rect x="60.0" y="11.0" width="3.2" height="30.0" rx="1.6" fill="var(--saffron)"/><rect x="66.0" y="3.8" width="3.2" height="44.3" rx="1.6" fill="var(--saffron)"/><rect x="72.0" y="8.2" width="3.2" height="35.5" rx="1.6" fill="var(--saffron)"/><rect x="78.0" y="4.5" width="3.2" height="43.0" rx="1.6" fill="var(--saffron)"/><rect x="84.0" y="16.3" width="3.2" height="19.5" rx="1.6" fill="var(--saffron)"/><rect x="90.0" y="10.9" width="3.2" height="30.1" rx="1.6" fill="var(--saffron)"/><rect x="96.0" y="14.3" width="3.2" height="23.5" rx="1.6" fill="var(--saffron)"/><rect x="102.0" y="9.8" width="3.2" height="32.4" rx="1.6" fill="var(--saffron)"/><rect x="108.0" y="9.4" width="3.2" height="33.3" rx="1.6" fill="var(--saffron)"/><rect x="114.0" y="17.8" width="3.2" height="16.5" rx="1.6" fill="var(--saffron)"/><rect x="120.0" y="14.7" width="3.2" height="22.6" rx="1.6" fill="var(--saffron)"/><rect x="126.0" y="13.8" width="3.2" height="24.5" rx="1.6" fill="var(--saffron)"/><rect x="132.0" y="4.3" width="3.2" height="43.5" rx="1.6" fill="var(--saffron)"/><rect x="138.0" y="6.5" width="3.2" height="39.0" rx="1.6" fill="var(--saffron)"/><rect x="144.0" y="15.6" width="3.2" height="20.9" rx="1.6" fill="var(--saffron)"/><rect x="150.0" y="6.0" width="3.2" height="39.9" rx="1.6" fill="var(--saffron)"/><rect x="156.0" y="15.9" width="3.2" height="20.2" rx="1.6" fill="var(--saffron)"/><rect x="162.0" y="8.7" width="3.2" height="34.6" rx="1.6" fill="var(--saffron)"/><rect x="168.0" y="16.1" width="3.2" height="19.9" rx="1.6" fill="var(--saffron)"/><rect x="174.0" y="17.9" width="3.2" height="16.2" rx="1.6" fill="var(--saffron)"/><rect x="180.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="186.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="192.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="198.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="204.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="210.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="216.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="222.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="228.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="234.0" y="4.9" width="3.2" height="42.2" rx="1.6" fill="var(--saffron)"/><rect x="240.0" y="14.8" width="3.2" height="22.4" rx="1.6" fill="var(--saffron)"/><rect x="246.0" y="14.7" width="3.2" height="22.5" rx="1.6" fill="var(--saffron)"/><rect x="252.0" y="3.3" width="3.2" height="45.5" rx="1.6" fill="var(--saffron)"/><rect x="258.0" y="4.9" width="3.2" height="42.2" rx="1.6" fill="var(--saffron)"/><rect x="264.0" y="13.6" width="3.2" height="24.8" rx="1.6" fill="var(--saffron)"/><rect x="270.0" y="3.6" width="3.2" height="44.8" rx="1.6" fill="var(--saffron)"/><rect x="276.0" y="9.9" width="3.2" height="32.2" rx="1.6" fill="var(--saffron)"/><rect x="282.0" y="7.8" width="3.2" height="36.4" rx="1.6" fill="var(--saffron)"/><rect x="288.0" y="14.9" width="3.2" height="22.2" rx="1.6" fill="var(--saffron)"/><rect x="294.0" y="3.9" width="3.2" height="44.2" rx="1.6" fill="var(--saffron)"/><rect x="300.0" y="7.6" width="3.2" height="36.8" rx="1.6" fill="var(--saffron)"/><rect x="306.0" y="3.5" width="3.2" height="45.0" rx="1.6" fill="var(--saffron)"/><rect x="312.0" y="4.6" width="3.2" height="42.8" rx="1.6" fill="var(--saffron)"/><rect x="318.0" y="13.5" width="3.2" height="25.0" rx="1.6" fill="var(--saffron)"/><rect x="324.0" y="12.6" width="3.2" height="26.9" rx="1.6" fill="var(--saffron)"/><rect x="330.0" y="15.5" width="3.2" height="21.1" rx="1.6" fill="var(--saffron)"/><rect x="336.0" y="15.8" width="3.2" height="20.5" rx="1.6" fill="var(--saffron)"/><rect x="342.0" y="17.0" width="3.2" height="18.0" rx="1.6" fill="var(--saffron)"/><rect x="348.0" y="13.4" width="3.2" height="25.1" rx="1.6" fill="var(--saffron)"/><rect x="354.0" y="8.9" width="3.2" height="34.1" rx="1.6" fill="var(--saffron)"/><rect x="360.0" y="17.9" width="3.2" height="16.2" rx="1.6" fill="var(--saffron)"/><rect x="366.0" y="7.8" width="3.2" height="36.4" rx="1.6" fill="var(--saffron)"/><rect x="372.0" y="12.9" width="3.2" height="26.2" rx="1.6" fill="var(--saffron)"/><rect x="378.0" y="13.3" width="3.2" height="25.4" rx="1.6" fill="var(--saffron)"/><rect x="384.0" y="5.7" width="3.2" height="40.6" rx="1.6" fill="var(--saffron)"/><rect x="390.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="396.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="402.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="408.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="414.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="420.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="426.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="432.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="438.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="444.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="450.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="456.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="462.0" y="10.8" width="3.2" height="30.5" rx="1.6" fill="var(--saffron)"/><rect x="468.0" y="13.2" width="3.2" height="25.5" rx="1.6" fill="var(--saffron)"/><rect x="474.0" y="10.8" width="3.2" height="30.5" rx="1.6" fill="var(--saffron)"/><rect x="480.0" y="7.4" width="3.2" height="37.2" rx="1.6" fill="var(--saffron)"/><rect x="486.0" y="17.1" width="3.2" height="17.8" rx="1.6" fill="var(--saffron)"/><rect x="492.0" y="3.4" width="3.2" height="45.3" rx="1.6" fill="var(--saffron)"/><rect x="498.0" y="17.6" width="3.2" height="16.8" rx="1.6" fill="var(--saffron)"/><rect x="504.0" y="6.7" width="3.2" height="38.5" rx="1.6" fill="var(--saffron)"/><rect x="510.0" y="5.3" width="3.2" height="41.4" rx="1.6" fill="var(--saffron)"/><rect x="516.0" y="17.7" width="3.2" height="16.6" rx="1.6" fill="var(--saffron)"/><rect x="522.0" y="6.2" width="3.2" height="39.7" rx="1.6" fill="var(--saffron)"/><rect x="528.0" y="12.5" width="3.2" height="27.0" rx="1.6" fill="var(--saffron)"/><rect x="534.0" y="9.3" width="3.2" height="33.4" rx="1.6" fill="var(--saffron)"/><rect x="540.0" y="17.8" width="3.2" height="16.4" rx="1.6" fill="var(--saffron)"/><rect x="546.0" y="17.3" width="3.2" height="17.5" rx="1.6" fill="var(--saffron)"/><rect x="552.0" y="15.2" width="3.2" height="21.5" rx="1.6" fill="var(--saffron)"/><rect x="558.0" y="3.7" width="3.2" height="44.7" rx="1.6" fill="var(--saffron)"/><rect x="564.0" y="15.0" width="3.2" height="22.0" rx="1.6" fill="var(--saffron)"/><rect x="570.0" y="6.7" width="3.2" height="38.7" rx="1.6" fill="var(--saffron)"/><rect x="576.0" y="4.1" width="3.2" height="43.9" rx="1.6" fill="var(--saffron)"/><rect x="582.0" y="3.9" width="3.2" height="44.3" rx="1.6" fill="var(--saffron)"/><rect x="588.0" y="12.8" width="3.2" height="26.4" rx="1.6" fill="var(--saffron)"/><rect x="594.0" y="12.6" width="3.2" height="26.7" rx="1.6" fill="var(--saffron)"/><rect x="600.0" y="10.1" width="3.2" height="31.8" rx="1.6" fill="var(--saffron)"/><rect x="606.0" y="6.4" width="3.2" height="39.3" rx="1.6" fill="var(--saffron)"/><rect x="612.0" y="16.3" width="3.2" height="19.3" rx="1.6" fill="var(--saffron)"/><rect x="618.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="624.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="630.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="636.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="642.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="648.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="654.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="660.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="666.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="672.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="678.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="684.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><rect x="690.0" y="6.8" width="3.2" height="38.5" rx="1.6" fill="var(--saffron)"/><rect x="696.0" y="6.0" width="3.2" height="39.9" rx="1.6" fill="var(--saffron)"/><rect x="702.0" y="5.1" width="3.2" height="41.8" rx="1.6" fill="var(--saffron)"/><rect x="708.0" y="17.4" width="3.2" height="17.2" rx="1.6" fill="var(--saffron)"/><rect x="714.0" y="3.8" width="3.2" height="44.4" rx="1.6" fill="var(--saffron)"/><rect x="720.0" y="16.6" width="3.2" height="18.8" rx="1.6" fill="var(--saffron)"/><rect x="726.0" y="12.9" width="3.2" height="26.3" rx="1.6" fill="var(--saffron)"/><rect x="732.0" y="8.8" width="3.2" height="34.4" rx="1.6" fill="var(--saffron)"/><rect x="738.0" y="4.2" width="3.2" height="43.6" rx="1.6" fill="var(--saffron)"/><rect x="744.0" y="12.9" width="3.2" height="26.3" rx="1.6" fill="var(--saffron)"/><rect x="750.0" y="4.1" width="3.2" height="43.7" rx="1.6" fill="var(--saffron)"/><rect x="756.0" y="9.8" width="3.2" height="32.4" rx="1.6" fill="var(--saffron)"/><rect x="762.0" y="13.3" width="3.2" height="25.4" rx="1.6" fill="var(--saffron)"/><rect x="768.0" y="13.2" width="3.2" height="25.6" rx="1.6" fill="var(--saffron)"/><rect x="774.0" y="15.3" width="3.2" height="21.4" rx="1.6" fill="var(--saffron)"/><rect x="780.0" y="16.8" width="3.2" height="18.4" rx="1.6" fill="var(--saffron)"/><rect x="786.0" y="15.7" width="3.2" height="20.6" rx="1.6" fill="var(--saffron)"/><rect x="792.0" y="7.6" width="3.2" height="36.7" rx="1.6" fill="var(--saffron)"/><rect x="798.0" y="3.0" width="3.2" height="45.9" rx="1.6" fill="var(--saffron)"/><rect x="804.0" y="15.5" width="3.2" height="20.9" rx="1.6" fill="var(--saffron)"/><rect x="810.0" y="17.2" width="3.2" height="17.6" rx="1.6" fill="var(--saffron)"/><rect x="816.0" y="3.2" width="3.2" height="45.6" rx="1.6" fill="var(--saffron)"/><rect x="822.0" y="10.0" width="3.2" height="32.1" rx="1.6" fill="var(--saffron)"/><rect x="828.0" y="11.9" width="3.2" height="28.2" rx="1.6" fill="var(--saffron)"/><rect x="834.0" y="14.4" width="3.2" height="23.2" rx="1.6" fill="var(--saffron)"/><rect x="840.0" y="9.1" width="3.2" height="33.9" rx="1.6" fill="var(--saffron)"/><rect x="846.0" y="5.6" width="3.2" height="40.8" rx="1.6" fill="var(--saffron)"/><rect x="852.0" y="11.1" width="3.2" height="29.7" rx="1.6" fill="var(--saffron)"/><rect x="858.0" y="11.6" width="3.2" height="28.7" rx="1.6" fill="var(--saffron)"/><rect x="864.0" y="17.1" width="3.2" height="17.8" rx="1.6" fill="var(--saffron)"/><rect x="870.0" y="4.3" width="3.2" height="43.5" rx="1.6" fill="var(--saffron)"/><rect x="876.0" y="24.8" width="3.2" height="2.5" rx="1.6" fill="var(--rule)"/><path d="M97 58 L97 74" stroke="var(--rule)" stroke-width="1.4"/><path d="M308 58 L308 74" stroke="var(--rule)" stroke-width="1.4"/><path d="M537 58 L537 74" stroke="var(--rule)" stroke-width="1.4"/><path d="M779 58 L779 74" stroke="var(--rule)" stroke-width="1.4"/><text x="97" y="92" text-anchor="middle" class="typed">the fee is computed</text><text x="308" y="92" text-anchor="middle" class="typed">on gross,</text><text x="537" y="92" text-anchor="middle" class="typed">should be net</text><text x="779" y="92" text-anchor="middle" class="typed">— write that down</text>
+    </svg>
+  </figure>
+
+  <div class="two" style="margin-top: 30px;">
+    <div>
+      <h3>Why it matters more than it sounds</h3>
+      <p class="section-lede">You can see the words while you are still speaking, so a misheard phrase is caught in the sentence you are in, not three paragraphs later. And a pause is a natural place to stop: nothing is lost if you change your mind.</p>
+    </div>
+    <div>
+      <h3>When you want the other thing</h3>
+      <p class="section-lede"><code>mynah set vad=off</code> turns segmentation off: the whole session is transcribed as one block when it ends. Useful for a dictated paragraph you want punctuated as a whole — and slower to appear, by design.</p>
+    </div>
+  </div>
+</section>
+
+<section id="tuned">
+  <p class="label">The part nobody sees</p>
+  <h2>Tuned against recordings, not guessed at</h2>
+  <div class="two">
+    <div>
+      <p class="section-lede">Deciding when an utterance ended is the whole game. Too eager and a sentence is cut in half; too patient and the text arrives after you have already moved on. Those thresholds live in <code>tuning/tuning.toml</code> — how long a silence closes an utterance, how much trailing silence to trim, how far above the room speech must sit.</p>
+      <p class="section-lede">They are <b>pinned by a golden corpus</b>: recordings with known boundaries, in <code>tuning/golden/</code>. Change a threshold and the test suite says which recording moved.</p>
+      <p class="section-lede">The noise floor is measured at the start of a session, but its contribution is <b>capped at the speech line</b> — a calibrated gate above it would demand speech louder than speech, and no setting could counter that. Frames captured during calibration are kept, not dropped: start talking immediately and that speech is still segmented.</p>
+    </div>
+    <div>
+<pre><span class="dim">tuning/tuning.toml</span>
+
+utterance_silence         = <span class="cmd">0.8</span>    <span class="dim"># silence that closes one</span>
+trailing_padding          = <span class="cmd">0.2</span>    <span class="dim"># kept, so endings survive</span>
+noise_calibration_seconds = <span class="cmd">1.0</span>    <span class="dim"># measured at session start</span>
+calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># and capped here</span>
+
+<span class="dim">tuning/golden/ — what holds it to that</span>
+  quiet_two_utterances.wav          <span class="ok">✓</span>
+  speech_during_calibration.wav     <span class="ok">✓</span>
+  speech_over_noise_in_calibration  <span class="ok">✓</span>
+  gap_below_silence.wav             <span class="ok">✓</span>
+  trailing_silence_trim.wav         <span class="ok">✓</span>
+  noisy_room.wav                    <span class="ok">✓</span></pre>
+      <p class="note" style="margin-top: 14px;">Too sensitive in a café, not sensitive enough in a quiet room: <code>mynah set frame_energy=0.02</code> raises your own floor. The contract is untouched — calibration can lift the gate above it, never below.</p>
+    </div>
+  </div>
+</section>
+
+<section id="local">
+  <p class="label">Local by definition</p>
+  <h2>There is no endpoint to turn off</h2>
+  <p class="section-lede">Speech is transcribed on your own hardware — mlx-whisper on the Apple GPU, whisper.cpp elsewhere. There is no account, no API key and no telemetry, because there is nothing to send anything to. <b>The only thing Mynah writes outside its own settings file is the text it types</b>, into the window you were already in.</p>
+  <blockquote>A dictation tool hears everything you say at your desk. That is the one kind of software where "it runs locally" should not be a setting you have to find.</blockquote>
+</section>
+
+<section id="platforms">
+  <p class="label">Where it runs</p>
+  <h2>One engine, a set of providers per platform</h2>
+  <p class="section-lede">Speech, typing and the indicator are interfaces; a platform is a set of implementations. That is why the Linux port is a handful of providers rather than a rewrite — and why the tuning contract is shared rather than re-derived.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>&nbsp;</th><th>macOS</th><th>Linux · Wayland</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">The engine, segmentation and tuning</th><td class="shared" colspan="2">one implementation, shared — a platform never re-derives it</td></tr>
+        <tr><th scope="row">Speech, on your own hardware</th><td>mlx-whisper, Apple GPU</td><td>whisper.cpp</td></tr>
+        <tr><th scope="row">Typing into the focused window</th><td>Accessibility API</td><td>wtype or the RemoteDesktop portal</td></tr>
+        <tr><th scope="row">The hotkey</th><td>pynput</td><td>your compositor's own binding</td></tr>
+        <tr><th scope="row">Indicator and menu</th><td>native pill and menu bar</td><td>tray item, Quickshell widget on Omarchy</td></tr>
+        <tr><th scope="row">Runs at login</th><td>SMAppService</td><td>systemd --user</td></tr>
+        <tr><th scope="row">A native app, no Python at runtime</th><td>Mynah.app</td><td>in progress</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top: 16px;">Wayland only, deliberately: on X11 any client can read the keyboard and inject keystrokes, which is exactly what dictation needs — and exactly why the permission story there would be theatre. Portals grant both, visibly and revocably.</p>
+</section>
+
+<section id="install">
+  <p class="label">Install</p>
+  <h2>One command, then a guided first run</h2>
+  <div class="two">
+    <div>
+<pre><span class="cmd">$ pipx install git+https://github.com/ReidenXerx/mynah.git</span>
+<span class="cmd">$ mynah setup</span>
+
+<span class="dim">mynah — first-time setup</span>
+
+  <span class="ok">✓</span> Runtime extra — <span class="dim">sounddevice, pynput, webrtcvad, pyobjc</span>
+  <span class="cmd">✗</span> Accessibility — <span class="dim">Not granted yet</span>
+      <span class="dim">System Settings → Privacy &amp; Security → Accessibility
+      Add mynah and enable it, then re-run: mynah setup</span>
+  <span class="ok">✓</span> Microphone — <span class="dim">Reachable</span>
+  <span class="ok">✓</span> Hotkey — <span class="dim">Valid (&lt;cmd&gt;+&lt;shift&gt;+.)</span></pre>
+      <p class="note" style="margin-top: 14px;">The first run installs the ~1.6 GB speech runtime itself, then names whatever is still missing and what to do about it. The login service is installed last, once the rest passes — never on top of a check that failed.</p>
+    </div>
+    <div>
+      <h3>The settings worth knowing</h3>
+      <div class="scroll" style="margin-top: 12px;">
+        <table class="settings">
+          <tbody>
+            <tr><td>hotkey</td><td>The global key, pynput syntax — <code>&lt;f8&gt;</code>, <code>&lt;ctrl&gt;+&lt;space&gt;</code></td></tr>
+            <tr><td>trigger</td><td><code>toggle</code> to press twice, <code>ptt</code> to hold while you talk</td></tr>
+            <tr><td>language</td><td>The language you speak</td></tr>
+            <tr><td>vad</td><td>Off means the text arrives only when the session ends</td></tr>
+            <tr><td>frame_energy</td><td>Your floor for what counts as speech — lower hears more of the room</td></tr>
+            <tr><td>auto_stop_silence</td><td>Seconds of silence that end a session by themselves</td></tr>
+            <tr><td>idle_timeout</td><td>How long the model stays warm afterwards (0 = never unload)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top: 14px;"><code>mynah config</code> prints all of them with the file they live in; <code>mynah set key=value</code> changes one.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div>
+    <div class="footer-links">
+      <a href="https://github.com/ReidenXerx/mynah">GitHub</a>
+      <a href="https://github.com/ReidenXerx/mynah#readme">README</a>
+      <a href="https://github.com/ReidenXerx/mynah/blob/main/docs/LINUX-APP.md">The Linux adapter</a>
+      <a href="https://github.com/ReidenXerx/mynah/blob/main/docs/SWIFT-APP.md">The macOS app</a>
+      <a href="https://duduphudu.app/whiz/">whiz</a>
+    </div>
+    <p class="note" style="margin-top: 12px;">MIT · built by <a href="https://duduphudu.app/">DuduPhudu</a></p>
+  </div>
+  <p class="note" style="max-width: 34ch;">Mynah was <code>whiz dictate</code> until it outgrew it. Your old settings are imported on the first run.</p>
+</footer>
+
+</div>
+<script>
+  document.querySelectorAll("[data-copy]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.classList.add("done");
+        setTimeout(function () { button.classList.remove("done"); }, 1100);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(button.dataset.copy).then(done, function () {});
+      }
+    });
+  });
+</script>
+</body>
+</html>

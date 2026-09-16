@@ -80,8 +80,8 @@ class MacIndicator(DictationIndicator):
         front is an AppKit UI op; dispatch it to the main thread so a call
         from the hotkey/transcribe threads is safe.
 
-        The ``whizFadeIn:``/``whizFadeOut:`` selectors live on the indicator
-        view (``_WhizIndicatorViewImpl``), not on ``NSPanel`` — so dispatch
+        The ``mynahFadeIn:``/``mynahFadeOut:`` selectors live on the indicator
+        view (``_MynahIndicatorViewImpl``), not on ``NSPanel`` — so dispatch
         to ``self._view`` (matching ``update_level``/``set_state``). The
         view's ``window()`` resolves the panel at run time.
         """
@@ -89,10 +89,10 @@ class MacIndicator(DictationIndicator):
             logger.warning("indicator show() but _view is None — panel not created")
             return
         self._visible = True
-        logger.debug("indicator show() — dispatching whizFadeIn: to main thread")
+        logger.debug("indicator show() — dispatching mynahFadeIn: to main thread")
         try:
             self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
-                "whizFadeIn:", None, False
+                "mynahFadeIn:", None, False
             )
         except Exception as e:  # noqa: BLE001
             logger.warning("indicator show() dispatch failed: %s", e, exc_info=True)
@@ -103,10 +103,10 @@ class MacIndicator(DictationIndicator):
             logger.warning("indicator hide() but _view is None — panel not created")
             return
         self._visible = False
-        logger.debug("indicator hide() — dispatching whizFadeOut: to main thread")
+        logger.debug("indicator hide() — dispatching mynahFadeOut: to main thread")
         try:
             self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
-                "whizFadeOut:", None, False
+                "mynahFadeOut:", None, False
             )
         except Exception as e:  # noqa: BLE001
             logger.warning("indicator hide() dispatch failed: %s", e, exc_info=True)
@@ -120,7 +120,7 @@ class MacIndicator(DictationIndicator):
         if self._view is not None:
             try:
                 self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
-                    "whizUpdateDisplay:", None, False
+                    "mynahUpdateDisplay:", None, False
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -131,7 +131,7 @@ class MacIndicator(DictationIndicator):
         if self._view is not None:
             try:
                 self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
-                    "whizSetState:", None, False
+                    "mynahSetState:", None, False
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -155,7 +155,7 @@ class MacIndicator(DictationIndicator):
             self._panel = None
 
     def _create_panel(self) -> None:
-        """Build the NSPanel + WhizIndicatorView. Imports pyobjc lazily."""
+        """Build the NSPanel + MynahIndicatorView. Imports pyobjc lazily."""
         import AppKit
         from Foundation import NSRect, NSPoint, NSSize
 
@@ -257,10 +257,10 @@ class MacIndicator(DictationIndicator):
             self._panel.setContentView_(self._view)
 
 
-class WhizIndicatorView:
+class MynahIndicatorView:
     """Pure-Python holder for the NSView draw method.
 
-    The real ObjC ``_WhizIndicatorViewImpl`` subclass (created at import
+    The real ObjC ``_MynahIndicatorViewImpl`` subclass (created at import
     time on macOS via ``_create_objc_view_class``) delegates ``drawRect_``
     here. Keeping the draw logic in a plain Python class avoids requiring a
     compiled PyObjC subclass at import time and keeps this module importable
@@ -350,9 +350,9 @@ class WhizIndicatorView:
 # catches the ImportError.
 #
 # Design:
-# - WhizIndicatorView (above) holds the pure-Python draw/state methods.
-# - _WhizIndicatorViewImpl is a real NSView (ObjC) subclass whose methods
-#   delegate to WhizIndicatorView.* (drawRect, _whiz_update_display, ...).
+# - MynahIndicatorView (above) holds the pure-Python draw/state methods.
+# - _MynahIndicatorViewImpl is a real NSView (ObjC) subclass whose methods
+#   delegate to MynahIndicatorView.* (drawRect, _mynah_update_display, ...).
 # - _get_objc_view_class() returns the ObjC subclass, creating it once
 #   (idempotent). _create_panel calls .alloc().initWithFrame_() on it.
 # - On non-macOS / no pyobjc, _get_objc_view_class() raises ImportError,
@@ -362,16 +362,16 @@ _OBJC_VIEW_CLASS = None
 
 
 def _create_objc_view_class():
-    """Create (once) an NSView subclass that delegates to WhizIndicatorView methods."""
+    """Create (once) an NSView subclass that delegates to MynahIndicatorView methods."""
     global _OBJC_VIEW_CLASS
     if _OBJC_VIEW_CLASS is not None:
         return _OBJC_VIEW_CLASS
     import objc
     from AppKit import NSView
 
-    class _WhizIndicatorViewImpl(NSView):
+    class _MynahIndicatorViewImpl(NSView):
         def initWithFrame_(self, frame):
-            self = objc.super(_WhizIndicatorViewImpl, self).initWithFrame_(frame)
+            self = objc.super(_MynahIndicatorViewImpl, self).initWithFrame_(frame)
             if self is not None:
                 self._indicator = None
                 self._vfx_view = None
@@ -381,7 +381,7 @@ def _create_objc_view_class():
 
         def drawRect_(self, rect):
             try:
-                WhizIndicatorView.drawRect_(self, rect)
+                MynahIndicatorView.drawRect_(self, rect)
             except Exception:  # noqa: BLE001
                 logger.debug("drawRect failed", exc_info=True)
 
@@ -389,25 +389,25 @@ def _create_objc_view_class():
         # selector (trailing colon in ObjC). pyobjc maps Python trailing
         # underscores to ObjC colons, but internal underscores also map to
         # colons — so we use CamelCase names (no internal underscores) to keep
-        # the mapping unambiguous: whizUpdateDisplay_ -> whizUpdateDisplay:.
-        def whizUpdateDisplay_(self, sender):  # noqa: ARG002
+        # the mapping unambiguous: mynahUpdateDisplay_ -> mynahUpdateDisplay:.
+        def mynahUpdateDisplay_(self, sender):  # noqa: ARG002
             try:
                 self.setNeedsDisplay_(True)
             except Exception:  # noqa: BLE001
-                logger.debug("whizUpdateDisplay failed", exc_info=True)
+                logger.debug("mynahUpdateDisplay failed", exc_info=True)
 
-        def whizSetState_(self, sender):  # noqa: ARG002
+        def mynahSetState_(self, sender):  # noqa: ARG002
             try:
                 self.setNeedsDisplay_(True)
             except Exception:  # noqa: BLE001
-                logger.debug("whizSetState failed", exc_info=True)
+                logger.debug("mynahSetState failed", exc_info=True)
 
         # Panel fade in/out: drive the panel's alphaValue toward the target.
         # Using a short NSAnimationContext implicit animation eases the alpha.
-        def whizFadeIn_(self, sender):  # noqa: ARG002
+        def mynahFadeIn_(self, sender):  # noqa: ARG002
             self._fade_panel(True)
 
-        def whizFadeOut_(self, sender):  # noqa: ARG002
+        def mynahFadeOut_(self, sender):  # noqa: ARG002
             self._fade_panel(False)
 
         def _fade_panel(self, fade_in: bool) -> None:
@@ -475,7 +475,7 @@ def _create_objc_view_class():
                 panel.orderOut_(None)
                 logger.debug("_fade_panel_impl: alpha=0.0, ordered out")
 
-        def whizOrderOut_(self, sender):  # noqa: ARG002
+        def mynahOrderOut_(self, sender):  # noqa: ARG002
             """Deferred hide: order out the panel unless superseded by a show.
 
             ``_pending_out_gen`` was snapshotted at hide time. If a show has
@@ -491,9 +491,9 @@ def _create_objc_view_class():
                 if panel is not None:
                     panel.orderOut_(None)
             except Exception:  # noqa: BLE001
-                logger.debug("whizOrderOut failed", exc_info=True)
+                logger.debug("mynahOrderOut failed", exc_info=True)
 
-    _OBJC_VIEW_CLASS = _WhizIndicatorViewImpl
+    _OBJC_VIEW_CLASS = _MynahIndicatorViewImpl
     return _OBJC_VIEW_CLASS
 
 

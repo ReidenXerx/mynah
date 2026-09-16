@@ -49,7 +49,7 @@ actor WhisperEngine {
     // MARK: - Lifecycle
 
     /// Load the model. Seconds on a cold start, which is why the caller keeps it
-    /// resident for `dictate_idle_timeout` after a session rather than unloading
+    /// resident for `idle_timeout` after a session rather than unloading
     /// immediately.
     func load() throws {
         guard context == nil else { return }

@@ -15,24 +15,24 @@ struct FlatTOMLTests {
     @Test("parses the scalar types the Python writer emits")
     func parsesScalars() {
         let values = FlatTOML.parse("""
-        dictate_language = "ru"
-        dictate_idle_timeout = 45.0
+        language = "ru"
+        idle_timeout = 45.0
         ai_max_frames = 50
-        dictate_vad = true
-        dictate_idle_visible = false
+        vad = true
+        idle_visible = false
         """)
 
-        #expect(values["dictate_language"] == .string("ru"))
-        #expect(values["dictate_idle_timeout"] == .double(45.0))
+        #expect(values["language"] == .string("ru"))
+        #expect(values["idle_timeout"] == .double(45.0))
         #expect(values["ai_max_frames"] == .int(50))
-        #expect(values["dictate_vad"] == .bool(true))
-        #expect(values["dictate_idle_visible"] == .bool(false))
+        #expect(values["vad"] == .bool(true))
+        #expect(values["idle_visible"] == .bool(false))
     }
 
     @Test("handles the escapes _emit_toml produces")
     func parsesEscapes() {
-        let values = FlatTOML.parse(#"dictate_prompt = "say \"hi\" and \\ then stop""#)
-        #expect(values["dictate_prompt"] == .string(#"say "hi" and \ then stop"#))
+        let values = FlatTOML.parse(#"prompt = "say \"hi\" and \\ then stop""#)
+        #expect(values["prompt"] == .string(#"say "hi" and \ then stop"#))
     }
 
     @Test("unescapes the control chars the Python writer now emits (C1)")
@@ -42,19 +42,19 @@ struct FlatTOMLTests {
         // as a raw byte, the line split in two, and the key was lost or
         // corrupted on BOTH sides (Swift's FlatTOML dropped the tail;
         // Python's tomllib read the file fine until Swift re-emitted it).
-        let values = FlatTOML.parse(#"dictate_prompt = "line1\nline2\r\nline3\tend""#)
-        #expect(values["dictate_prompt"] == .string("line1\nline2\r\nline3\tend"))
+        let values = FlatTOML.parse(#"prompt = "line1\nline2\r\nline3\tend""#)
+        #expect(values["prompt"] == .string("line1\nline2\r\nline3\tend"))
 
         // And the Swift writer's side of the contract: emit must re-escape.
-        let round = FlatTOML.parse(FlatTOML.emit(["dictate_prompt": .string("a\nb\tc\rd")]))
-        #expect(round["dictate_prompt"] == .string("a\nb\tc\rd"))
+        let round = FlatTOML.parse(FlatTOML.emit(["prompt": .string("a\nb\tc\rd")]))
+        #expect(round["prompt"] == .string("a\nb\tc\rd"))
     }
 
     @Test("parses a document written with CRLF line endings (M7)")
     func parsesCRLFDocument() {
-        let values = FlatTOML.parse("dictate_language = \"ru\"\r\ndictate_vad = true\r\n")
-        #expect(values["dictate_language"] == .string("ru"))
-        #expect(values["dictate_vad"] == .bool(true))
+        let values = FlatTOML.parse("language = \"ru\"\r\nvad = true\r\n")
+        #expect(values["language"] == .string("ru"))
+        #expect(values["vad"] == .bool(true))
     }
 
     @Test("parses string arrays, including empty ones")
@@ -81,15 +81,15 @@ struct FlatTOMLTests {
         // only what parsed, deleting those keys from disk — while Python's
         // tomllib read the same file fine.
         let values = FlatTOML.parse("""
-        dictate_frame_energy = 0.010 # tuned for my mic
-        dictate_vad = true  # silero
+        frame_energy = 0.010 # tuned for my mic
+        vad = true  # silero
         ai_max_frames = 50 # cap
-        dictate_vad_alt = true#no-space
+        vad_alt = true#no-space
         """)
-        #expect(values["dictate_frame_energy"] == .double(0.010))
-        #expect(values["dictate_vad"] == .bool(true))
+        #expect(values["frame_energy"] == .double(0.010))
+        #expect(values["vad"] == .bool(true))
         #expect(values["ai_max_frames"] == .int(50))
-        #expect(values["dictate_vad_alt"] == .bool(true))
+        #expect(values["vad_alt"] == .bool(true))
     }
 
     @Test("does not mistake a # inside a value for a comment")
@@ -107,15 +107,15 @@ struct FlatTOMLTests {
         // annotated value, saved by the Swift settings window.
         let document = """
         ai_model = "qwen3.5:9b"
-        dictate_frame_energy = 0.010 # tuned
-        dictate_vad = true # silero
+        frame_energy = 0.010 # tuned
+        vad = true # silero
         ocr_min_width = 1920
         """
         let parsed = FlatTOML.parse(document)
         let round = FlatTOML.parse(FlatTOML.emit(parsed))
         #expect(round.count == 4)
-        #expect(round["dictate_frame_energy"] == .double(0.010))
-        #expect(round["dictate_vad"] == .bool(true))
+        #expect(round["frame_energy"] == .double(0.010))
+        #expect(round["vad"] == .bool(true))
         #expect(round["ocr_min_width"] == .int(1920))
     }
 
@@ -125,19 +125,19 @@ struct FlatTOMLTests {
         # a comment
         [section]
 
-        dictate_language = "uk"
+        language = "uk"
         """)
         #expect(values.count == 1)
-        #expect(values["dictate_language"] == .string("uk"))
+        #expect(values["language"] == .string("uk"))
     }
 
     @Test("round-trips through emit unchanged")
     func roundTrips() {
         let original: [String: FlatTOML.Value] = [
-            "dictate_language": .string("ru"),
-            "dictate_prompt": .string(#"quote " and slash \"#),
-            "dictate_idle_timeout": .double(45.0),
-            "dictate_menu_bar": .bool(true),
+            "language": .string("ru"),
+            "prompt": .string(#"quote " and slash \"#),
+            "idle_timeout": .double(45.0),
+            "menu_bar": .bool(true),
             "model_dirs": .stringArray(["/one", "/two"]),
         ]
         #expect(FlatTOML.parse(FlatTOML.emit(original)) == original)
@@ -145,12 +145,12 @@ struct FlatTOMLTests {
 
     @Test("a multi-line prompt survives a full parse/emit round trip (C1)")
     func roundTripsMultiLinePrompt() {
-        // The end-to-end failure: `mynah config set dictate_prompt='...'`
+        // The end-to-end failure: `mynah set prompt='...'`
         // with an embedded newline used to corrupt the file for Swift
         // readers. The writer escapes, the parser unescapes, and a
         // double round trip must be stable.
         let original: [String: FlatTOML.Value] = [
-            "dictate_prompt": .string("Отвечай кратко.\nПервая строка.\r\nВторая."),
+            "prompt": .string("Отвечай кратко.\nПервая строка.\r\nВторая."),
         ]
         let emitted = FlatTOML.emit(original)
         let parsed = FlatTOML.parse(emitted)
@@ -178,14 +178,14 @@ struct MynahConfigTests {
 
     @Test("reads an int where a float is expected")
     func coercesIntToDouble() {
-        // `mynah config set dictate_idle_timeout=0` writes a bare `0`.
-        let config = MynahConfig.from(FlatTOML.parse("dictate_idle_timeout = 0"))
+        // `mynah set idle_timeout=0` writes a bare `0`.
+        let config = MynahConfig.from(FlatTOML.parse("idle_timeout = 0"))
         #expect(config.idleTimeout == 0)
     }
 
     @Test("falls back to defaults for missing and mistyped keys")
     func toleratesBadValues() {
-        let config = MynahConfig.from(FlatTOML.parse(#"dictate_vad = "yes""#))
+        let config = MynahConfig.from(FlatTOML.parse(#"vad = "yes""#))
         #expect(config.vad)  // default, not a crash
         #expect(config.language == "ru")
     }
@@ -241,7 +241,7 @@ struct MynahConfigTests {
         try withIsolatedConfigDir {
             try FileManager.default.createDirectory(
                 at: MynahConfig.directory, withIntermediateDirectories: true)
-            try FlatTOML.emit(["dictate_language": .string("uk"), "dictate_vad": .bool(false)])
+            try FlatTOML.emit(["language": .string("uk"), "vad": .bool(false)])
                 .write(to: MynahConfig.path, atomically: true, encoding: .utf8)
             let (config, error) = MynahConfig.loadReporting()
             #expect(error == nil)
@@ -252,19 +252,21 @@ struct MynahConfigTests {
 
     @Test("saving preserves keys owned by the Python side")
     func savePreservesForeignKeys() {
+        // `stt_provider` is a real CLI-owned key this app has no property for;
+        // `future_setting` stands in for a key written by a newer CLI.
         var values = FlatTOML.parse("""
-        ai_model = "qwen3:8b"
-        model_dirs = ["/custom"]
-        dictate_language = "ru"
+        stt_provider = "mlx"
+        future_setting = ["one", "two"]
+        language = "ru"
         """)
 
         var config = MynahConfig.from(values)
         config.language = "uk"
         config.merged(into: &values)
 
-        #expect(values["ai_model"] == .string("qwen3:8b"))
-        #expect(values["model_dirs"] == .stringArray(["/custom"]))
-        #expect(values["dictate_language"] == .string("uk"))
+        #expect(values["stt_provider"] == .string("mlx"))
+        #expect(values["future_setting"] == .stringArray(["one", "two"]))
+        #expect(values["language"] == .string("uk"))
     }
 }
 

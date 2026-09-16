@@ -99,7 +99,7 @@ class MacTextInjector(TextInjector):
             except ImportError:
                 return False, (
                     "PyObjC (pyobjc-framework-ApplicationServices) not installed.\n"
-                    "Install the dictate extra: pipx inject mynah 'mynah[macos]'"
+                    "Install the macos extra: pipx inject mynah 'mynah[macos]'"
                 )
 
     # ---------- internal: keystroke path ----------

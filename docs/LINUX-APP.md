@@ -51,7 +51,7 @@ until the portal-registered hotkey starts a session. Per session:
    (vendored build, same pinned version as macOS), and inject via the
    RemoteDesktop portal session.
 
-The hotkey toggles a session (matching `dictate_trigger = "toggle"` default);
+The hotkey toggles a session (matching the `trigger = "toggle"` default);
 push-to-talk arrives with the same trigger handling as macOS.
 
 ## Permissions UX

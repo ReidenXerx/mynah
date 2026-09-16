@@ -666,7 +666,7 @@ class DictationEngine:
             import sounddevice as sd
         except ImportError:
             print(
-                "sounddevice not installed. Install the dictate extra:\n"
+                "sounddevice not installed. Install the macos extra:\n"
                 "  pipx inject mynah 'mynah[macos]'",
                 file=sys.stderr,
             )
@@ -1040,7 +1040,7 @@ class DictationEngine:
         if (
             self.s.menu_bar
             and self._menu_bar is None
-            and os.environ.get("WHIZ_DICTATE_SERVICE") == "1"
+            and os.environ.get("MYNAH_SERVICE") == "1"
         ):
             # Menu bar requested but not created (rumps/pyobjc missing or
             # broken — see the setup warning in the log). Under the

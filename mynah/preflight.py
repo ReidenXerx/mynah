@@ -35,8 +35,8 @@ class CheckResult:
     hint: str = ""
 
 
-def _dictate_extra_installed() -> bool:
-    """True if the 'dictate' extra's heavy deps are importable."""
+def _extra_installed() -> bool:
+    """True if the 'macos' extra's heavy deps are importable."""
     for mod in ("sounddevice", "pynput", "webrtcvad"):
         try:
             __import__(mod)
@@ -61,16 +61,16 @@ def _inject_extra() -> int:
 
 
 def _check_extra() -> CheckResult:
-    """Verify the 'dictate' extra's importable deps are installed."""
-    if _dictate_extra_installed():
+    """Verify the 'macos' extra's importable deps are installed."""
+    if _extra_installed():
         return CheckResult(
             ok=True,
-            title="Dictate extra",
+            title="Runtime extra",
             detail="sounddevice, pynput, webrtcvad, pyobjc all importable",
         )
     return CheckResult(
         ok=False,
-        title="Dictate extra",
+        title="Runtime extra",
         detail="Missing deps — will auto-install now",
         hint="pipx inject mynah 'mynah[macos]'",
     )
@@ -244,21 +244,21 @@ def setup(install_service: bool = True) -> int:
     """
     print("mynah — first-time setup\n", file=sys.stderr)
 
-    # Step 0: auto-inject the dictate extra if missing. This downloads
+    # Step 0: auto-inject the macos extra if missing. This downloads
     # mlx-whisper + deps (~1.6 GB), so stream pipx's output live. After
     # injecting, the checks import lazily so they'll pick up the fresh install.
-    if not _dictate_extra_installed():
-        print("  ⚙ Installing the dictate extra (mlx-whisper + deps)…", file=sys.stderr)
+    if not _extra_installed():
+        print("  ⚙ Installing the macos extra (mlx-whisper + deps)…", file=sys.stderr)
         print("    This downloads ~1.6 GB — give it a minute.\n", file=sys.stderr)
         rc = _inject_extra()
         if rc != 0:
             print(
-                f"  ✗ Failed to install the dictate extra (pipx exit {rc}).\n"
+                f"  ✗ Failed to install the macos extra (pipx exit {rc}).\n"
                 "    Run manually: pipx inject mynah 'mynah[macos]'",
                 file=sys.stderr,
             )
             return 1
-        print("  ✓ Dictate extra installed.\n", file=sys.stderr)
+        print("  ✓ Runtime extra installed.\n", file=sys.stderr)
 
     # Run all checks (extra, accessibility, microphone, hotkey).
     results = run_checks()

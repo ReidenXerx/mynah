@@ -3,20 +3,21 @@ import OSLog
 
 /// Typed access to `~/.config/mynah/config.toml`, shared with the Python CLI.
 ///
-/// The file is a single flat table owned by *both* sides: Python writes
-/// pipeline keys (`ai_model`, `model_dirs`, …), Swift writes dictation keys
-/// (`dictate_*`). So saving is always read-modify-write — `save()` reparses the
-/// file and overwrites only the dictation keys, leaving every other key byte-
-/// identical. Clobbering the user's `mynah analyze` settings by rewriting the
-/// whole file from a Swift-side struct would be a nasty regression, and it is
-/// the specific thing `MynahConfigTests.testSavePreservesForeignKeys` guards.
+/// The file is a single flat table owned by *both* sides, and the two do not
+/// know the same keys: the CLI also writes `stt_provider`, `injector` and
+/// `indicator`, which mean nothing to this app, and a newer CLI will write keys
+/// this build has never heard of. So saving is always read-modify-write —
+/// `save()` reparses the file and overwrites only the keys below, leaving every
+/// other key byte-identical. Rewriting the whole file from this struct would
+/// silently drop the rest, and it is the specific thing
+/// `MynahConfigTests.testSavePreservesForeignKeys` guards.
 ///
 /// Defaults mirror `mynah/config.py`. Keep them in sync — if they drift, the
 /// same config file means two different things depending on which binary reads
 /// it.
 struct MynahConfig: Equatable {
 
-    // MARK: - Dictation keys (Swift-owned)
+    // MARK: - Settings
 
     var model: String = ""
     var language: String = "ru"
@@ -39,20 +40,20 @@ struct MynahConfig: Equatable {
     /// Mapping from struct property to TOML key. Single source of truth for
     /// both load and save so the two can't drift.
     private static let keys = (
-        model: "dictate_model",
-        language: "dictate_language",
-        prompt: "dictate_prompt",
-        idleTimeout: "dictate_idle_timeout",
-        hotkey: "dictate_hotkey",
-        trigger: "dictate_trigger",
-        vad: "dictate_vad",
-        autoStopSilence: "dictate_auto_stop_silence",
-        showIndicator: "dictate_show_indicator",
-        idleVisible: "dictate_idle_visible",
-        menuBar: "dictate_menu_bar",
-        frameEnergy: "dictate_frame_energy",
-        minEnergy: "dictate_min_energy",
-        minUtterance: "dictate_min_utterance"
+        model: "model",
+        language: "language",
+        prompt: "prompt",
+        idleTimeout: "idle_timeout",
+        hotkey: "hotkey",
+        trigger: "trigger",
+        vad: "vad",
+        autoStopSilence: "auto_stop_silence",
+        showIndicator: "show_indicator",
+        idleVisible: "idle_visible",
+        menuBar: "menu_bar",
+        frameEnergy: "frame_energy",
+        minEnergy: "min_energy",
+        minUtterance: "min_utterance"
     )
 
     // MARK: - Location

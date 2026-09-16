@@ -74,7 +74,7 @@ private let hotkeyHandler: EventHandlerUPP = { _, _, context in
 
 /// Parses pynput-style hotkey strings so the config file stays readable by both
 /// implementations. Changing the syntax would mean every existing user's
-/// `dictate_hotkey` silently stopped working.
+/// `hotkey` silently stopped working.
 enum HotkeySpec {
 
     struct Combo {

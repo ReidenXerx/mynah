@@ -4,7 +4,7 @@ The tuning file is the single source of truth for the dictate
 segmentation pipeline's constants. Every implementation hardcodes the
 values in its own language, and these tests pin each one against the
 file so a drift fails loudly — the Swift suite mirrors this file in
-macos/Tests/WhizAppTests/TuningTests.swift.
+macos/Tests/MynahAppTests/TuningTests.swift.
 
 The file is deliberately NOT read at runtime by the engines. If a
 value here changes, the constants must change in every implementation

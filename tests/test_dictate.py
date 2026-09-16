@@ -893,7 +893,7 @@ def test_dictate_friendly_keys_map_to_config_fields():
 
 
 def test_dictate_friendly_keys_cover_all_dictate_config_fields():
-    """Every dictate_* config field should be reachable via a friendly name."""
+    """Every config field should be reachable via a friendly name."""
     from mynah.cli import FRIENDLY
 
     mapped_fields = set(FRIENDLY.values())
@@ -1425,10 +1425,10 @@ def test_cmd_dictate_set_accepts_known_provider(tmp_path, monkeypatch):
 
 
 def test_run_with_appkit_exits_1_when_menu_bar_fails_under_service(monkeypatch):
-    """With WHIZ_DICTATE_SERVICE=1, menu_bar requested, and no menu bar
+    """With MYNAH_SERVICE=1, menu_bar requested, and no menu bar
     created (rumps import fails inside MacMenuBar.setup), run() must
     exit 1 so the LastExitStatus churn is visible."""
-    monkeypatch.setenv("WHIZ_DICTATE_SERVICE", "1")
+    monkeypatch.setenv("MYNAH_SERVICE", "1")
     indicator = FakeIndicator()
     engine = _make_engine(
         indicator=indicator,
@@ -1452,7 +1452,7 @@ def test_run_with_appkit_terminal_fallback_returns_0(monkeypatch):
     """Without the service env key (a terminal run), the degraded
     hotkey-only fallback stays: rc=0 — the user can see the situation and
     Ctrl+C out of it."""
-    monkeypatch.delenv("WHIZ_DICTATE_SERVICE", raising=False)
+    monkeypatch.delenv("MYNAH_SERVICE", raising=False)
     indicator = FakeIndicator()
     engine = _make_engine(
         indicator=indicator,
@@ -1725,7 +1725,7 @@ def test_service_build_plist_contains_required_keys(monkeypatch):
     assert "<key>ProcessType</key>" in xml
     assert "Interactive" in xml
     assert "/usr/local/bin/mynah" in xml
-    assert "dictate" in xml  # ProgramArguments includes the subcommand
+    assert "<string>dictate</string>" not in xml  # bare `mynah` IS the command
     assert "mynah.log" in xml
 
 
@@ -1740,7 +1740,7 @@ def test_service_build_plist_uses_runner_when_available(monkeypatch):
     assert "/stable/mynah" in xml
     assert "-m" in xml
     assert "mynah" in xml
-    assert "dictate" in xml
+    assert "<string>dictate</string>" not in xml
     assert "EnvironmentVariables" in xml
     assert "PYTHONPATH" in xml
     assert "/venv/site-packages" in xml
@@ -1754,7 +1754,7 @@ def test_service_build_plist_falls_back_to_python_m(monkeypatch):
     xml = service.build_plist()
     assert "-m" in xml
     assert "mynah" in xml
-    assert "dictate" in xml
+    assert "<string>dictate</string>" not in xml
 
 
 def test_service_install_writes_plist_and_loads(monkeypatch, tmp_path):
@@ -1832,7 +1832,7 @@ def test_service_uninstall_removes_plist(monkeypatch, tmp_path):
 
 
 def test_service_plist_emits_service_env_on_every_path(monkeypatch):
-    """W2-M14: the generated plist must set WHIZ_DICTATE_SERVICE=1 on
+    """W2-M14: the generated plist must set MYNAH_SERVICE=1 on
     every argv path. engine.py's `_run_with_appkit` reads it to decide
     between rc=0 (which KeepAlive silently turns into a relaunch loop)
     and rc=1 on a menu-bar failure — the env key is only load-bearing if
@@ -1842,42 +1842,61 @@ def test_service_plist_emits_service_env_on_every_path(monkeypatch):
 
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: None)
-    monkeypatch.delenv("WHIZ_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("MYNAH_CONFIG_DIR", raising=False)
 
     # Path 3: python -m mynah fallback — the previously bare path.
     xml = service.build_plist()
     assert "EnvironmentVariables" in xml
-    assert "WHIZ_DICTATE_SERVICE" in xml
+    assert "MYNAH_SERVICE" in xml
 
 
-def test_service_plist_passes_through_whiz_config_dir(monkeypatch, tmp_path):
-    """W2-M14: WHIZ_CONFIG_DIR set in the installer's environment is
+def test_service_plist_argv_has_no_dictate_subcommand(monkeypatch):
+    """The plist must launch bare `mynah`, which IS the dictation command.
+
+    Inherited from `whiz dictate`, build_plist() used to append "dictate" to
+    argv. There is no such subcommand here: argparse would exit 2 on every
+    launch, and KeepAlive + ThrottleInterval 30 turns that into a crash loop
+    that `mynah service status` reports as installed.
+    """
+    from mynah import service
+
+    monkeypatch.setattr(service, "_ensure_runner", lambda: None)
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
+    monkeypatch.delenv("MYNAH_CONFIG_DIR", raising=False)
+
+    xml = service.build_plist()
+    assert "<string>dictate</string>" not in xml
+    assert "<string>/usr/local/bin/mynah</string>" in xml
+
+
+def test_service_plist_passes_through_config_dir(monkeypatch, tmp_path):
+    """W2-M14: MYNAH_CONFIG_DIR set in the installer's environment is
     emitted into the plist. mynah.config reads it at import, so a custom
     config dir used for the CLI must survive into the agent."""
     from mynah import service
 
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
-    monkeypatch.setenv("WHIZ_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("MYNAH_CONFIG_DIR", str(tmp_path))
 
     xml = service.build_plist()
-    assert "WHIZ_CONFIG_DIR" in xml
+    assert "MYNAH_CONFIG_DIR" in xml
     assert str(tmp_path) in xml
-    assert "WHIZ_DICTATE_SERVICE" in xml
+    assert "MYNAH_SERVICE" in xml
 
 
-def test_service_plist_omits_whiz_config_dir_when_unset(monkeypatch):
+def test_service_plist_omits_config_dir_when_unset(monkeypatch):
     """W2-M14 flip side: with no custom config dir, the key is absent from
-    the plist — an empty-string WHIZ_CONFIG_DIR would be worse than none
+    the plist — an empty-string MYNAH_CONFIG_DIR would be worse than none
     (config.py treats the empty string as a real override)."""
     from mynah import service
 
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
-    monkeypatch.delenv("WHIZ_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("MYNAH_CONFIG_DIR", raising=False)
 
     xml = service.build_plist()
-    assert "WHIZ_CONFIG_DIR" not in xml
+    assert "MYNAH_CONFIG_DIR" not in xml
 
 
 def test_service_uninstall_when_not_installed(monkeypatch, tmp_path):
@@ -1980,7 +1999,7 @@ def test_setup_check_extra_passes_when_importable(monkeypatch):
     monkeypatch.setitem(sys.modules, "ApplicationServices", types.ModuleType("ApplicationServices"))
     r = setup_mod._check_extra()
     assert r.ok is True
-    assert r.title == "Dictate extra"
+    assert r.title == "Runtime extra"
 
 
 def test_setup_check_extra_fails_when_missing(monkeypatch):
@@ -1997,7 +2016,7 @@ def test_setup_check_extra_fails_when_missing(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
-    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: False)
+    monkeypatch.setattr(setup_mod, "_extra_installed", lambda: False)
     r = setup_mod._check_extra()
     assert r.ok is False
     assert "pipx inject" in r.hint
@@ -2116,7 +2135,7 @@ def test_setup_run_checks_returns_three_results():
     results = setup_mod.run_checks()
     assert len(results) == 4
     titles = [r.title for r in results]
-    assert titles == ["Dictate extra", "Accessibility", "Microphone", "Hotkey"]
+    assert titles == ["Runtime extra", "Accessibility", "Microphone", "Hotkey"]
 
 
 def test_setup_all_pass_points_at_service(monkeypatch, capsys):
@@ -2124,9 +2143,9 @@ def test_setup_all_pass_points_at_service(monkeypatch, capsys):
     the login service (the one-command onboarding flow)."""
     from mynah import preflight as setup_mod
 
-    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(setup_mod, "_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
-        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Runtime extra", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
@@ -2146,9 +2165,9 @@ def test_setup_all_pass_notes_running_service(monkeypatch, capsys):
     """When all checks pass and the service is already loaded, note that."""
     from mynah import preflight as setup_mod
 
-    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(setup_mod, "_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
-        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Runtime extra", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
@@ -2164,9 +2183,9 @@ def test_setup_no_service_flag_skips_install(monkeypatch, capsys):
     """install_service=False skips the service install and points at it."""
     from mynah import preflight as setup_mod
 
-    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(setup_mod, "_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
-        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Runtime extra", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Accessibility", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
@@ -2183,9 +2202,9 @@ def test_setup_failure_returns_one_and_recheck_hint(monkeypatch, capsys):
     """A failing check returns rc=1 and tells the user to re-run setup."""
     from mynah import preflight as setup_mod
 
-    monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
+    monkeypatch.setattr(setup_mod, "_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
-        setup_mod.CheckResult(ok=True, title="Dictate extra", detail="ok"),
+        setup_mod.CheckResult(ok=True, title="Runtime extra", detail="ok"),
         setup_mod.CheckResult(ok=False, title="Accessibility", detail="no", hint="grant it"),
         setup_mod.CheckResult(ok=True, title="Microphone", detail="ok"),
         setup_mod.CheckResult(ok=True, title="Hotkey", detail="ok"),
@@ -2372,7 +2391,7 @@ def test_dictate_set_menubar_alias(tmp_path, monkeypatch):
 
 def test_menu_bar_friendly_key_and_config_table_covered():
     """menu_bar is reachable via friendly keys AND the config table
-    — the existing coverage tests assert EVERY dictate_* field is mapped, so
+    — the existing coverage tests assert EVERY config field is mapped, so
     this guards against a future field being added without a friendly name."""
     from mynah import cli
 
@@ -2641,7 +2660,7 @@ def test_menubar_setup_noop_if_already_setup(monkeypatch):
 
 
 def test_indicator_show_dispatches_fade_to_view_not_panel():
-    """show()/hide() must dispatch whizFadeIn:/whizFadeOut: to ``self._view``
+    """show()/hide() must dispatch mynahFadeIn:/mynahFadeOut: to ``self._view``
     (where those selectors are defined), not to ``self._panel`` (NSPanel,
     which doesn't implement them). Dispatching to the panel silently failed
     under the bare except, leaving the indicator invisible for the whole
@@ -2657,14 +2676,14 @@ def test_indicator_show_dispatches_fade_to_view_not_panel():
 
     ind.show()
     view.performSelectorOnMainThread_withObject_waitUntilDone_.assert_called_once_with(
-        "whizFadeIn:", None, False
+        "mynahFadeIn:", None, False
     )
     # The panel must NOT be the dispatch target — it doesn't implement the selector.
     panel.performSelectorOnMainThread_withObject_waitUntilDone_.assert_not_called()
 
     ind.hide()
     view.performSelectorOnMainThread_withObject_waitUntilDone_.assert_called_with(
-        "whizFadeOut:", None, False
+        "mynahFadeOut:", None, False
     )
     panel.performSelectorOnMainThread_withObject_waitUntilDone_.assert_not_called()
 

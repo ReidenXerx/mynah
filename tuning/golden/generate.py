@@ -2,14 +2,14 @@
 """Generate the shared segmentation golden corpus.
 
 Synthesizes deterministic 16 kHz mono s16le WAV fixtures that pin the
-utterance-segmentation behavior every whiz implementation must agree on,
+utterance-segmentation behavior every Mynah implementation must agree on,
 and writes ``expected.json`` by running the reference logic (the
 Python engine's energy-gate + trailing-silence state machine, with
 webrtcvad disabled so no model is needed) over each fixture.
 
 The fixtures live in this repo and are consumed by:
 - tests/test_segmentation_golden.py     (Python)
-- macos/Tests/WhizAppTests/TuningTests.swift (Swift)
+- macos/Tests/MynahAppTests/TuningTests.swift (Swift)
 
 Determinism rules — the corpus must regenerate byte-identically:
 - No timestamps, no randomness, no floating-point time. Everything is

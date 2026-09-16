@@ -6,7 +6,7 @@ the fixtures in tuning/golden/, whose expectations are pinned in
 expected.json. The reference in generate.py exists to WRITE the corpus;
 this test proves the production engine READS the same audio the same
 way. The Swift suite runs the same fixtures through
-UtteranceDetector (macos/Tests/WhizAppTests/TuningTests.swift), so a
+UtteranceDetector (macos/Tests/MynahAppTests/TuningTests.swift), so a
 segmentation change that breaks cross-implementation agreement fails
 on both platforms.
 

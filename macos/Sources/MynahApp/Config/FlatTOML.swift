@@ -92,7 +92,7 @@ enum FlatTOML {
 
     /// Index of the first `#` that starts a comment, or nil.
     ///
-    /// Quote-aware: `dictate_prompt = "say #1 loudly"` has no comment, and
+    /// Quote-aware: `prompt = "say #1 loudly"` has no comment, and
     /// neither does `model_dirs = ["/a#b"]`. Backslash escapes are honoured so a
     /// `\"` inside a string does not end it prematurely.
     private static func firstUnquotedHash(in s: String) -> String.Index? {

@@ -4,7 +4,7 @@ import Testing
 
 // The Swift resolver used to accept only literal paths and bare filenames,
 // while `resolve()` in mynah/models.py accepts full aliases, short aliases and
-// prefixes. The same `dictate_model` value therefore meant a working model on
+// prefixes. The same `model` value therefore meant a working model on
 // the Python side and "no model found" on the Swift side. These tests pin the
 // parity (mirroring tests/test_models.py's resolve tests).
 

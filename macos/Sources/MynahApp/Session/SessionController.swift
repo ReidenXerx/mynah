@@ -243,7 +243,7 @@ final class SessionController: ObservableObject {
     }
 
     /// Auto-stop on prolonged silence (M1, wave-2): end the session after
-    /// `dictate_auto_stop_silence` seconds of continuous silence with no
+    /// `auto_stop_silence` seconds of continuous silence with no
     /// utterance open. Python's engine has honored the key since wave-1
     /// (its `_process_vad_frames` sets `_end_session_requested`); the Swift
     /// port used to round-trip the config value without ever reading it,
@@ -327,7 +327,7 @@ final class SessionController: ObservableObject {
     }
 
     /// Whether the energy gates alone are deciding what counts as speech for
-    /// the *current* session: true when `dictate_vad` is on but no Silero
+    /// the *current* session: true when `vad` is on but no Silero
     /// detector could be loaded. Surfaced so the VAD toggle reading "on" does
     /// not silently mean "loudness-only rejection" (M5).
     @Published private(set) var isVADDegraded = false
@@ -354,7 +354,7 @@ final class SessionController: ObservableObject {
             "utterance \(utterance.duration, format: .fixed(precision: 2))s rms \(energy, format: .fixed(precision: 4)) gate \(gate, format: .fixed(precision: 4))")
 
         guard utterance.duration >= config.minUtterance else {
-            Log.session.notice("utterance rejected: shorter than dictate_min_utterance")
+            Log.session.notice("utterance rejected: shorter than min_utterance")
             return
         }
         guard energy >= gate else {
@@ -486,7 +486,7 @@ final class SessionController: ObservableObject {
         }
     }
 
-    /// Keep the model resident for `dictate_idle_timeout` so back-to-back
+    /// Keep the model resident for `idle_timeout` so back-to-back
     /// dictation stays warm, then free it — the "zero RAM at idle" behaviour
     /// from `engine.py`. A timeout of 0 means never unload.
     private func scheduleIdleUnload() {
@@ -539,7 +539,7 @@ final class SessionController: ObservableObject {
     }
 }
 
-/// Default `initial_prompt` when `dictate_prompt` is unset.
+/// Default `initial_prompt` when `prompt` is unset.
 ///
 /// Carried over verbatim from `DEFAULT_RUSSIAN_PROMPT` in `engine.py`. Informal
 /// Russian in the prompt biases the decoder toward reproducing informal Russian

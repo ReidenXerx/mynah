@@ -1,14 +1,14 @@
-# Shared tuning contract for every whiz implementation.
+# Shared tuning contract for every Mynah implementation.
 #
-# One source of truth for the dictate segmentation pipeline's constants:
-# energy floors, adaptive-noise calibration, utterance shaping, and the
-# Whisper hallucination phrase list. Python (`whiz/dictate/engine.py`),
-# Swift (`macos/Sources/WhizApp/...`), and the Rust core (when it exists)
-# all hardcode these values in their own language, and tests pin their
-# constants against this file:
+# One source of truth for the segmentation pipeline's constants: energy
+# floors, adaptive-noise calibration, utterance shaping, and the Whisper
+# hallucination phrase list. Python (`mynah/engine.py`), Swift
+# (`macos/Sources/MynahApp/...`), and any future port all hardcode these
+# values in their own language, and tests pin their constants against this
+# file:
 #
 #   python: tests/test_tuning.py
-#   swift:  macos/Tests/WhizAppTests/TuningTests.swift
+#   swift:  macos/Tests/MynahAppTests/TuningTests.swift
 #
 # It is deliberately NOT read at runtime. Each implementation keeps its
 # constants compiled in; this file is the contract that test suites pin
@@ -78,7 +78,7 @@ calibration_speech_floor = 0.03
 # --- Whisper decoder anti-hallucination thresholds (W2-M12) ---
 #
 # Applied by the STT providers at decode time, stricter than Whisper's
-# defaults. Python: whiz/dictate/providers/mlx.py (NO_SPEECH_THRESHOLD /
+# defaults. Python: mynah/providers/mlx.py (NO_SPEECH_THRESHOLD /
 # LOGPROB_THRESHOLD). Swift: WhisperEngine.swift sets the same pair on
 # whisper.cpp (no_speech_thold / logprob_thold). mlx additionally applies
 # hallucination_silence_threshold=2.0, which whisper.cpp has no equivalent
@@ -94,11 +94,11 @@ whisper_no_speech_threshold = 0.35
 # probabilities. Whisper default -1.0.
 whisper_logprob_threshold = -0.5
 
-# --- Config defaults (must match whiz/config.py and WhizConfig.swift) ---
+# --- Config defaults (must match mynah/config.py and MynahConfig.swift) ---
 
 # Static per-frame energy floor (normalized RMS, 0.0-1.0). Frames below
 # this are silence before any VAD sees them. The original 0.03 was tuned
-# on one machine and proved far too high on others — see whiz/config.py
+# on one machine and proved far too high on others — see mynah/config.py
 # for the full rationale. The adaptive noise floor can raise this.
 frame_energy_default = 0.010
 # Minimum whole-utterance RMS to bother transcribing at all.
@@ -127,7 +127,7 @@ min_utterance_default = 0.25
 # Both implementations (engine.py `_HALLUCINATION_ARTIFACTS` /
 # `_HALLUCINATION_VOCAB` and TranscriptFilter.swift) apply the same two
 # modes; tests in both suites pin the split (tests/test_tuning.py,
-# macos/Tests/WhizAppTests/TuningTests.swift).
+# macos/Tests/MynahAppTests/TuningTests.swift).
 hallucination_artifact_phrases = [
     "спасибо за субтитры",
     "субтитры создавал",

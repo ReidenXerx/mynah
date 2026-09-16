@@ -67,7 +67,7 @@ enum WhisperModel {
     ///   1. an existing file path (absolute or `~`-relative)
     ///   2. a bare filename present in a search directory
     ///   3. an alias, resolved exactly as `resolve` in `mynah/models.py` does,
-    ///      so the same `dictate_model` value means the same model from
+    ///      so the same `model` value means the same model from
     ///      either side:
     ///        - full alias  `large-v3-turbo-q5_0`
     ///        - short alias `turbo` (only when it matches exactly one model,
@@ -76,7 +76,7 @@ enum WhisperModel {
     ///      preference order
     ///
     /// Before the alias stage existed, anything but a literal path or
-    /// filename returned nil: `dictate_model = "turbo"` (a name the Python
+    /// filename returned nil: `model = "turbo"` (a name the Python
     /// CLI happily resolves) failed with "no model found" here, and
     /// `large-v3` on a disk holding only `ggml-large-v3-q5_0.bin` worked in
     /// Python and not in Swift. One alias form is deliberately MORE

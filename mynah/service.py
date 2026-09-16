@@ -32,7 +32,7 @@ _LAUNCH_AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
 _LOG_PATH = Path.home() / "Library" / "Logs" / "mynah.log"
 # A renamed copy of the framework Python binary, placed at a stable path
 # outside the pipx venv so it survives ``pipx install --force`` during
-# ``mynah upgrade``. The kernel process name (``p_comm``) is set from the
+# ``pipx upgrade mynah``. The kernel process name (``p_comm``) is set from the
 # binary basename at ``execve``, so a binary named ``mynah`` shows as
 # "mynah" in Activity Monitor / Force Quit — not "Python". Because the path
 # is stable, the Accessibility/TCC permission granted to it persists
@@ -120,7 +120,7 @@ def _ensure_runner() -> str | None:
     so Activity Monitor shows "mynah". Since it's outside the venv, the
     venv's ``site-packages`` is injected via ``PYTHONPATH`` in the plist.
     The stable path means the Accessibility/TCC permission granted to it
-    persists across ``pipx install --force`` during ``mynah upgrade``.
+    persists across ``pipx install --force`` during an upgrade.
 
     Returns the absolute path to the runner binary, or None if it can't
     be built (the caller falls back to the plain ``mynah`` script).
@@ -169,7 +169,7 @@ def _ensure_runner() -> str | None:
     return str(runner)
 
 
-def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
+def _resolve_mynah_bin() -> tuple[list[str], dict[str, str]]:
     """Resolve the command (and env vars) to launch ``mynah``.
 
     Prefer a renamed Python runner binary (``mynah``) so the process shows
@@ -182,12 +182,12 @@ def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
 
     Env vars emitted on EVERY argv path (M14, wave-2):
 
-    - ``WHIZ_DICTATE_SERVICE=1`` — marks the process as running under
+    - ``MYNAH_SERVICE=1`` — marks the process as running under
       launchd. engine.py's ``_run_with_appkit`` reads it to decide
       between returning 0 (which KeepAlive silently turns into a
       relaunch loop) and returning 1 on a menu-bar setup failure, so
       the agent must actually receive it whichever argv path resolved.
-    - ``WHIZ_CONFIG_DIR`` — passed through when set in the installer's
+    - ``MYNAH_CONFIG_DIR`` — passed through when set in the installer's
       environment: mynah.config reads it at import, so a custom config
       dir used for the CLI must survive into the agent too.
 
@@ -195,10 +195,10 @@ def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
     the plist's ``EnvironmentVariables`` key (empty dict when no override
     is needed).
     """
-    env: dict[str, str] = {"WHIZ_DICTATE_SERVICE": "1"}
-    config_dir = os.environ.get("WHIZ_CONFIG_DIR")
+    env: dict[str, str] = {"MYNAH_SERVICE": "1"}
+    config_dir = os.environ.get("MYNAH_CONFIG_DIR")
     if config_dir:
-        env["WHIZ_CONFIG_DIR"] = config_dir
+        env["MYNAH_CONFIG_DIR"] = config_dir
     runner = _ensure_runner()
     if runner:
         site = _venv_site_packages() or ""
@@ -212,10 +212,11 @@ def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
 
 def build_plist() -> str:
     """Build the LaunchAgent plist XML (string)."""
-    argv, env_vars = _resolve_whiz_bin()
-    # Ensure the dictation command is explicit (not just bare `mynah`).
-    if argv[-1] != "dictate" and "dictate" not in argv:
-        argv = argv + ["dictate"]
+    argv, env_vars = _resolve_mynah_bin()
+    # Bare `mynah` IS the dictation command (cli.cmd_run is the parser's
+    # default), so nothing is appended. It used to append `dictate`, from
+    # when this was `whiz dictate`; under launchd that argv now exits 2 on
+    # every launch and KeepAlive turns it into a 30-second crash loop.
 
     args_xml = "\n".join(
         f"    <string>{escape(a)}</string>" for a in argv

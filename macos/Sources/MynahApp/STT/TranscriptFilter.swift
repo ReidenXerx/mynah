@@ -15,7 +15,7 @@ enum TranscriptFilter {
 
     // The duration and energy floors that used to live here were dead: the
     // gating moved to `SessionController.enqueue`, driven by
-    // `dictate_min_utterance` / `dictate_min_energy` / `dictate_frame_energy`.
+    // `min_utterance` / `min_energy` / `frame_energy`.
     // Keeping them meant two sources of truth, and the copy here still held the
     // old, too-high values (0.35 / 0.025 / 0.03) that the config keys were added
     // to replace — so wiring them back up would have silently restored the

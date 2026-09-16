@@ -2,13 +2,13 @@ import SwiftUI
 
 /// The settings window contents.
 ///
-/// Only exposes settings the Swift app actually honours. `dictate_trigger`
+/// Only exposes settings the Swift app actually honours. `trigger`
 /// (push-to-talk) exists in the config file and is implemented in the Python
 /// engine, but not here yet — showing a control for it would be worse than
 /// omitting it, because a switch that silently does nothing is
 /// indistinguishable from a bug.
 ///
-/// `dictate_auto_stop_silence` is honored here since wave-2 (M1):
+/// `auto_stop_silence` is honored here since wave-2 (M1):
 /// SessionController ends the session after the configured silence. It has
 /// no dedicated control in this window — set it with
 /// `mynah dictate set silence=<seconds>`.

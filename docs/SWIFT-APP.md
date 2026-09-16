@@ -14,7 +14,7 @@ its complexity is the cost of that impersonation:
   "Python", and keeps it at a fixed path so the TCC Accessibility grant survives
   `pipx install --force`.
 - `providers/macos_indicator.py` drives AppKit through stringly-typed selectors
-  (`performSelectorOnMainThread_withObject_waitUntilDone_("whizFadeIn:", …)`),
+  (`performSelectorOnMainThread_withObject_waitUntilDone_("mynahFadeIn:", …)`),
   with instant-show fallbacks because CoreAnimation fails to load under launchd.
 - `providers/macos_rumps.py` exists because hand-driving `NSStatusItem` through
   PyObjC did not work; `providers/macos_menubar.py` was the abandoned attempt.
@@ -31,7 +31,7 @@ construction, so all of the above stops being necessary rather than being fixed.
 | Entry point, menu bar item | `MynahApp.swift` | `macos_rumps.py` |
 | Menu contents | `UI/MenuBarContent.swift` | `macos_rumps.py` |
 | Floating pill | `UI/IndicatorPanel.swift` | `macos_indicator.py` (519 → ~150 lines) |
-| W monogram | `UI/WhizLogo.swift` | `macos_logo.py` |
+| Bird mark | `UI/MynahLogo.swift` | `macos_logo.py` |
 | Session state | `Session/SessionController.swift` | part of `engine.py` |
 | Mic level | `Session/MicLevelMonitor.swift` | part of `engine.py` |
 | Global hotkey | `Input/HotkeyManager.swift` | `pynput` |
@@ -309,9 +309,11 @@ implementation and hallucination behaviour can change between releases.
 
 ## Config is co-owned
 
-Both binaries read and write `~/.config/mynah/config.toml`. Python owns the
-pipeline keys, Swift owns `dictate_*`, and neither may clobber the other's, so
-`MynahConfig.save()` is always read-modify-write.
+Both binaries read and write `~/.config/mynah/config.toml`, one flat table of
+unprefixed keys. Neither side knows all of them — the CLI also writes
+`stt_provider`, `injector` and `indicator`, and a newer CLI will write keys an
+older app has never heard of — so `MynahConfig.save()` is always
+read-modify-write, and so is `config.save()` on the Python side.
 
 `FlatTOML.swift` is a ~120-line parser rather than a TOML dependency, for the
 same reason `config.py` hand-rolls `_emit_toml`: the schema is one flat table of
@@ -431,7 +433,7 @@ same binary.
    since dictation no longer needs Python at all.
 6. **Cutover** — delete `service.py`, `setup.py`, and the `macos_*` providers.
    Sign with a Developer ID and notarize.
-7. **Extract a `WhizKit` library target** — move everything except `@main` and
+7. **Extract a `MynahKit` library target** — move everything except `@main` and
    `AppDelegate` out of the executable, leaving a thin app shell.
 
    Two reasons. Xcode 16 refuses to render SwiftUI previews in an executable
@@ -441,12 +443,12 @@ same binary.
    works but is a known rough edge.
 
    `#Preview` blocks already exist in `UI/IndicatorPanel.swift`,
-   `UI/SettingsView.swift`, `UI/WhizLogo.swift` and `UI/AppliesNote.swift`. They
+   `UI/SettingsView.swift`, `UI/MynahLogo.swift` and `UI/AppliesNote.swift`. They
    compile and cost nothing; they start rendering the moment this lands.
 
    Cost is ~2,900 lines relocated and seven types made `public`
    (`SessionController`, `IndicatorPanel`, `HotkeyManager`, `SettingsWindow`,
-   `MenuBarContent`, `WhizLogo`, `Log`) plus the members the shell touches.
+   `MenuBarContent`, `MynahLogo`, `Log`) plus the members the shell touches.
    Mechanical, but it touches every file — worth doing as its own PR so it does
    not bury a feature change in access-modifier churn.
 8. **Other platforms** — same structure for Windows and Linux; `providers/base.py`

@@ -99,9 +99,23 @@ class DictationIndicator(ABC):
     def show(self) -> None:
         """Display the overlay."""
 
+    #: Whether this indicator draws a spectrum as well as a level. The engine
+    #: only pays for the transform when something is going to show it, so an
+    #: indicator that draws one bar must not set this.
+    wants_spectrum: bool = False
+
     @abstractmethod
     def update_level(self, level: float) -> None:
         """Feed a live mic amplitude in [0.0, 1.0] to animate the volume curve."""
+
+    def update_spectrum(self, bands: list[float]) -> None:
+        """Feed the frame's band energies, low to high, each in [0.0, 1.0].
+
+        Optional: the default does nothing, so an indicator that shows a single
+        level needs to know nothing about this. Called immediately BEFORE
+        ``update_level`` for the same frame, so an implementation can carry both
+        in one update rather than sending two.
+        """
 
     @abstractmethod
     def set_state(self, state: str) -> None:

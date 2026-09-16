@@ -695,3 +695,90 @@ def test_the_listing_names_the_one_that_will_be_used():
         # here it falls back to the platform's choice rather than to nothing.
         config.injector = "nonsense"
         assert chosen_names(config)["injector"] == "smart"
+
+
+# ---------------------------------------------------------------------------
+# The spectrum behind the level meter
+# ---------------------------------------------------------------------------
+
+
+def _tone(np, hz, seconds=0.03, rate=16000, amplitude=0.2):
+    t = np.arange(int(rate * seconds)) / rate
+    return (amplitude * np.sin(2 * np.pi * hz * t)).astype(np.float32)
+
+
+def test_bands_cover_speech_low_to_high():
+    np = pytest.importorskip("numpy")
+    from mynah.engine import _band_edges
+
+    edges = _band_edges(np, 480, 16000)
+    assert len(edges) == 12
+    # Every band owns at least one bin — otherwise the low end is always empty.
+    assert all(hi > lo for lo, hi in edges)
+    # Low to high, and inside the frame.
+    assert edges == sorted(edges)
+    assert edges[-1][1] <= 241
+
+
+def test_silence_is_flat_and_a_voice_is_not():
+    """The first version divided unnormalised FFT magnitudes by a guessed
+    reference, so every band saturated at 1 and the meter was a solid block —
+    for silence as well."""
+    np = pytest.importorskip("numpy")
+    from mynah.engine import _band_edges, _spectrum
+
+    window = np.hanning(480)
+    edges = _band_edges(np, 480, 16000)
+
+    silence = _spectrum(np.zeros(480, dtype=np.float32), np, window, edges)
+    assert max(silence) == 0.0
+
+    voice = _spectrum(_tone(np, 220) + _tone(np, 700, amplitude=0.1), np, window, edges)
+    assert max(voice) > 0.5, "a voice should reach most of the meter"
+    assert min(voice) < 0.2, "and should not light every band at once"
+
+
+def test_a_tone_lands_in_the_band_it_belongs_to():
+    np = pytest.importorskip("numpy")
+    from mynah.engine import _band_edges, _spectrum
+
+    window = np.hanning(480)
+    edges = _band_edges(np, 480, 16000)
+
+    low = _spectrum(_tone(np, 120), np, window, edges)
+    high = _spectrum(_tone(np, 4000), np, window, edges)
+    assert low.index(max(low)) < 3, "120 Hz belongs at the left end"
+    assert high.index(max(high)) > 8, "4 kHz belongs at the right end"
+
+
+def test_the_engine_only_measures_a_spectrum_when_something_draws_one():
+    """An FFT per frame on the audio thread is cheap, but not free, and the
+    macOS indicator shows one bar."""
+    from mynah.providers.base import NullIndicator
+    from mynah.providers.linux_indicator import SocketIndicator
+
+    assert NullIndicator().wants_spectrum is False
+    assert SocketIndicator.wants_spectrum is True
+
+
+def test_the_bands_ride_with_the_level(tmp_path):
+    """One event per frame, not two: the socket should not carry two messages
+    30 times a second for one frame of audio."""
+    engine = FakeEngine()
+    srv = control.ControlServer(
+        on_toggle=engine.toggle, on_start=engine.start, on_stop=engine.stop,
+        on_quit=engine.quit, state=lambda: engine.state,
+        path=tmp_path / "run" / "control.sock",
+    )
+    srv.start()
+    try:
+        published: list[dict] = []
+        with mock.patch.object(srv, "publish", published.append):
+            indicator = __import__(
+                "mynah.providers.linux_indicator", fromlist=["SocketIndicator"]
+            ).SocketIndicator()
+            indicator.update_spectrum([0.1, 0.9, 0.4])
+            indicator.update_level(0.5)
+        assert published == [{"event": "level", "level": 0.5, "bands": [0.1, 0.9, 0.4]}]
+    finally:
+        srv.stop()

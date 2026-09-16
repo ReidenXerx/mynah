@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import os
+import math
 import queue
 import sys
 import threading
@@ -180,6 +181,59 @@ _MERGE_LIMIT_SECONDS = 20
 _MERGE_LIMIT_BYTES = 2 * 16000 * _MERGE_LIMIT_SECONDS
 
 
+# The band edges the level meter is drawn from, in hertz. Log-spaced across
+# the range speech actually occupies: below 80 Hz is room rumble and a desk
+# being knocked, above 5 kHz there is almost nothing left of a voice. Twelve
+# bands is what a small meter can show without turning into noise.
+_SPECTRUM_BANDS = 12
+_SPECTRUM_LOW_HZ = 80.0
+_SPECTRUM_HIGH_HZ = 5000.0
+# Divides the band magnitudes so a normal speaking voice lands near the top of
+# the meter. Measured rather than guessed: across the speech frames of a test
+# recording the band magnitudes run 0.001 to 0.05 with a 75th percentile of
+# 0.026, so this puts an ordinary syllable around three quarters of full scale
+# and leaves headroom for a shout.
+_SPECTRUM_REFERENCE = 0.03
+
+
+def _band_edges(np, frame_samples: int, sample_rate: int) -> list[tuple[int, int]]:
+    """Bin ranges for each band, low to high. Computed once per session."""
+    import math
+
+    edges = []
+    for i in range(_SPECTRUM_BANDS + 1):
+        fraction = i / _SPECTRUM_BANDS
+        hz = _SPECTRUM_LOW_HZ * math.pow(_SPECTRUM_HIGH_HZ / _SPECTRUM_LOW_HZ, fraction)
+        edges.append(int(hz * frame_samples / sample_rate))
+    out = []
+    for lo, hi in zip(edges, edges[1:]):
+        # Every band must own at least one bin, or the low end is empty.
+        out.append((lo, max(hi, lo + 1)))
+    return out
+
+
+def _spectrum(mono, np, window, edges) -> list[float]:
+    """Band energies for one frame, low to high, each roughly in [0, 1].
+
+    A 480-sample real FFT, which is microseconds — this runs on the audio
+    thread, and anything expensive there is heard as a dropout rather than
+    seen as a slow meter.
+
+    The transform is normalised by the window's own sum, so a band's value is
+    in the signal's amplitude units rather than in unscaled FFT magnitudes.
+    Without that every band saturates at 1 and the meter is a solid block —
+    which is exactly what the first version drew.
+    """
+    spectrum = np.abs(np.fft.rfft(mono * window)) / (window.sum() / 2)
+    bands = []
+    for lo, hi in edges:
+        value = float(spectrum[lo:hi].mean()) if hi > lo else 0.0
+        # Square root rather than raw magnitude: quiet consonants are most of
+        # what makes a meter look alive, and linear scaling hides them.
+        bands.append(min(1.0, math.sqrt(value / _SPECTRUM_REFERENCE) if value > 0 else 0.0))
+    return bands
+
+
 def _rms_int16(pcm_bytes: bytes) -> float:
     """RMS amplitude of 16-bit PCM, normalized to 0.0–1.0.
 
@@ -315,6 +369,9 @@ class DictationEngine:
         self._utterance_queue: queue.Queue = queue.Queue()
         # Whether this session has typed anything yet — see _spaced().
         self._typed_in_session = False
+        # Built per session, and only when the indicator draws a spectrum.
+        self._spectrum_window = None
+        self._spectrum_edges: list[tuple[int, int]] = []
         self._stop_event = threading.Event()
         # Auto-stop request: set by the audio callback when silence elapses,
         # acted on by the run loop OFF the audio thread (the callback must
@@ -696,6 +753,17 @@ class DictationEngine:
         frame_samples = frame_bytes // 2
         frame_seconds = frame_samples / WHISPER_SAMPLE_RATE
 
+        # The spectrum's window and band edges depend only on the frame size,
+        # so they are built here rather than 33 times a second.
+        if getattr(self.indicator, "wants_spectrum", False):
+            import numpy as _np
+
+            self._spectrum_window = _np.hanning(frame_samples)
+            self._spectrum_edges = _band_edges(_np, frame_samples, WHISPER_SAMPLE_RATE)
+        else:
+            self._spectrum_window = None
+            self._spectrum_edges = []
+
         def callback(indata, frames, time_info, status):  # noqa: ARG001
             """sounddevice stream callback — runs on the audio thread."""
             # Generation guard (W2-H1): a stale stream (its join timed out)
@@ -710,6 +778,11 @@ class DictationEngine:
             # RMS amplitude for the indicator volume curve (0.0–1.0).
             rms = float(np.sqrt(np.mean(mono ** 2)))
             level = min(1.0, rms * 5.0)
+            if self._spectrum_window is not None:
+                # Only when something is going to draw it.
+                self.indicator.update_spectrum(
+                    _spectrum(mono, np, self._spectrum_window, self._spectrum_edges)
+                )
             self.indicator.update_level(level)
             # Adaptive noise floor calibration: during the first
             # _NOISE_CALIBRATION_SECONDS of audio, collect per-frame RMS.

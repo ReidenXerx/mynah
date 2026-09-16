@@ -24,9 +24,13 @@ class SocketIndicator(DictationIndicator):
 
     name = "socket"
 
+    # The shell draws a spectrum, so the engine should measure one.
+    wants_spectrum = True
+
     def __init__(self) -> None:
         self._state = "idle"
         self._visible = False
+        self._bands: list[float] = []
 
     def setup(self) -> None:
         # Nothing to create: there is no window on this platform.
@@ -36,10 +40,16 @@ class SocketIndicator(DictationIndicator):
         self._visible = True
         control.publish({"event": "visible", "visible": True})
 
+    def update_spectrum(self, bands: list[float]) -> None:
+        # Held for the level that follows it: one event carries both, because
+        # the socket should not get two messages 30 times a second for one
+        # frame of audio.
+        self._bands = bands
+
     def update_level(self, level: float) -> None:
         # Rate-limited in control.publish_level: this is called for every 30 ms
         # frame, and no UI can use 33 updates a second.
-        control.publish_level(level)
+        control.publish_level(level, self._bands)
 
     def set_state(self, state: str) -> None:
         if state == self._state:

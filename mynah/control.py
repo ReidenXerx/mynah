@@ -297,11 +297,13 @@ def publish(event: dict[str, Any]) -> None:
     server.publish(event)
 
 
-def publish_level(level: float) -> None:
-    """Publish a mic level, coalesced to at most ~30 a second.
+def publish_level(level: float, bands: list[float] | None = None) -> None:
+    """Publish a mic level, and the band energies behind it, at most ~30/s.
 
     Called from the capture thread for every 30 ms frame. The rate limit is
-    here rather than in the caller so every future publisher gets it.
+    here rather than in the caller so every future publisher gets it. ``bands``
+    is low to high; a subscriber that only wants a level can ignore it, and an
+    engine that measures none simply omits it.
     """
     global _last_level_at
     server = active()
@@ -311,7 +313,10 @@ def publish_level(level: float) -> None:
     if now - _last_level_at < _LEVEL_MIN_INTERVAL:
         return
     _last_level_at = now
-    server.publish({"event": "level", "level": round(float(level), 4)})
+    event: dict[str, Any] = {"event": "level", "level": round(float(level), 4)}
+    if bands:
+        event["bands"] = [round(float(b), 3) for b in bands]
+    server.publish(event)
 
 
 # ---------- client ----------

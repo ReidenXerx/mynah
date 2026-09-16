@@ -42,7 +42,8 @@ directory the server refuses to use unless it owns it.
 {"cmd": "status"}     -> {"ok": true, "state": "listening", "pid": 4242}
 {"cmd": "subscribe"}  -> then one event per line:
                          {"event": "state", "state": "listening"}
-                         {"event": "level", "level": 0.42}
+                         {"event": "level", "level": 0.42,
+                          "bands": [0.71, 1.0, 0.78, ...]}
                          {"event": "text",  "text": "the fee is computed"}
 ```
 
@@ -58,6 +59,12 @@ Two properties that are easy to get wrong and hard to notice:
 - **Level events are coalesced to ~30 a second.** They are published from the
   capture thread for every 30 ms frame, and a shell that stops reading must
   never be able to stall audio.
+- **`bands` is the frame's spectrum**, twelve log-spaced bands from 80 Hz to
+  5 kHz — where a voice lives — measured by a 480-sample FFT and normalised by
+  the window's own sum, so a band's value is in amplitude units rather than raw
+  FFT magnitudes. The engine only computes it when the selected indicator sets
+  `wants_spectrum`, and it rides with the level rather than as its own event.
+  A subscriber that only wants one number ignores it.
 
 ## Apps that ignore the virtual keyboard
 

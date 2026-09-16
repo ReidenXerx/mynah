@@ -11,6 +11,7 @@ Run with: pytest tests/test_dictate.py
 
 from __future__ import annotations
 
+import queue
 import sys
 import threading
 import types
@@ -3150,3 +3151,80 @@ def test_vad_uses_effective_frame_energy():
     assert engine._utterance_buffer == []
     assert engine._in_speech is False
     engine._end_session()
+
+
+# ---------------------------------------------------------------------------
+# Batching: talk, pause, talk
+# ---------------------------------------------------------------------------
+
+
+def test_queued_utterances_are_transcribed_together():
+    """Whisper encodes a 30-second window whatever it is given, so three
+    utterances waiting in the queue cost three full encodes when they could
+    cost one. Speaking in short bursts fell further behind with every pause."""
+    engine = _make_engine()
+    q = queue.Queue()
+    for chunk in (b"\x01\x02" * 100, b"\x03\x04" * 100, b"\x05\x06" * 100):
+        q.put(chunk)
+
+    merged, flushed = engine._drain_queued(q, q.get())
+    assert flushed is False
+    assert merged == (b"\x01\x02" * 100) + (b"\x03\x04" * 100) + (b"\x05\x06" * 100)
+    assert q.empty()
+
+
+def test_merging_stops_at_the_window_it_is_worth():
+    """Past whisper's own window the model chunks internally and the merge
+    stops paying for itself."""
+    engine = _make_engine()
+    q = queue.Queue()
+    one_second = b"\x00\x01" * 16000
+    for _ in range(40):
+        q.put(one_second)
+
+    merged, _flushed = engine._drain_queued(q, q.get())
+    assert len(merged) <= eng._MERGE_LIMIT_BYTES + len(one_second)
+    assert not q.empty(), "the rest stays queued for the next transcription"
+
+
+def test_the_flush_sentinel_survives_a_merge():
+    """Draining must not swallow the end-of-session signal: the last audio is
+    still transcribed, and then the worker stops, which is what it asked for."""
+    engine = _make_engine()
+    q = queue.Queue()
+    q.put(b"\x01\x02" * 100)
+    q.put(eng._FLUSH_SENTINEL)
+    q.put(b"\x09\x09" * 100)  # a later session's audio must not be taken
+
+    merged, flushed = engine._drain_queued(q, b"\x07\x08" * 100)
+    assert flushed is True
+    assert merged == (b"\x07\x08" * 100) + (b"\x01\x02" * 100)
+    assert q.get_nowait() == b"\x09\x09" * 100
+
+
+def test_a_lone_utterance_is_not_delayed():
+    """Batching may only take what is already queued — never wait for audio
+    that has not happened yet."""
+    engine = _make_engine()
+    q = queue.Queue()
+    merged, flushed = engine._drain_queued(q, b"\x01\x02" * 100)
+    assert merged == b"\x01\x02" * 100
+    assert flushed is False
+
+
+def test_successive_utterances_are_spaced():
+    """Whisper trims each utterance, so typing them as they come runs them
+    together: "the fee is computedon gross"."""
+    engine = _make_engine()
+    assert engine._spaced("the fee is computed") == "the fee is computed"
+    engine._typed_in_session = True
+    assert engine._spaced("on gross") == " on gross"
+    # Punctuation belongs to the word before it.
+    assert engine._spaced(", but it should be net") == ", but it should be net"
+    assert engine._spaced("") == ""
+
+
+def test_the_first_utterance_does_not_indent_what_was_there():
+    engine = _make_engine()
+    engine._typed_in_session = False
+    assert not engine._spaced("hello").startswith(" ")

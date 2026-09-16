@@ -242,10 +242,27 @@ def _check_typing() -> CheckResult:
 
     ok, hint = WtypeInjector().check_permissions(prompt=False)
     if ok:
+        from mynah.providers.linux_clipboard import _clipboard_ready
+
+        if _clipboard_ready():
+            return CheckResult(
+                ok=True,
+                title="Typing",
+                detail="wtype, and the clipboard for apps that ignore it",
+            )
+        # Not a failure: typing works. But some apps — Warp among them — never
+        # apply the keymap wtype uploads and render the text as digits, and the
+        # only way in there is a paste.
         return CheckResult(
             ok=True,
             title="Typing",
-            detail="wtype is installed — mynah can type into the focused window",
+            detail="wtype is installed — but nothing to paste with",
+            hint=(
+                "Some apps (Warp, and anything else that ignores a virtual\n"
+                "  keyboard) turn typed text into digits. Install wl-clipboard\n"
+                "  and mynah pastes into those instead:\n"
+                "  sudo pacman -S wl-clipboard"
+            ),
         )
     first, _, rest = hint.partition("\n")
     return CheckResult(ok=False, title="Typing", detail=first, hint=rest.strip())

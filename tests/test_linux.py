@@ -11,6 +11,7 @@ import json
 import os
 import socket
 import stat
+import subprocess
 import sys
 import threading
 import time
@@ -562,3 +563,117 @@ def test_modmask_spells_the_combo():
     assert preflight._combo(72, "D") == "SUPER+ALT+D"
     assert preflight._combo(65, "M") == "SUPER+SHIFT+M"
     assert preflight._combo(0, "F8") == "F8"
+
+
+# ---------------------------------------------------------------------------
+# Typing into apps that ignore a virtual keyboard
+# ---------------------------------------------------------------------------
+
+
+def test_terminals_paste_with_ctrl_shift_v():
+    """Ctrl+V is a control character to the program inside a terminal."""
+    from mynah.providers import linux_clipboard as clip
+
+    assert clip.paste_chord("dev.warp.warp") == ("CTRL SHIFT", "V")
+    assert clip.paste_chord("foot") == ("CTRL SHIFT", "V")
+    assert clip.paste_chord("org.gnome.texteditor") == ("CTRL", "V")
+    assert clip.paste_chord("") == ("CTRL", "V")
+
+
+def test_the_clipboard_is_borrowed_and_given_back(monkeypatch):
+    from mynah.providers import linux_clipboard as clip
+
+    injector = clip.ClipboardInjector()
+    injector._copy = "/usr/bin/wl-copy"
+    injector._paste = "/usr/bin/wl-paste"
+    monkeypatch.setattr(clip, "focused_class", lambda: "dev.warp.warp")
+    monkeypatch.setattr(clip, "RESTORE_AFTER", 0.01)
+    monkeypatch.setattr(injector, "_send_chord", lambda mods, key: True)
+
+    written: list[str] = []
+
+    def fake_run(argv, **kwargs):
+        if argv[0].endswith("wl-paste") and "--list-types" in argv:
+            return mock.Mock(returncode=0, stdout="text/plain\n")
+        if argv[0].endswith("wl-paste"):
+            return mock.Mock(returncode=0, stdout="what was there before")
+        written.append(kwargs.get("input", ""))
+        return mock.Mock(returncode=0, stdout="")
+
+    with mock.patch("subprocess.run", fake_run):
+        injector.type_text("the fee is computed")
+        deadline = time.monotonic() + 2
+        while len(written) < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+    assert written[0] == "the fee is computed"
+    assert written[-1] == "what was there before", "the clipboard must be given back"
+
+
+def test_wl_copy_output_is_not_captured():
+    """wl-copy forks a daemon that serves the selection and inherits the pipes,
+    so capturing its output waits for a process designed not to exit. The first
+    version timed out on every utterance and silently fell back to typing."""
+    from mynah.providers import linux_clipboard as clip
+
+    injector = clip.ClipboardInjector()
+    injector._copy = "/usr/bin/wl-copy"
+    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as run:
+        assert injector._write_clipboard("hello") is True
+    kwargs = run.call_args[1]
+    assert kwargs.get("capture_output") is not True
+    assert kwargs.get("stdout") is subprocess.DEVNULL
+    assert kwargs.get("stderr") is subprocess.DEVNULL
+
+
+def test_an_image_on_the_clipboard_is_left_alone():
+    """A clipboard holding something that is not text cannot be carried, so it
+    is not read and not restored — better untouched than replaced with text."""
+    from mynah.providers import linux_clipboard as clip
+
+    injector = clip.ClipboardInjector()
+    injector._paste = "/usr/bin/wl-paste"
+    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0, stdout="image/png\n")):
+        assert injector._read_clipboard() is None
+
+
+def test_the_chord_goes_through_the_compositor(monkeypatch):
+    """Not through a virtual keyboard: an app that ignores those is the whole
+    reason this injector exists."""
+    from mynah.providers import linux_clipboard as clip
+
+    injector = clip.ClipboardInjector()
+    injector._hyprctl = "/usr/bin/hyprctl"
+    monkeypatch.setenv("HYPRLAND_INSTANCE_SIGNATURE", "abc")
+    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0, stdout="ok")) as run:
+        assert injector._send_chord("CTRL SHIFT", "V") is True
+    argv = run.call_args[0][0]
+    assert argv[:2] == ["/usr/bin/hyprctl", "dispatch"]
+    assert 'mods = "CTRL SHIFT"' in argv[2] and 'key = "V"' in argv[2]
+
+
+def test_the_smart_injector_pastes_only_where_typing_fails(monkeypatch):
+    from mynah.providers import linux_clipboard as clip
+
+    injector = clip.SmartInjector()
+    typed: list[str] = []
+    pasted: list[str] = []
+    monkeypatch.setattr(injector._typing, "type_text", typed.append)
+    monkeypatch.setattr(injector._pasting, "type_text", pasted.append)
+
+    monkeypatch.setattr(injector, "_class_now", lambda: "foot")
+    injector.type_text("into a terminal that honours the keymap")
+    monkeypatch.setattr(injector, "_class_now", lambda: "dev.warp.warp")
+    injector.type_text("into warp")
+
+    assert typed == ["into a terminal that honours the keymap"]
+    assert pasted == ["into warp"]
+
+
+def test_wtype_chord_presses_and_releases_in_order():
+    injector = linux_inject.WtypeInjector(binary="/usr/bin/wtype")
+    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0, stderr="")) as run:
+        assert injector.send_chord("CTRL SHIFT", "V") is True
+    assert run.call_args[0][0] == [
+        "/usr/bin/wtype", "-M", "ctrl", "-M", "shift", "-P", "V", "-p", "V", "-m", "shift", "-m", "ctrl",
+    ]

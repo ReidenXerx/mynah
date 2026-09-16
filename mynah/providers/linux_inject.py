@@ -71,6 +71,30 @@ class WtypeInjector(TextInjector):
         # the engine means the event fires exactly when the text really landed.
         control.publish({"event": "text", "text": text})
 
+    def send_chord(self, mods: str, key: str) -> bool:
+        """Press a shortcut, e.g. ("CTRL SHIFT", "V").
+
+        Used by the clipboard injector where the compositor cannot be asked to
+        deliver one itself. Modifiers are wtype's own names.
+        """
+        if self._binary is None:
+            return False
+        argv = [self._binary]
+        names = [m.strip().lower() for m in mods.split() if m.strip()]
+        for mod in names:
+            argv += ["-M", mod]
+        argv += ["-P", key, "-p", key]
+        for mod in reversed(names):
+            argv += ["-m", mod]
+        try:
+            done = subprocess.run(argv, capture_output=True, text=True, timeout=TYPE_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return False
+        if done.returncode != 0:
+            logger.error("wtype chord failed: %s", (done.stderr or "").strip())
+            return False
+        return True
+
     def check_permissions(self, prompt: bool = True) -> tuple[bool, str]:
         """Wayland has no permission to ask for — only tools to have.
 

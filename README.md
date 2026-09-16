@@ -74,7 +74,7 @@ mynah setup                          # dependencies, permissions, hotkey, login 
 ```bash
 pipx install git+https://github.com/ReidenXerx/mynah.git
 pipx inject mynah 'mynah[linux]'
-sudo pacman -S whisper-cpp wtype     # speech, and typing into the focused window
+sudo pacman -S whisper-cpp wtype wl-clipboard   # speech, typing, and pasting
 mynah setup                          # checks each of these and names what is missing
 ```
 
@@ -114,7 +114,7 @@ Settings live in `~/.config/mynah/config.toml`, shared with the macOS app. Usefu
 | --- | --- | --- |
 | Dictation engine, segmentation, tuning | ✅ | ✅ |
 | Speech | mlx-whisper on the Apple GPU | whisper.cpp |
-| Typing into the focused window | Accessibility API | `wtype`, on wlroots and KDE |
+| Typing into the focused window | Accessibility API | `wtype`, and the clipboard for apps that ignore it |
 | Hotkey | pynput | the compositor's own binding, to `mynah toggle` |
 | Indicator and menu | native pill + menu bar item | the shell's, through `mynah watch` — a bar widget and a pill on Omarchy |
 | Runs at login | `SMAppService` / LaunchAgent | `systemd --user`, tied to the graphical session |

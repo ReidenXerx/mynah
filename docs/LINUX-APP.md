@@ -13,7 +13,7 @@ So the Linux side is a set of providers plus one socket:
 | Concern | Here | Why |
 |---|---|---|
 | Speech | `whisper-cli` (whisper.cpp), a subprocess per utterance | the binary the distro already packages; no Python speech dependency at all |
-| Typing | `wtype`, text on **stdin** | the virtual-keyboard protocol is the compositor-blessed way to synthesize input |
+| Typing | `wtype`, text on **stdin**; the clipboard where that fails | the virtual-keyboard protocol is the compositor-blessed way to synthesize input — where it is honoured |
 | Indicator | published on the control socket | the shell draws it, in the desktop's own idiom |
 | Hotkey | your compositor, bound to `mynah toggle` | no Wayland client may grab a global key |
 | Capture | `sounddevice`, 16 kHz mono, 30 ms frames | unchanged from macOS; PipeWire serves it through PortAudio |
@@ -58,6 +58,24 @@ Two properties that are easy to get wrong and hard to notice:
 - **Level events are coalesced to ~30 a second.** They are published from the
   capture thread for every 30 ms frame, and a shell that stops reading must
   never be able to stall audio.
+
+## Apps that ignore the virtual keyboard
+
+`wtype` uploads its own keymap and then sends keycodes from it. An app that
+never applies that keymap reads those keycodes with the layout the real
+keyboard has — and since the generated keymap assigns characters to keycodes
+from 1 upward, `echo plain abcdef` arrives as `1234567894701-=`. Warp does
+this. Nothing in the protocol lets us detect it; the app just renders digits.
+
+So the default injector is `smart`: it types with `wtype`, and for the apps
+known to do this it puts the utterance on the clipboard and asks the
+**compositor** to deliver the paste chord (`hl.dsp.send_shortcut` on Hyprland —
+not a virtual keyboard, which is the thing being ignored). Terminals get
+Ctrl+Shift+V, everything else Ctrl+V, and the clipboard is put back about a
+second later. A clipboard holding an image is left untouched rather than
+replaced with text.
+
+`mynah set injector=wtype` never pastes; `injector=clipboard` always does.
 
 ## The desktop half
 

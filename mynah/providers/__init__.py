@@ -53,9 +53,18 @@ def _register_linux() -> None:
     _STT_PROVIDERS["whisper-cpp"] = ("linux", lambda: _import_attr(
         "mynah.providers.linux_stt", "WhisperCppProvider"))
     _AVAILABLE["whisper-cpp"] = lambda: _probe("mynah.providers.linux_stt", "find_binary")
+    # Registered first, so auto-detect picks it: types with wtype, and pastes
+    # into the apps that ignore a virtual keyboard's keymap (see
+    # linux_clipboard.SmartInjector).
+    _INJECTORS["smart"] = ("linux", lambda: _import_attr(
+        "mynah.providers.linux_clipboard", "SmartInjector"))
+    _AVAILABLE["smart"] = lambda: _probe("mynah.providers.linux_inject", "find_binary")
     _INJECTORS["wtype"] = ("linux", lambda: _import_attr(
         "mynah.providers.linux_inject", "WtypeInjector"))
     _AVAILABLE["wtype"] = lambda: _probe("mynah.providers.linux_inject", "find_binary")
+    _INJECTORS["clipboard"] = ("linux", lambda: _import_attr(
+        "mynah.providers.linux_clipboard", "ClipboardInjector"))
+    _AVAILABLE["clipboard"] = lambda: _probe("mynah.providers.linux_clipboard", "_clipboard_ready")
     _INDICATORS["socket"] = ("linux", lambda: _import_attr(
         "mynah.providers.linux_indicator", "SocketIndicator"))
 

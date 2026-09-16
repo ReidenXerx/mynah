@@ -172,6 +172,13 @@ _HALLUCINATION_VOCAB = frozenset(
 # Sentinel enqueued to tell the transcribe worker to exit its loop.
 _FLUSH_SENTINEL = object()
 
+# How much audio one transcription may merge, in bytes of 16-bit mono PCM.
+# Whisper's encoder works on a 30-second window; past that it chunks
+# internally and the merge stops paying for itself. 20 seconds leaves room
+# for the window without risking a split mid-sentence.
+_MERGE_LIMIT_SECONDS = 20
+_MERGE_LIMIT_BYTES = 2 * 16000 * _MERGE_LIMIT_SECONDS
+
 
 def _rms_int16(pcm_bytes: bytes) -> float:
     """RMS amplitude of 16-bit PCM, normalized to 0.0–1.0.
@@ -306,6 +313,8 @@ class DictationEngine:
         # Completed utterances ready for transcription — thread-safe queue
         # decoupling the audio callback (fast) from STT (slow).
         self._utterance_queue: queue.Queue = queue.Queue()
+        # Whether this session has typed anything yet — see _spaced().
+        self._typed_in_session = False
         self._stop_event = threading.Event()
         # Auto-stop request: set by the audio callback when silence elapses,
         # acted on by the run loop OFF the audio thread (the callback must
@@ -518,6 +527,9 @@ class DictationEngine:
             # that got louder/quieter between sessions is handled correctly.
             self._noise_cal_rms = []
             self._noise_calibrated = False
+            # Nothing typed yet, so the first utterance is not spaced away
+            # from whatever the user was already writing.
+            self._typed_in_session = False
             self._effective_frame_energy = self.s.frame_energy
             self._effective_min_energy = self.s.min_energy
             # Claim a new session generation and bind the worker/capture
@@ -879,6 +891,21 @@ class DictationEngine:
         self._in_speech = False
         self._silence_frames = 0
 
+    def _spaced(self, text: str) -> str:
+        """A separator between one utterance and the next, within a session.
+
+        Whisper returns each utterance trimmed, so typing them as they come
+        runs them together — "the fee is computedon gross". A leading space
+        fixes that, except before punctuation that belongs to the word before
+        it, and except for the first utterance of a session, which would
+        otherwise indent whatever the user was already writing.
+        """
+        if not self._typed_in_session or not text:
+            return text
+        if text[0] in ",.!?;:)]}»…":
+            return text
+        return " " + text
+
     # ---------- transcription worker ----------
 
     def _transcribe_loop(self, utterance_queue: queue.Queue | None = None) -> None:
@@ -897,7 +924,50 @@ class DictationEngine:
             item = utterance_queue.get()
             if item is _FLUSH_SENTINEL:
                 break
-            self._transcribe_and_inject(item, np)
+            merged, flushed = self._drain_queued(utterance_queue, item)
+            self._transcribe_and_inject(merged, np)
+            if flushed:
+                break
+
+    def _drain_queued(self, utterance_queue: queue.Queue, first: bytes) -> tuple[bytes, bool]:
+        """Join ``first`` with whatever else is already waiting behind it.
+
+        Whisper encodes a 30-second window whatever it is given, so three
+        utterances cost three full encodes while one merged utterance costs
+        one. That is what makes speaking in short bursts — talk, pause, talk —
+        fall further and further behind: every pause bought another encode.
+
+        Merging only ever takes what is ALREADY queued, so nothing waits for
+        audio that has not happened yet: with a free worker the first utterance
+        is transcribed alone and immediately, and batching appears only when
+        the user is talking faster than the machine transcribes, which is
+        exactly when it is needed.
+
+        The pieces are adjacent audio from one session, so concatenating them
+        also gives the model more context than a two-word fragment has, which
+        is what makes the text read as a sentence rather than as scraps.
+
+        Returns the merged PCM and whether the flush sentinel was consumed
+        while draining (the session is ending; the caller must stop after this
+        last transcription, which is exactly what the sentinel asked for).
+        """
+        parts = [first]
+        total = len(first)
+        flushed = False
+        while total < _MERGE_LIMIT_BYTES:
+            try:
+                item = utterance_queue.get_nowait()
+            except queue.Empty:
+                break
+            if item is _FLUSH_SENTINEL:
+                flushed = True
+                break
+            parts.append(item)
+            total += len(item)
+        if len(parts) > 1:
+            logger.debug("Merging %d queued utterances (%.1fs)", len(parts),
+                         total / (2 * WHISPER_SAMPLE_RATE))
+        return b"".join(parts), flushed
 
     def _transcribe_and_inject(self, pcm_bytes: bytes, np) -> None:
         """Transcribe a PCM utterance and inject the text into the focused app."""
@@ -951,7 +1021,8 @@ class DictationEngine:
                 return
             logger.debug("Injecting text: %s", text)
             try:
-                self.injector.type_text(text)
+                self.injector.type_text(self._spaced(text))
+                self._typed_in_session = True
             except Exception as e:  # noqa: BLE001
                 # An injection failure (Accessibility revoked, target app
                 # gone, ...) must never propagate: this runs on the

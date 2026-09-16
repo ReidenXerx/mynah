@@ -206,12 +206,25 @@
   .footer a { color: var(--muted); }
   .footer a:hover { color: var(--saffron); }
   .footer-links { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--mono); font-size: 12.5px; }
+
+  /* Back to the hub these pages belong to. */
+  .nav .back {
+    order: -1;
+    display: inline-flex; align-items: center; gap: .5em;
+    font: 600 13px/1 var(--mono); color: inherit; text-decoration: none;
+    border: 1px solid var(--rule); border-radius: 999px;
+    padding: 8px 13px 8px 10px; opacity: .9;
+    transition: border-color .15s ease, opacity .15s ease;
+  }
+  .nav .back:hover { opacity: 1; border-color: currentColor; }
+  .nav .back span { line-height: 0; font-size: 1.1em; }
 </style>
 </head>
 <body>
 <div class="page">
 
 <header class="nav">
+  <a class="back" href="https://duduphudu.app/#plugins"><span>&larr;</span> duduphudu</a>
   <a class="brand" href="#top">
     <svg viewBox="38 -10 208 208" aria-hidden="true"><path fill-rule="evenodd" fill="var(--bird)" d="M178 86 C176 58 156 36 126 34 C86 32 52 64 52 104 C52 136 70 162 98 172 C124 182 152 176 168 158 C176 140 179 112 178 86 Z M104 40 C96 22 98 10 110 2 C112 16 118 26 128 32 Z M132 30 C128 12 134 2 148 0 C146 14 148 24 154 34 Z M88 50 C74 38 70 26 78 16 C84 28 92 36 102 40 Z M176 78 L224 92 C232 95 232 105 224 108 L176 120 C172 106 172 92 176 78 Z M126 92 a24 24 0 1 0 48 0 a24 24 0 1 0 -48 0 z"/></svg>
     mynah

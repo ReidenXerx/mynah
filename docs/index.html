@@ -202,7 +202,7 @@
     </div>
     <ul class="facts">
       <li>no account · no API key</li>
-      <li>macOS today · Linux in progress</li>
+      <li>macOS and Linux · Wayland</li>
       <li>MIT</li>
     </ul>
   </div>
@@ -332,15 +332,15 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
       <tbody>
         <tr><th scope="row">The engine, segmentation and tuning</th><td class="shared" colspan="2">one implementation, shared — a platform never re-derives it</td></tr>
         <tr><th scope="row">Speech, on your own hardware</th><td>mlx-whisper, Apple GPU</td><td>whisper.cpp</td></tr>
-        <tr><th scope="row">Typing into the focused window</th><td>Accessibility API</td><td>wtype or the RemoteDesktop portal</td></tr>
-        <tr><th scope="row">The hotkey</th><td>pynput</td><td>your compositor's own binding</td></tr>
-        <tr><th scope="row">Indicator and menu</th><td>native pill and menu bar</td><td>tray item, Quickshell widget on Omarchy</td></tr>
+        <tr><th scope="row">Typing into the focused window</th><td>Accessibility API</td><td>wtype, on wlroots and KDE</td></tr>
+        <tr><th scope="row">The hotkey</th><td>pynput</td><td>your compositor's, bound to mynah toggle</td></tr>
+        <tr><th scope="row">Indicator and menu</th><td>native pill and menu bar</td><td>the shell's, through mynah watch</td></tr>
         <tr><th scope="row">Runs at login</th><td>SMAppService</td><td>systemd --user</td></tr>
-        <tr><th scope="row">A native app, no Python at runtime</th><td>Mynah.app</td><td>in progress</td></tr>
+        <tr><th scope="row">Where the face comes from</th><td>Mynah.app, no Python at runtime</td><td>the desktop&rsquo;s own shell</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note" style="margin-top: 16px;">Wayland only, deliberately: on X11 any client can read the keyboard and inject keystrokes, which is exactly what dictation needs — and exactly why the permission story there would be theatre. Portals grant both, visibly and revocably.</p>
+  <p class="note" style="margin-top: 16px;">Wayland only on Linux, deliberately: on X11 any client can already read the keyboard and inject keystrokes, so there is nothing to grant and nothing to revoke. The gap is GNOME, which does not implement the virtual-keyboard protocol <code>wtype</code> needs; a portal injector for it is not written yet.</p>
 </section>
 
 <section id="install">
@@ -348,7 +348,14 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
   <h2>One command, then a guided first run</h2>
   <div class="two">
     <div>
-<pre><span class="cmd">$ pipx install git+https://github.com/ReidenXerx/mynah.git</span>
+<pre><span class="dim">macOS</span>
+<span class="cmd">$ pipx install git+https://github.com/ReidenXerx/mynah.git</span>
+<span class="cmd">$ pipx inject mynah 'mynah[macos]'</span>
+
+<span class="dim">Linux</span>
+<span class="cmd">$ pipx inject mynah 'mynah[linux]'</span>
+<span class="cmd">$ sudo pacman -S whisper-cpp wtype</span>
+
 <span class="cmd">$ mynah setup</span>
 
 <span class="dim">mynah — first-time setup</span>

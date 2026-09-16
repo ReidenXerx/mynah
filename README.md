@@ -11,8 +11,8 @@ Everything runs on the machine you are sitting at.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-F5B301)](LICENSE)
 [![Python ≥3.11](https://img.shields.io/badge/python-%E2%89%A53.11-F5B301)](https://www.python.org/)
-[![macOS · Linux](https://img.shields.io/badge/macOS-shipping-3FBF9A)](#where-it-runs)
-[![Linux](https://img.shields.io/badge/Linux%20%C2%B7%20Wayland-in%20progress-FF8A3D)](docs/LINUX-APP.md)
+[![macOS](https://img.shields.io/badge/macOS-shipping-3FBF9A)](#where-it-runs)
+[![Linux · Wayland](https://img.shields.io/badge/Linux%20%C2%B7%20Wayland-shipping-3FBF9A)](docs/LINUX-APP.md)
 
 ```bash
 pipx install git+https://github.com/ReidenXerx/mynah.git
@@ -61,14 +61,29 @@ unloads and Mynah costs nothing at all.
 
 ## Install
 
+**macOS**
+
 ```bash
 pipx install git+https://github.com/ReidenXerx/mynah.git
-pipx inject mynah 'mynah[macos]'     # or 'mynah[linux]' when the Linux runtime lands
+pipx inject mynah 'mynah[macos]'
 mynah setup                          # dependencies, permissions, hotkey, login service
 ```
 
+**Linux (Wayland)**
+
+```bash
+pipx install git+https://github.com/ReidenXerx/mynah.git
+pipx inject mynah 'mynah[linux]'
+sudo pacman -S whisper-cpp wtype     # speech, and typing into the focused window
+mynah setup                          # checks each of these and names what is missing
+```
+
 `mynah setup` is the honest path: it checks each requirement, says which one is missing and what to
-do about it, and only installs the login service once everything else passes.
+do about it — including the one `curl` that downloads a speech model — and only installs the login
+service once everything else passes.
+
+On Omarchy, [omarchy-mynah](https://github.com/ReidenXerx/omarchy-mynah) adds the desktop half: it
+binds the key, puts the bird in the bar with a live level, and shows a pill while it listens.
 
 ## Commands
 
@@ -85,12 +100,12 @@ Settings live in `~/.config/mynah/config.toml`, shared with the macOS app. Usefu
 
 | Setting | What it does |
 | --- | --- |
-| `hotkey` | The global key, in pynput syntax (`<ctrl>+<space>`, `<f8>`) |
+| `hotkey` | The global key, in pynput syntax (`<ctrl>+<space>`, `<f8>`). macOS only — on Wayland your compositor binds `mynah toggle` |
 | `trigger` | `toggle` — press to start and stop — or `ptt`, hold to talk |
 | `language` | Spoken language code |
 | `model` | Speech model repo or path; empty means the provider's default |
 | `vad` | Split speech into utterances. Off means text only arrives at the end |
-| `sensitivity` | Per-frame speech floor: lower hears more, and more of the room |
+| `frame_energy` | Per-frame speech floor: lower hears more, and more of the room |
 | `auto_stop_silence` | Seconds of silence that end a session by themselves |
 
 ## Where it runs
@@ -99,14 +114,19 @@ Settings live in `~/.config/mynah/config.toml`, shared with the macOS app. Usefu
 | --- | --- | --- |
 | Dictation engine, segmentation, tuning | ✅ | ✅ |
 | Speech | mlx-whisper on the Apple GPU | whisper.cpp |
-| Typing into the focused window | Accessibility API | Wayland, `wtype` or the RemoteDesktop portal |
-| Hotkey | pynput | the compositor's own binding |
-| Indicator and menu | native pill + menu bar item | tray item, and a Quickshell widget on Omarchy |
-| Runs at login | `SMAppService` / LaunchAgent | `systemd --user` |
-| Native app | `Mynah.app`, no Python at runtime — see [SWIFT-APP.md](docs/SWIFT-APP.md) | planned — see [LINUX-APP.md](docs/LINUX-APP.md) |
+| Typing into the focused window | Accessibility API | `wtype`, on wlroots and KDE |
+| Hotkey | pynput | the compositor's own binding, to `mynah toggle` |
+| Indicator and menu | native pill + menu bar item | the shell's, through `mynah watch` — a bar widget and a pill on Omarchy |
+| Runs at login | `SMAppService` / LaunchAgent | `systemd --user`, tied to the graphical session |
+| Native app | `Mynah.app`, no Python at runtime — see [SWIFT-APP.md](docs/SWIFT-APP.md) | the desktop's own shell — see [LINUX-APP.md](docs/LINUX-APP.md) |
 
 The engine is provider-abstracted: speech, typing and indicator are interfaces, and a platform is a
-set of implementations. That is why the Linux port is a set of providers rather than a rewrite.
+set of implementations. That is why the Linux port is three small providers rather than a rewrite —
+and why the tuning contract is shared instead of re-derived.
+
+Wayland only on Linux, deliberately: on X11 any client can already read the keyboard and inject
+keystrokes, so there is nothing to grant and nothing to revoke. GNOME is the gap — it does not
+implement the virtual-keyboard protocol `wtype` needs, and a portal injector is not written yet.
 
 ## Nothing leaves your machine
 

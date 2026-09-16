@@ -1,114 +1,126 @@
-# The Linux dictation adapter
+# Dictation on Linux
 
-`mynah-daemon` (P1 in docs/ARCHITECTURE.md) brings native dictation to Linux:
-the same segmentation pipeline, pinned to the same tuning contract and golden
-corpus, in a small daemon instead of a port of the PyObjC daemon.
+The same engine as macOS, with the edges turned outward.
 
-## Decisions (settled)
+On macOS mynah owns everything: it grabs its own hotkey with pynput, transcribes
+in-process with mlx-whisper, types with the Accessibility API and draws its own
+NSPanel. On Wayland it can do none of those things, and that is not a gap to
+work around — it is the design of the platform. A client may not read the
+keyboard globally, and the shell, not the app, draws the desktop.
 
-**Wayland only.** No X11 support, not even as a fallback. Rationale:
+So the Linux side is a set of providers plus one socket:
 
-- X11 has no security model: any client can snoop and inject keystrokes
-  globally. Dictation needs exactly those two capabilities — reading a global
-  hotkey and injecting text — so on X11 the app would be no more privileged
-  than any keylogger, and any "security" prompting would be theater.
-- Wayland's portals grant both capabilities with user-visible, revocable,
-  per-app permission. The Linux desktop direction is Wayland (GNOME, KDE,
-  and wlroots compositors all default to it), and supporting X11 doubles the
-  integration surface for a security story we cannot honestly tell.
-- Note: the portal APIs themselves often have X11 backends. We are not
-  restricting the build to Wayland-only systems; we simply do not ship an
-  X11-specific path. If a user runs a Wayland compositor with XWayland,
-  portals still work for the Wayland side; dictating into X11 apps happens
-  through the portal's injection, where available.
-
-**Stack.**
-
-| Concern | Choice | Why |
+| Concern | Here | Why |
 |---|---|---|
-| Language | Rust | no GC pauses on the audio thread; one core crate shared with the UI (P3) |
-| Audio capture | PipeWire | the Linux audio layer; wireplumber handles device routing; captures at 16 kHz mono like `sounddevice` does |
-| Global shortcut | xdg-desktop-portal GlobalShortcuts | the Wayland-blessed way to get a global hotkey with a permission dialog |
-| Screen/keyboard capture for injection | xdg-desktop-portal RemoteDesktop | the sanctioned input-injection path on Wayland |
-| Tray | StatusNotifierItem (SNI) over D-Bus | works on GNOME (appindicator ext), KDE, wlroots trays; no GTK/Qt dependency needed to serve it |
-| Service | systemd `--user` unit | the Linux equivalent of the macOS LaunchAgent: starts at login, restarts on failure, `systemctl --user` controls it |
+| Speech | `whisper-cli` (whisper.cpp), a subprocess per utterance | the binary the distro already packages; no Python speech dependency at all |
+| Typing | `wtype`, text on **stdin** | the virtual-keyboard protocol is the compositor-blessed way to synthesize input |
+| Indicator | published on the control socket | the shell draws it, in the desktop's own idiom |
+| Hotkey | your compositor, bound to `mynah toggle` | no Wayland client may grab a global key |
+| Capture | `sounddevice`, 16 kHz mono, 30 ms frames | unchanged from macOS; PipeWire serves it through PortAudio |
+| Segmentation | unchanged | the golden corpus pins one implementation for both platforms |
+| Service | `systemd --user`, tied to `graphical-session.target` | the Linux equivalent of the LaunchAgent |
 
-## What the daemon does
+Install:
 
-The lifecycle mirrors the macOS app: a resident tray daemon that is idle
-until the portal-registered hotkey starts a session. Per session:
+```bash
+pipx install git+https://github.com/ReidenXerx/mynah.git
+pipx inject mynah 'mynah[linux]'
+sudo pacman -S whisper-cpp wtype      # or your distro's equivalents
+mynah setup
+```
 
-1. Calibrate ambient noise for `noise_calibration_seconds` (tuning.toml),
-   keeping the frames (the PR #1 lesson — speech in the window is segmented,
-   not dropped).
-2. Capture 16 kHz mono via PipeWire in 30 ms frames.
-3. Run the energy-gate state machine (`mynah-core`'s detector — the same
-   logic the golden corpus pins).
-4. Close utterances at `utterance_silence`, trim trailing silence to
-   `trailing_padding` (following the Swift policy — see divergences in
-   ARCHITECTURE.md).
-5. Gate on min-length and whole-buffer RMS, transcribe with whisper.cpp
-   (vendored build, same pinned version as macOS), and inject via the
-   RemoteDesktop portal session.
+`mynah setup` checks each of those, names what is missing, and prints the exact
+command that fixes it — including the `curl` that downloads a model.
 
-The hotkey toggles a session (matching the `trigger = "toggle"` default);
-push-to-talk arrives with the same trigger handling as macOS.
+## The control socket
 
-## Permissions UX
+`$XDG_RUNTIME_DIR/mynah/control.sock`, line-delimited JSON, mode 0600 in a 0700
+directory the server refuses to use unless it owns it.
 
-Portals put the permission story in the desktop's hands, which is what we
-want on Linux (unlike X11, where nothing can be enforced):
+```
+{"cmd": "toggle"}     -> {"ok": true, "state": "idle"}
+{"cmd": "status"}     -> {"ok": true, "state": "listening", "pid": 4242}
+{"cmd": "subscribe"}  -> then one event per line:
+                         {"event": "state", "state": "listening"}
+                         {"event": "level", "level": 0.42}
+                         {"event": "text",  "text": "the fee is computed"}
+```
 
-- **GlobalShortcuts**: the compositor shows a bind/listen dialog; the user
-  confirms the shortcut once, and it can be revoked per-app in settings.
-- **RemoteDesktop**: a session-scoped dialog for input injection. We ask at
-  first session start, not at daemon startup, so the prompt is attached to
-  the user's action, not to login.
+`mynah toggle` is what a keybinding runs. `mynah watch` is what a shell plugin
+reads: every line is a complete JSON object and stdout is flushed per line, so a
+`Process` with a line parser is the whole integration.
 
-Failure modes must degrade the way the macOS app does: a denied portal
-request surfaces in the tray (tooltip/menu line) and does not crash the
-daemon; the daemon retries the permission on the next session attempt.
+Two properties that are easy to get wrong and hard to notice:
 
-## Support matrix
+- **A command is acknowledged, then carried out.** Ending a session drains the
+  transcription queue, which is seconds of whisper. Replying only afterwards
+  made the key that stopped dictation look wedged and timed the client out.
+- **Level events are coalesced to ~30 a second.** They are published from the
+  capture thread for every 30 ms frame, and a shell that stops reading must
+  never be able to stall audio.
 
-| Desktop | Global hotkey | Text injection | Notes |
-|---|---|---|---|
-| GNOME (Wayland) | ✅ GlobalShortcuts | ✅ RemoteDesktop | XDG portal support built in |
-| KDE Plasma (Wayland) | ✅ GlobalShortcuts | ✅ RemoteDesktop | native portal frontends |
-| Sway / Hyprland / wlroots | ⚠️ compositor-dependent | ⚠️ compositor-dependent | portals need xdg-desktop-portal-wlr; some compositors ship their own |
-| X11 sessions (any DE) | ❌ no X11 path | ❌ no X11 path | by decision — see above |
+## The desktop half
 
-The P1 acceptance bar is the first row: GNOME or KDE on Wayland,
-end-to-end dictate, golden corpus green through `mynah-core`'s detector.
+[omarchy-mynah](https://github.com/ReidenXerx/omarchy-mynah) is the Omarchy
+plugin: it binds the key through `hl.bind` (and re-binds after a config reload,
+which drops runtime binds), puts the bird in the bar with a live level, and
+shows a pill while a session is open. It starts the engine itself when nothing
+else is running one, and adopts the systemd service when there is one.
 
-## Open issues
+Nothing about the engine depends on it. Without a shell plugin, dictation works
+exactly the same; it just has no face.
 
-1. **RemoteDesktop is heavy for text injection.** The portal was designed for
-   screen sharing + remote control; we only need CreateVirtualKeyboard. Watch
-   the spec for a lighter surface; if injection via ydotool-style uinput is
-   ever sanctioned for sandboxed apps, prefer it.
-2. **SNI without a full toolkit.** Serving SNI over D-Bus directly avoids
-   GTK/Qt deps, but icon handling (menus, activation) is fiddly. If it costs
-   more than it saves, a minimal `ksni`-style crate is the fallback.
-3. **PipeWire capture permissions.** Screen-capture portals gate screen
-   audio; microphone capture is Flatpak/snap sandbox policy. For a
-   non-sandboxed build this is plain PipeWire permission, but if we ever
-   sandbox the daemon, mic access needs the pipewire portal story nailed
-   down.
-4. **Calibration defect — resolved, no longer open.** The shared
-   poisoned-calibration defect is fixed speech-aware in both engines
-   (see ARCHITECTURE.md): calibration frames at or above
-   `calibration_speech_floor` are excluded from the noise median, and
-   fewer than `noise_min_samples` quiet frames aborts calibration to
-   the static gates. `mynah-core` ports that exactly; the corpus cases
-   `speech_during_calibration` and `speech_over_noise_in_calibration`
-   pin it for every implementation, Rust included.
+## Latency, measured
 
-## Out of scope for P1
+Whisper encodes a 30-second window whatever you said, so the cost is per
+utterance, not per second of speech. On a 22-core Meteor Lake laptop, CPU only:
 
-- X11 (permanent decision, see above).
-- Diarization/analyze (that is P2 — this daemon is dictation only).
-- UI (P3; the daemon exposes enough D-Bus surface for a tray, which
-  satisfies P1 without a separate UI process).
-- Model downloads: P1 uses the same `mynah models download` layout and the
-  user's existing models dir; a first-class Linux downloader can come later.
+| Model | Per utterance | "The fee is computed on gross, but it should be net." |
+|---|---|---|
+| `ggml-base` (142 MB) | ~1.5 s | "The **feed** is computed on **bros**, but it should be net." |
+| `ggml-small` (466 MB) | ~4.2 s | exact |
+
+(Synthetic speech, which is harder than a real voice.) Utterances pipeline — the
+next is captured while the last is transcribed — but talk faster than your
+machine transcribes and the text falls further behind. `small` is the default
+because a wrong word costs more than a second; `mynah set model=base` is there
+for a slower machine or a faster feel.
+
+A GPU backend would change this picture: whisper.cpp loads `ggml-*` backends
+from `/usr/lib/ggml`, and on Arch `ggml-cuda`, `ggml-hip` and `ggml-openvino` are
+packaged. None is installed by default, and mynah does not install one: waking a
+discrete GPU for every sentence is a choice for the machine's owner, not for a
+dictation tool.
+
+## Wayland only
+
+No X11 path, deliberately. On X11 any client can read the keyboard and inject
+keystrokes globally, which is exactly what dictation needs — so there is nothing
+to grant and nothing to revoke, and a permission story there would be theatre.
+Wayland puts both capabilities where they can be seen: the compositor decides
+whether to honour the virtual keyboard, and the binding is the user's own.
+
+`wtype` needs `virtual-keyboard-v1`, which wlroots compositors (Hyprland, Sway,
+river) implement. GNOME does not, and there `wtype` fails — a `RemoteDesktop`
+portal injector is the way in, and is not written yet. That is the honest state
+of the support matrix:
+
+| Desktop | Hotkey | Typing |
+|---|---|---|
+| Hyprland / Sway / wlroots | your compositor's own binding | ✅ `wtype` |
+| KDE Plasma (Wayland) | its global shortcuts | ✅ `wtype` (KWin implements the protocol) |
+| GNOME (Wayland) | its custom shortcuts | ❌ needs a portal injector |
+| X11, any desktop | — | ❌ by decision, see above |
+
+## What a Rust daemon would buy
+
+An earlier plan for this was a Rust daemon (`mynah-core`) with PipeWire capture,
+the GlobalShortcuts portal and a StatusNotifierItem tray. It is not what shipped,
+because the engine already existed and the platform-specific part turned out to
+be three small providers rather than a port.
+
+What that plan would still buy, if the Python version's costs ever bite: no
+interpreter in the session, no per-utterance subprocess, and a tray that works on
+desktops with no Quickshell. Nothing about the current design blocks it — the
+control protocol above is the contract, and a Rust engine that speaks it would
+leave the Omarchy plugin untouched.

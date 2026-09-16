@@ -1,4 +1,11 @@
-"""launchd LaunchAgent management for ``mynah``.
+"""The login service. launchd here, systemd --user on Linux.
+
+``install`` / ``uninstall`` / ``status`` are the platform-neutral verbs the CLI
+calls; everything else in this module is launchd. On Linux they hand straight
+over to ``mynah.systemd`` — see that module for why the unit is tied to the
+graphical session rather than to login.
+
+launchd LaunchAgent management for ``mynah``.
 
 Manages a per-user LaunchAgent that starts ``mynah`` at login and
 keeps it running (``KeepAlive``). This is the \"always-on\" service: the
@@ -269,11 +276,20 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
 
-def install() -> int:
-    """Install and load the LaunchAgent so dictation starts at login.
+def _is_macos() -> bool:
+    return sys.platform == "darwin"
 
-    Refreshes if already loaded. Returns 0 on success, 1 if launchctl fails.
+
+def install() -> int:
+    """Install the login service so dictation starts with the session.
+
+    Refreshes if already loaded. Returns 0 on success, 1 if the init system
+    refuses.
     """
+    if not _is_macos():
+        from mynah import systemd
+
+        return systemd.install()
     _LAUNCH_AGENTS_DIR.mkdir(parents=True, exist_ok=True)
     _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -311,7 +327,11 @@ def install() -> int:
 
 
 def uninstall() -> int:
-    """Unload and remove the LaunchAgent. Returns 0 even if not installed."""
+    """Remove the login service. Returns 0 even if it was not installed."""
+    if not _is_macos():
+        from mynah import systemd
+
+        return systemd.uninstall()
     plist = plist_path()
     if plist.exists():
         _run(["launchctl", "unload", str(plist)])
@@ -326,6 +346,10 @@ def uninstall() -> int:
 
 def status() -> int:
     """Print the service status: loaded/not-loaded, PID, last exit."""
+    if not _is_macos():
+        from mynah import systemd
+
+        return systemd.status()
     res = _run(["launchctl", "list", LABEL])
     if res.returncode != 0:
         print(f"mynah service: not loaded ({LABEL}).")

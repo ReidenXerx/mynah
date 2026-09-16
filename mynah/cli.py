@@ -7,6 +7,13 @@
     mynah service ...      install | uninstall | status of the login service
     mynah providers        which speech, typing and indicator providers are here
 
+On Wayland the compositor owns the hotkey, so three more commands exist for it
+and for the desktop shell to drive a running mynah:
+
+    mynah toggle           start or end a session (bind your key to this)
+    mynah status           what it is doing right now
+    mynah watch            stream state, level and typed text as JSON lines
+
 Every command takes --help. The one you run most is the first one, and after
 `mynah setup` installs the service you rarely run any of them: the hotkey is the
 interface.
@@ -240,6 +247,60 @@ def cmd_providers(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_control(args: argparse.Namespace) -> int:
+    """Drive a running mynah through its control socket.
+
+    This is what a compositor keybinding and a shell plugin call. It is not the
+    macOS path: there the app owns its hotkey and there is no socket to talk to.
+    """
+    from mynah import control
+
+    try:
+        reply = control.command(args.control_cmd)
+    except control.ControlError as e:
+        print(f"mynah: {e}", file=sys.stderr)
+        return 1
+    if not reply.get("ok"):
+        print(f"mynah: {reply.get('error', 'refused')}", file=sys.stderr)
+        return 1
+    state = reply.get("state")
+    if state and args.control_cmd != "quit":
+        print(state)
+    return 0
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    """Stream events from a running mynah as JSON lines, one per line.
+
+    Written for a shell plugin to read from a pipe: every line is a complete
+    JSON object, stdout is flushed per line, and the stream ends when mynah
+    quits or the reader goes away.
+    """
+    import json
+
+    from mynah import control
+
+    try:
+        conn = control.connect(timeout=args.timeout)
+    except control.ControlError as e:
+        print(f"mynah: {e}", file=sys.stderr)
+        return 1
+    try:
+        conn.settimeout(None)
+        conn.sendall(b'{"cmd": "subscribe"}\n')
+        with conn.makefile("r", encoding="utf-8") as reader:
+            for line in reader:
+                line = line.strip()
+                if not line:
+                    continue
+                print(line, flush=True)
+    except (OSError, KeyboardInterrupt):
+        pass
+    finally:
+        conn.close()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mynah",
@@ -285,6 +346,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("providers", help="What can listen, type and show an indicator here").set_defaults(
         func=cmd_providers)
+
+    sub.add_parser("toggle", help="Start or end a session in a running mynah").set_defaults(
+        func=cmd_control, control_cmd="toggle")
+    sub.add_parser("start", help="Start a session in a running mynah").set_defaults(
+        func=cmd_control, control_cmd="start")
+    sub.add_parser("stop", help="End the session in a running mynah").set_defaults(
+        func=cmd_control, control_cmd="stop")
+    sub.add_parser("status", help="What a running mynah is doing").set_defaults(
+        func=cmd_control, control_cmd="status")
+    sub.add_parser("quit", help="Ask a running mynah to exit").set_defaults(
+        func=cmd_control, control_cmd="quit")
+
+    watch = sub.add_parser("watch", help="Stream state, level and typed text as JSON lines")
+    watch.add_argument("--timeout", type=float, default=2.0,
+                       help="Seconds to wait for a running mynah before giving up")
+    watch.set_defaults(func=cmd_watch)
     return parser
 
 

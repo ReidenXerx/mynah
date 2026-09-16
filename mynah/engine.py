@@ -382,6 +382,12 @@ class DictationEngine:
         ok, hint = self.injector.check_permissions()
         if not ok:
             print(hint, file=sys.stderr)
+            # Only macOS has a permission the user grants in a dialog while we
+            # wait. Elsewhere the check fails because something is missing from
+            # the system, and polling for five minutes would just hide the
+            # message that says what to install.
+            if not _is_macos():
+                return 1
             if not _wait_for_accessibility(self.injector):
                 return 1
             print("Accessibility granted — starting mynah.", file=sys.stderr)
@@ -666,7 +672,7 @@ class DictationEngine:
             import sounddevice as sd
         except ImportError:
             print(
-                "sounddevice not installed. Install the macos extra:\n"
+                "sounddevice not installed. Install the runtime extra:\n"
                 "  pipx inject mynah 'mynah[macos]'",
                 file=sys.stderr,
             )
@@ -996,7 +1002,14 @@ class DictationEngine:
         if self.s.show_indicator and self.s.idle_visible:
             self._set_state("idle")
             self.indicator.show()
+        server = self._start_control_server()
         listener = self._start_hotkey_listener()
+        if listener is None and server is None:
+            print(
+                "Nothing can start a session: no hotkey listener and no control "
+                "socket. Dictation will sit idle.",
+                file=sys.stderr,
+            )
         try:
             while not self._stop_event.is_set():
                 time.sleep(_TICK)
@@ -1005,7 +1018,41 @@ class DictationEngine:
         finally:
             if listener:
                 listener.stop()
+            if server:
+                server.stop()
         return 0
+
+    def _start_control_server(self):
+        """Serve the control socket, so the compositor and shell can drive us.
+
+        Only on Linux: macOS owns its hotkey and draws its own indicator, so
+        nothing outside the process needs to speak to it. Returns the server,
+        or None when there is none to run (a socket we could not open is a
+        reason to say so, not to refuse to dictate).
+        """
+        if _is_macos():
+            return None
+        from mynah import control
+
+        server = control.ControlServer(
+            on_toggle=self.toggle_session,
+            on_start=self.ptt_press,     # idempotent: start if not running
+            on_stop=self.ptt_release,    # idempotent: stop if running
+            on_quit=self.stop,
+            state=lambda: self._indicator_state,
+        )
+        try:
+            server.start()
+        except Exception as e:  # noqa: BLE001
+            print(f"Control socket unavailable: {e}", file=sys.stderr)
+            return None
+        print(
+            f"mynah is listening on {server.path}\n"
+            f"  Bind a key to:  mynah toggle\n"
+            f"  Watch it with:  mynah watch",
+            file=sys.stderr,
+        )
+        return server
 
     def _run_with_appkit(self) -> int:
         """Run with the macOS AppKit event loop, owned by rumps.
@@ -1110,12 +1157,19 @@ class DictationEngine:
         modifier+key combo; pynput only fires press/release for the final key
         in a combo, which is exactly what we want.
         """
+        if not _is_macos():
+            # No client can grab a global hotkey on Wayland — that is the
+            # point of Wayland. The compositor binds the key and runs
+            # `mynah toggle`, which reaches us through the control socket.
+            logger.debug("hotkey is the compositor's on this platform")
+            return None
+
         try:
             from pynput import keyboard
         except ImportError:
             print(
                 "pynput not installed — cannot listen for the hotkey.\n"
-                "Install the dictate extra: pipx inject mynah 'mynah[macos]'\n"
+                "Install the macos extra: pipx inject mynah 'mynah[macos]'\n"
                 "Or press Ctrl+C to quit (dictation won't toggle without a hotkey).",
                 file=sys.stderr,
             )

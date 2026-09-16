@@ -20,9 +20,13 @@ verified, not assumed.
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -35,14 +39,29 @@ class CheckResult:
     hint: str = ""
 
 
+def _is_linux() -> bool:
+    return sys.platform.startswith("linux")
+
+
+def extra_name() -> str:
+    """The extra that carries this platform's runtime deps."""
+    return "linux" if _is_linux() else "macos"
+
+
+def _required_modules() -> tuple[str, ...]:
+    """What has to import before dictation can run here.
+
+    Linux needs no pynput (the compositor owns the hotkey) and no pyobjc
+    (there is no window to draw) — capture and segmentation, and that is all.
+    """
+    if _is_linux():
+        return ("sounddevice", "webrtcvad", "numpy")
+    return ("sounddevice", "pynput", "webrtcvad", "AppKit", "Quartz", "ApplicationServices")
+
+
 def _extra_installed() -> bool:
-    """True if the 'macos' extra's heavy deps are importable."""
-    for mod in ("sounddevice", "pynput", "webrtcvad"):
-        try:
-            __import__(mod)
-        except ImportError:
-            return False
-    for mod in ("AppKit", "Quartz", "ApplicationServices"):
+    """True if this platform's extra is importable."""
+    for mod in _required_modules():
         try:
             __import__(mod)
         except ImportError:
@@ -51,12 +70,12 @@ def _extra_installed() -> bool:
 
 
 def _inject_extra() -> int:
-    """Run ``pipx inject mynah 'mynah[macos]'``, streaming output live.
+    """Run ``pipx inject mynah 'mynah[<platform>]'``, streaming output live.
 
     Returns the pipx exit code (0 = success).
     """
     return subprocess.run(
-        ["pipx", "inject", "mynah", "mynah[macos]"], check=False
+        ["pipx", "inject", "mynah", f"mynah[{extra_name()}]"], check=False
     ).returncode
 
 
@@ -66,13 +85,13 @@ def _check_extra() -> CheckResult:
         return CheckResult(
             ok=True,
             title="Runtime extra",
-            detail="sounddevice, pynput, webrtcvad, pyobjc all importable",
+            detail=", ".join(_required_modules()) + " all importable",
         )
     return CheckResult(
         ok=False,
         title="Runtime extra",
         detail="Missing deps — will auto-install now",
-        hint="pipx inject mynah 'mynah[macos]'",
+        hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
     )
 
 
@@ -114,7 +133,7 @@ def _check_accessibility() -> CheckResult:
             ok=False,
             title="Accessibility",
             detail="PyObjC not installed — cannot check",
-            hint="pipx inject mynah 'mynah[macos]'",
+            hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
         )
 
 
@@ -133,7 +152,7 @@ def _check_microphone() -> CheckResult:
             ok=False,
             title="Microphone",
             detail="sounddevice not installed — cannot check",
-            hint="pipx inject mynah 'mynah[macos]'",
+            hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
         )
     try:
         # A zero-block, sub-second stream open is enough to trigger the OS
@@ -185,7 +204,7 @@ def _check_hotkey() -> CheckResult:
             ok=False,
             title="Hotkey",
             detail="pynput not installed — cannot validate",
-            hint="pipx inject mynah 'mynah[macos]'",
+            hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
         )
     from mynah.config import load as load_config
 
@@ -211,6 +230,132 @@ def _check_hotkey() -> CheckResult:
         )
 
 
+# ---------------------------------------------------------------------------
+# Linux checks. Nothing here is a permission dialog: on Wayland what can be
+# missing is a tool, a model, or a keybinding the compositor owns.
+# ---------------------------------------------------------------------------
+
+
+def _check_typing() -> CheckResult:
+    """Can we type into the focused window at all?"""
+    from mynah.providers.linux_inject import WtypeInjector
+
+    ok, hint = WtypeInjector().check_permissions(prompt=False)
+    if ok:
+        return CheckResult(
+            ok=True,
+            title="Typing",
+            detail="wtype is installed — mynah can type into the focused window",
+        )
+    first, _, rest = hint.partition("\n")
+    return CheckResult(ok=False, title="Typing", detail=first, hint=rest.strip())
+
+
+def _check_speech() -> CheckResult:
+    """whisper.cpp and a model to run through it."""
+    from mynah.providers import linux_stt
+    from mynah.config import load as load_config
+
+    binary = linux_stt.find_binary()
+    if binary is None:
+        return CheckResult(
+            ok=False,
+            title="Speech",
+            detail="whisper.cpp is not installed",
+            hint=(
+                "Arch:   sudo pacman -S whisper-cpp\n"
+                "  Debian: sudo apt install whisper.cpp\n"
+                "  Or point mynah at a build: MYNAH_WHISPER_CLI=/path/to/whisper-cli"
+            ),
+        )
+    wanted = load_config().model
+    model = linux_stt.find_model(wanted)
+    if model is None:
+        name = (wanted or linux_stt.DEFAULT_MODEL).strip()
+        size = linux_stt.MODEL_SIZES.get(name, "")
+        known = name if name in linux_stt.MODEL_SIZES else linux_stt.DEFAULT_MODEL
+        return CheckResult(
+            ok=False,
+            title="Speech",
+            detail=f"{Path(binary).name} is installed, but there is no {name!r} model",
+            hint=(
+                f"Download it{f' ({size})' if size else ''}:\n"
+                f"  {linux_stt.download_command(known)}\n"
+                "  Or point at one you have:  mynah set model=/path/to/ggml-small.bin"
+            ),
+        )
+    return CheckResult(
+        ok=True,
+        title="Speech",
+        detail=f"{Path(binary).name} with {model.name}",
+    )
+
+
+def _check_compositor_hotkey() -> CheckResult:
+    """Is a key actually bound to `mynah toggle`?
+
+    No client can grab a global hotkey on Wayland, so this is the compositor's
+    job and usually beyond our reach. Hyprland can be asked, which is the
+    common case on Omarchy — anywhere else we say what to bind and leave the
+    verdict open rather than claim a check we did not make.
+    """
+    binds = _hyprland_binds()
+    if binds is None:
+        return CheckResult(
+            ok=True,
+            title="Hotkey",
+            detail="Bound in your compositor (mynah cannot read it from here)",
+            hint="Bind a key to:  mynah toggle",
+        )
+    for combo, dispatched in binds:
+        if "mynah" in dispatched and ("toggle" in dispatched or dispatched.endswith("mynah")):
+            return CheckResult(ok=True, title="Hotkey", detail=f"{combo} → {dispatched}")
+    return CheckResult(
+        ok=False,
+        title="Hotkey",
+        detail="No Hyprland binding runs mynah",
+        hint=(
+            "Add one, then reload:\n"
+            "  bind = SUPER, D, exec, mynah toggle\n"
+            "  The Omarchy plugin binds it for you: "
+            "omarchy plugin add https://github.com/ReidenXerx/omarchy-mynah.git --enable"
+        ),
+    )
+
+
+def _hyprland_binds() -> list[tuple[str, str]] | None:
+    """Hyprland's bindings as (combo, dispatched) pairs, or None if not asked.
+
+    None means "no verdict": not Hyprland, no hyprctl, or a version whose JSON
+    we do not recognize. A check that cannot run must not fail the user.
+    """
+    if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return None
+    hyprctl = shutil.which("hyprctl")
+    if hyprctl is None:
+        return None
+    try:
+        done = subprocess.run(
+            [hyprctl, "-j", "binds"], capture_output=True, text=True, timeout=5, check=False
+        )
+        if done.returncode != 0:
+            return None
+        binds = json.loads(done.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    if not isinstance(binds, list):
+        return None
+    out = []
+    for bind in binds:
+        if not isinstance(bind, dict):
+            continue
+        key = str(bind.get("key", ""))
+        mods = bind.get("modmask", 0)
+        combo = f"{'SUPER+' if isinstance(mods, int) and mods & 64 else ''}{key}"
+        out.append((combo, f"{bind.get('dispatcher', '')} {bind.get('arg', '')}".strip()))
+    return out
+
+
 _CHECKS = (
     ("extra", _check_extra),
     ("accessibility", _check_accessibility),
@@ -218,10 +363,23 @@ _CHECKS = (
     ("hotkey", _check_hotkey),
 )
 
+_CHECKS_LINUX = (
+    ("extra", _check_extra),
+    ("typing", _check_typing),
+    ("speech", _check_speech),
+    ("microphone", _check_microphone),
+    ("hotkey", _check_compositor_hotkey),
+)
+
+
+def checks_for_platform() -> tuple[tuple[str, object], ...]:
+    """The checks that mean something on this platform."""
+    return _CHECKS_LINUX if _is_linux() else _CHECKS
+
 
 def run_checks() -> list[CheckResult]:
     """Run all prerequisite checks in order, returning their results."""
-    return [fn() for _name, fn in _CHECKS]
+    return [fn() for _name, fn in checks_for_platform()]
 
 
 def _mark(ok: bool) -> str:
@@ -248,13 +406,14 @@ def setup(install_service: bool = True) -> int:
     # mlx-whisper + deps (~1.6 GB), so stream pipx's output live. After
     # injecting, the checks import lazily so they'll pick up the fresh install.
     if not _extra_installed():
-        print("  ⚙ Installing the macos extra (mlx-whisper + deps)…", file=sys.stderr)
-        print("    This downloads ~1.6 GB — give it a minute.\n", file=sys.stderr)
+        print(f"  ⚙ Installing the {extra_name()} extra…", file=sys.stderr)
+        if not _is_linux():
+            print("    This downloads ~1.6 GB — give it a minute.\n", file=sys.stderr)
         rc = _inject_extra()
         if rc != 0:
             print(
-                f"  ✗ Failed to install the macos extra (pipx exit {rc}).\n"
-                "    Run manually: pipx inject mynah 'mynah[macos]'",
+                f"  ✗ Failed to install the {extra_name()} extra (pipx exit {rc}).\n"
+                f"    Run manually: pipx inject mynah 'mynah[{extra_name()}]'",
                 file=sys.stderr,
             )
             return 1

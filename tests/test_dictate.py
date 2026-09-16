@@ -110,7 +110,16 @@ class _FakeSoundDevice(types.ModuleType):
         _t.sleep(ms / 1000.0)
 
 
-sys.modules.setdefault("numpy", _FakeNumpy("numpy"))
+# The numpy stand-in is for machines without numpy; where the real one is
+# installed, use it. Anything else lets this file's stub leak into tests that
+# do need real array maths (tests/test_linux.py writes an actual WAV).
+try:  # pragma: no cover - depends on the environment
+    import numpy  # noqa: F401
+except ImportError:  # pragma: no cover
+    sys.modules.setdefault("numpy", _FakeNumpy("numpy"))
+
+# sounddevice stays faked even when it is installed: the capture loop has to be
+# driven deterministically, and a real one would open the microphone.
 sys.modules.setdefault("sounddevice", _FakeSoundDevice("sounddevice"))
 
 
@@ -738,11 +747,34 @@ def test_run_polls_for_accessibility_then_starts(monkeypatch):
         return original(prompt=prompt)
 
     injector.check_permissions = granting_check
-    # Mock _run_plain so it doesn't start a real pynput listener.
-    monkeypatch.setattr(engine, "_run_plain", lambda: 0)
+    # Waiting at the dialog is macOS behaviour; stub the run loop it reaches.
+    monkeypatch.setattr(eng, "_is_macos", lambda: True)
+    monkeypatch.setattr(engine, "_run_with_appkit", lambda: 0)
     rc = engine.run()
     assert rc == 0
     assert call_count["n"] >= 3, "should have polled at least 3 times"
+
+
+def test_run_exits_at_once_when_the_platform_has_no_dialog(monkeypatch):
+    """Off macOS a failed permission check means a missing tool, not a dialog.
+
+    Polling for five minutes would bury the message that says what to install,
+    so run() prints the hint and exits 1 immediately.
+    """
+    injector = FakeInjector()
+    injector.permissions_ok = False
+    engine = _make_engine(injector=injector)
+    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+
+    polled = {"n": 0}
+
+    def _never(*_a, **_k):
+        polled["n"] += 1
+        return True
+
+    monkeypatch.setattr(eng, "_wait_for_accessibility", _never)
+    assert engine.run() == 1
+    assert polled["n"] == 0
 
 
 def test_run_exits_if_accessibility_never_granted(monkeypatch):
@@ -750,7 +782,7 @@ def test_run_exits_if_accessibility_never_granted(monkeypatch):
     injector = FakeInjector()
     injector.permissions_ok = False
     engine = _make_engine(injector=injector)
-    monkeypatch.setattr(eng, "_is_macos", lambda: False)
+    monkeypatch.setattr(eng, "_is_macos", lambda: True)
     monkeypatch.setattr(eng, "_PERM_POLL_INTERVAL", 0.01)
     monkeypatch.setattr(eng, "_PERM_POLL_TIMEOUT", 0.05)
     rc = engine.run()
@@ -1146,6 +1178,11 @@ def test_start_session_aborts_if_stop_races_during_load():
 
 
 def _install_fake_pynput(monkeypatch, hotkey_parse):
+    # Installing a fake pynput means "pretend we are on the platform whose
+    # hotkey the app owns". Elsewhere the compositor owns it and the listener
+    # is deliberately not started, so force the macOS branch here.
+    monkeypatch.setattr(eng, "_is_macos", lambda: True)
+
     import types as _types
 
     class FakeKey:
@@ -1760,6 +1797,9 @@ def test_service_build_plist_falls_back_to_python_m(monkeypatch):
 def test_service_install_writes_plist_and_loads(monkeypatch, tmp_path):
     from mynah import service
 
+    # install/uninstall/status dispatch by platform; this is the launchd side.
+    monkeypatch.setattr(service, "_is_macos", lambda: True)
+
     plist = tmp_path / f"{service.LABEL}.plist"
     log = tmp_path / "mynah.log"
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
@@ -1788,6 +1828,9 @@ def test_service_unload_on_reinstall(monkeypatch, tmp_path):
     """install() unloads an existing plist before loading the new one."""
     from mynah import service
 
+    # install/uninstall/status dispatch by platform; this is the launchd side.
+    monkeypatch.setattr(service, "_is_macos", lambda: True)
+
     plist = tmp_path / f"{service.LABEL}.plist"
     log = tmp_path / "mynah.log"
     plist.write_text("<old/>")
@@ -1811,6 +1854,9 @@ def test_service_unload_on_reinstall(monkeypatch, tmp_path):
 
 def test_service_uninstall_removes_plist(monkeypatch, tmp_path):
     from mynah import service
+
+    # install/uninstall/status dispatch by platform; this is the launchd side.
+    monkeypatch.setattr(service, "_is_macos", lambda: True)
 
     plist = tmp_path / f"{service.LABEL}.plist"
     plist.write_text("<old/>")
@@ -1916,6 +1962,9 @@ def test_service_uninstall_when_not_installed(monkeypatch, tmp_path):
 def test_service_status_not_loaded(monkeypatch, tmp_path):
     from mynah import service
 
+    # install/uninstall/status dispatch by platform; this is the launchd side.
+    monkeypatch.setattr(service, "_is_macos", lambda: True)
+
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
 
     def fake_run(cmd, **kwargs):
@@ -1929,6 +1978,9 @@ def test_service_status_not_loaded(monkeypatch, tmp_path):
 
 def test_service_status_loaded_parses_pid(monkeypatch, tmp_path):
     from mynah import service
+
+    # install/uninstall/status dispatch by platform; this is the launchd side.
+    monkeypatch.setattr(service, "_is_macos", lambda: True)
 
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
     sample = '{\n    "PID" = 4242;\n    "LastExitStatus" = 0;\n}'
@@ -2133,9 +2185,14 @@ def test_setup_run_checks_returns_three_results():
     from mynah import preflight as setup_mod
 
     results = setup_mod.run_checks()
-    assert len(results) == 4
+    assert len(results) == len(setup_mod.checks_for_platform())
     titles = [r.title for r in results]
-    assert titles == ["Runtime extra", "Accessibility", "Microphone", "Hotkey"]
+    expected = (
+        ["Runtime extra", "Typing", "Speech", "Microphone", "Hotkey"]
+        if sys.platform.startswith("linux")
+        else ["Runtime extra", "Accessibility", "Microphone", "Hotkey"]
+    )
+    assert titles == expected
 
 
 def test_setup_all_pass_points_at_service(monkeypatch, capsys):

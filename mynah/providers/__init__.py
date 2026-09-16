@@ -10,7 +10,11 @@ Each provider has a short ``name`` (e.g. ``"mlx"``, ``"mac"``) used for
 the config override and ``--list-providers``.
 
 Registering a new platform's providers: add the import + class to the
-appropriate ``_PLATFORM_*`` map below.
+appropriate ``_register_*`` function below.
+
+A platform may register more than one provider for the same job (Linux ships
+whisper.cpp today and may ship others later), so auto-detection asks each
+candidate whether it can actually run here before settling on the first one.
 """
 
 from __future__ import annotations
@@ -37,6 +41,33 @@ _STT_PROVIDERS: dict[str, tuple[str, callable]] = {}
 _INJECTORS: dict[str, tuple[str, callable]] = {}
 _INDICATORS: dict[str, tuple[str, callable]] = {}
 
+# Optional "can this actually run on this machine?" probes, by provider name.
+# A provider without one is assumed usable on its platform. Probes must be
+# cheap and side-effect free: they run on every auto-detect.
+_AVAILABLE: dict[str, callable] = {}
+
+
+def _register_linux() -> None:
+    """Linux providers: whisper.cpp for speech, wtype for typing, the socket
+    for the indicator (the desktop shell draws it — see linux_indicator.py)."""
+    _STT_PROVIDERS["whisper-cpp"] = ("linux", lambda: _import_attr(
+        "mynah.providers.linux_stt", "WhisperCppProvider"))
+    _AVAILABLE["whisper-cpp"] = lambda: _probe("mynah.providers.linux_stt", "find_binary")
+    _INJECTORS["wtype"] = ("linux", lambda: _import_attr(
+        "mynah.providers.linux_inject", "WtypeInjector"))
+    _AVAILABLE["wtype"] = lambda: _probe("mynah.providers.linux_inject", "find_binary")
+    _INDICATORS["socket"] = ("linux", lambda: _import_attr(
+        "mynah.providers.linux_indicator", "SocketIndicator"))
+
+
+def _probe(module: str, func: str) -> bool:
+    """True if ``module.func()`` finds what the provider needs."""
+    try:
+        mod = __import__(module, fromlist=[func])
+        return bool(getattr(mod, func)())
+    except Exception:  # noqa: BLE001
+        return False
+
 
 def _register_macos() -> None:
     if sys.platform != "darwin":
@@ -58,12 +89,22 @@ def _import_attr(module: str, attr: str):
 
 
 def _platform_default(platform: str | None, table: dict[str, tuple[str, callable]]):
-    """Pick the first provider registered for ``platform`` (or current platform)."""
+    """Pick a provider registered for ``platform`` (or the current platform).
+
+    Prefers one whose availability probe passes, so a machine with two possible
+    backends gets the installed one rather than the first-registered one. With
+    none available, fall back to the first for the platform: its constructor
+    raises a message naming what to install, which beats "no provider".
+    """
     plat = platform or sys.platform
-    for _name, (supports, _ctor) in table.items():
-        if supports == plat:
-            return _name
-    return None
+    if plat.startswith("linux"):
+        plat = "linux"
+    candidates = [name for name, (supports, _ctor) in table.items() if supports == plat]
+    for name in candidates:
+        probe = _AVAILABLE.get(name)
+        if probe is None or probe():
+            return name
+    return candidates[0] if candidates else None
 
 
 def select_stt_provider(config: Config) -> STTProvider:
@@ -116,6 +157,8 @@ def list_providers(platform: str | None = None) -> dict[str, list[tuple[str, str
     Used by ``mynah providers``.
     """
     plat = platform or sys.platform
+    if plat.startswith("linux"):
+        plat = "linux"
     out: dict[str, list[tuple[str, str, bool]]] = {"stt": [], "injector": [], "indicator": []}
     for name, (supports, _ctor) in _STT_PROVIDERS.items():
         out["stt"].append((name, supports, supports == plat))
@@ -128,3 +171,4 @@ def list_providers(platform: str | None = None) -> dict[str, list[tuple[str, str
 
 # Register built-in providers on import.
 _register_macos()
+_register_linux()

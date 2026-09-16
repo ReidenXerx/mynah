@@ -3,7 +3,8 @@
 ``mynah setup`` is a one-command onboarding flow that gets a fresh
 pipx user from ``pipx install`` to a running always-on dictation agent:
 
-1. Auto-inject the ``dictate`` extra (``pipx inject mynah 'mynah[macos]'``)
+1. Auto-inject this platform's extra, from the same place mynah itself came
+   from (never by the bare name — see ``_origin``)
    if the heavy deps are missing — no separate manual step.
 2. Request macOS Accessibility permission (opens System Settings) and
    poll until granted — no crash loop.
@@ -48,6 +49,19 @@ def extra_name() -> str:
     return "linux" if _is_linux() else "macos"
 
 
+# What each platform's extra installs, for the case where there is no recorded
+# install origin to request the extra from. Pinned to pyproject.toml by a test:
+# a dependency added there and forgotten here would be missing on first run.
+EXTRA_PACKAGES = {
+    "linux": ("sounddevice", "webrtcvad-wheels", "numpy"),
+    "macos": (
+        "mlx-whisper", "sounddevice", "webrtcvad", "pynput",
+        "pyobjc-framework-Cocoa", "pyobjc-framework-Quartz",
+        "pyobjc-framework-ApplicationServices", "rumps", "setproctitle",
+    ),
+}
+
+
 def _required_modules() -> tuple[str, ...]:
     """What has to import before dictation can run here.
 
@@ -69,13 +83,73 @@ def _extra_installed() -> bool:
     return True
 
 
+def _origin() -> str:
+    """Where this mynah was installed from, as pip records it (PEP 610).
+
+    Needed because the bare name ``mynah`` on PyPI belongs to **someone else**
+    — an unrelated 0.0.0 package. Asking pip for ``mynah[linux]`` would resolve
+    to that, download it and run its build, which is exactly the supply chain
+    this project should not have. So the extra is always requested from the
+    same place the running code came from.
+
+    Returns a PEP 508 direct reference ("@ git+https://…"), or "" when the
+    install is local or editable and there is nothing to point at.
+    """
+    try:
+        from importlib.metadata import Distribution
+
+        raw = Distribution.from_name("mynah").read_text("direct_url.json")
+        if not raw:
+            return ""
+        import json
+
+        info = json.loads(raw)
+        url = str(info.get("url", ""))
+        if not url.startswith(("https://", "git+https://")):
+            return ""
+        revision = (info.get("vcs_info") or {}).get("commit_id")
+        if info.get("vcs_info"):
+            if not url.startswith("git+"):
+                url = f"git+{url}"
+            if revision:
+                url = f"{url}@{revision}"
+        return url
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _extra_spec() -> str:
+    """What to hand pip for this platform's extra."""
+    origin = _origin()
+    if origin:
+        return f"mynah[{extra_name()}] @ {origin}"
+    # No recorded origin (a local or editable install): name the extra's own
+    # dependencies instead, which never resolves the ``mynah`` name at all.
+    return ""
+
+
+def inject_command(extra: str | None = None) -> str:
+    """The command that installs an extra, as a user should type it.
+
+    Never ``mynah[extra]`` on its own: that name on PyPI is an unrelated
+    package, and pip would fetch it.
+    """
+    name = extra or extra_name()
+    origin = _origin()
+    if origin:
+        return f"pipx inject mynah \"mynah[{name}] @ {origin}\""
+    return "pipx inject mynah " + " ".join(EXTRA_PACKAGES[name])
+
+
 def _inject_extra() -> int:
-    """Run ``pipx inject mynah 'mynah[<platform>]'``, streaming output live.
+    """Install this platform's extra into mynah's own pipx venv.
 
     Returns the pipx exit code (0 = success).
     """
+    spec = _extra_spec()
+    packages = [spec] if spec else list(EXTRA_PACKAGES[extra_name()])
     return subprocess.run(
-        ["pipx", "inject", "mynah", f"mynah[{extra_name()}]"], check=False
+        ["pipx", "inject", "mynah", *packages], check=False
     ).returncode
 
 
@@ -91,7 +165,7 @@ def _check_extra() -> CheckResult:
         ok=False,
         title="Runtime extra",
         detail="Missing deps — will auto-install now",
-        hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
+        hint=inject_command(),
     )
 
 
@@ -133,7 +207,7 @@ def _check_accessibility() -> CheckResult:
             ok=False,
             title="Accessibility",
             detail="PyObjC not installed — cannot check",
-            hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
+            hint=inject_command(),
         )
 
 
@@ -152,7 +226,7 @@ def _check_microphone() -> CheckResult:
             ok=False,
             title="Microphone",
             detail="sounddevice not installed — cannot check",
-            hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
+            hint=inject_command(),
         )
     try:
         # A zero-block, sub-second stream open is enough to trigger the OS
@@ -204,7 +278,7 @@ def _check_hotkey() -> CheckResult:
             ok=False,
             title="Hotkey",
             detail="pynput not installed — cannot validate",
-            hint=f"pipx inject mynah 'mynah[{extra_name()}]'",
+            hint=inject_command(),
         )
     from mynah.config import load as load_config
 
@@ -455,7 +529,7 @@ def setup(install_service: bool = True) -> int:
         if rc != 0:
             print(
                 f"  ✗ Failed to install the {extra_name()} extra (pipx exit {rc}).\n"
-                f"    Run manually: pipx inject mynah 'mynah[{extra_name()}]'",
+                f"    Run manually: {inject_command()}",
                 file=sys.stderr,
             )
             return 1

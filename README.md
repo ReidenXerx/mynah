@@ -15,7 +15,7 @@ Everything runs on the machine you are sitting at.
 [![Linux · Wayland](https://img.shields.io/badge/Linux%20%C2%B7%20Wayland-shipping-3FBF9A)](docs/LINUX-APP.md)
 
 ```bash
-pipx install git+https://github.com/ReidenXerx/mynah.git
+pipx install "git+https://github.com/ReidenXerx/mynah.git"
 mynah setup
 ```
 
@@ -64,16 +64,16 @@ unloads and Mynah costs nothing at all.
 **macOS**
 
 ```bash
-pipx install git+https://github.com/ReidenXerx/mynah.git
-pipx inject mynah 'mynah[macos]'
+pipx install "git+https://github.com/ReidenXerx/mynah.git"
+pipx inject mynah "mynah[macos] @ git+https://github.com/ReidenXerx/mynah.git"
 mynah setup                          # dependencies, permissions, hotkey, login service
 ```
 
 **Linux (Wayland)**
 
 ```bash
-pipx install git+https://github.com/ReidenXerx/mynah.git
-pipx inject mynah 'mynah[linux]'
+pipx install "git+https://github.com/ReidenXerx/mynah.git"
+pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"
 sudo pacman -S whisper-cpp wtype wl-clipboard   # speech, typing, and pasting
 mynah setup                          # checks each of these and names what is missing
 ```
@@ -133,6 +133,11 @@ implement the virtual-keyboard protocol `wtype` needs, and a portal injector is 
 Speech is transcribed locally — mlx-whisper on macOS, whisper.cpp elsewhere. There is no account, no
 API key and no endpoint to disable, because there is none to begin with. The only file Mynah writes
 outside its own config is the text it types, into the window you were already in.
+
+> **The name `mynah` on PyPI is not this project.** It belongs to an unrelated
+> package, so the extras are always requested from this repository —
+> `mynah[linux] @ git+…` — and never as a bare `mynah[linux]`, which pip would
+> fetch from PyPI. `mynah setup` does the same thing for you.
 
 ## It came out of whiz
 

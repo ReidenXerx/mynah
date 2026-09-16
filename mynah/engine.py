@@ -742,7 +742,8 @@ class DictationEngine:
         except ImportError:
             print(
                 "sounddevice not installed. Install the runtime extra:\n"
-                "  pipx inject mynah 'mynah[macos]'",
+                "  Run `mynah setup`, which installs it from the same",
+                "  place mynah itself came from.",
                 file=sys.stderr,
             )
             self._stop_event.set()
@@ -1245,7 +1246,7 @@ class DictationEngine:
                 "rumps/pyobjc unavailable — the dictation service cannot show "
                 "its menu bar, so it will not start. Reinstall the dictate "
                 "extra, then reinstall the service:\n"
-                "  pipx inject mynah 'mynah[macos]' --force\n"
+                "  mynah setup\n"
                 "  mynah service uninstall && mynah service install",
                 file=sys.stderr,
             )
@@ -1313,7 +1314,7 @@ class DictationEngine:
         except ImportError:
             print(
                 "pynput not installed — cannot listen for the hotkey.\n"
-                "Install the macos extra: pipx inject mynah 'mynah[macos]'\n"
+                "Install the runtime with: mynah setup\n"
                 "Or press Ctrl+C to quit (dictation won't toggle without a hotkey).",
                 file=sys.stderr,
             )

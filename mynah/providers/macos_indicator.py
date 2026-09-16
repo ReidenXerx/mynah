@@ -147,7 +147,7 @@ class MacIndicator(DictationIndicator):
         except ImportError:
             logger.warning(
                 "PyObjC not available — dictation indicator disabled. "
-                "Install: pipx inject mynah 'mynah[macos]'"
+                "Install it with: mynah setup"
             )
             self._panel = None
         except Exception:  # noqa: BLE001

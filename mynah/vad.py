@@ -39,7 +39,8 @@ class VoiceActivityDetector:
         except ImportError:
             logger.warning(
                 "webrtcvad not installed — VAD disabled (dictation will not "
-                "segment utterances). Install: pipx inject mynah 'mynah[macos]'"
+                "segment utterances). Install it with the command "
+                "`mynah setup` prints."
             )
 
     @property

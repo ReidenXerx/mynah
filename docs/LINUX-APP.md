@@ -23,9 +23,11 @@ So the Linux side is a set of providers plus one socket:
 Install:
 
 ```bash
-pipx install git+https://github.com/ReidenXerx/mynah.git
-pipx inject mynah 'mynah[linux]'
-sudo pacman -S whisper-cpp wtype      # or your distro's equivalents
+pipx install "git+https://github.com/ReidenXerx/mynah.git"
+# The extra comes from this repository: the bare name `mynah` on PyPI is an
+# unrelated package, and pip would happily fetch that instead.
+pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"
+sudo pacman -S whisper-cpp wtype wl-clipboard
 mynah setup
 ```
 

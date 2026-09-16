@@ -192,7 +192,7 @@
     <h1>Say it. It types <em>where you are</em>.</h1>
     <p class="lede">Press a key and talk. Your words land in whatever window has focus — a commit message, a chat, a form — <b>as you pause, not when you stop.</b> The speech never leaves the machine you are sitting at.</p>
     <div class="cta">
-      <button class="button primary" type="button" data-copy="pipx install git+https://github.com/ReidenXerx/mynah.git">
+      <button class="button primary" type="button" data-copy='pipx install "git+https://github.com/ReidenXerx/mynah.git"' >
         <span>pipx install …/mynah.git</span><span class="copied" aria-hidden="true">copied</span>
       </button>
       <a class="button" href="https://github.com/ReidenXerx/mynah">Read the source</a>
@@ -342,12 +342,12 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
   <div class="two">
     <div>
 <pre><span class="dim">macOS</span>
-<span class="cmd">$ pipx install git+https://github.com/ReidenXerx/mynah.git</span>
-<span class="cmd">$ pipx inject mynah 'mynah[macos]'</span>
+<span class="cmd">$ pipx install "git+https://github.com/ReidenXerx/mynah.git"</span>
+<span class="cmd">$ pipx inject mynah "mynah[macos] @ git+https://github.com/ReidenXerx/mynah.git"</span>
 
 <span class="dim">Linux</span>
-<span class="cmd">$ pipx inject mynah 'mynah[linux]'</span>
-<span class="cmd">$ sudo pacman -S whisper-cpp wtype</span>
+<span class="cmd">$ pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"</span>
+<span class="cmd">$ sudo pacman -S whisper-cpp wtype wl-clipboard</span>
 
 <span class="cmd">$ mynah setup</span>
 
@@ -359,7 +359,7 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
       Add mynah and enable it, then re-run: mynah setup</span>
   <span class="ok">✓</span> Microphone — <span class="dim">Reachable</span>
   <span class="ok">✓</span> Hotkey — <span class="dim">Valid (&lt;cmd&gt;+&lt;shift&gt;+.)</span></pre>
-      <p class="note" style="margin-top: 14px;">The first run installs the ~1.6 GB speech runtime itself, then names whatever is still missing and what to do about it. The login service is installed last, once the rest passes — never on top of a check that failed.</p>
+      <p class="note" style="margin-top: 14px;">The extras are requested from this repository, never as a bare <code>mynah[macos]</code> — that name on PyPI is an unrelated package. The first run installs the speech runtime itself, then names whatever is still missing and what to do about it. The login service is installed last, once the rest passes — never on top of a check that failed.</p>
     </div>
     <div>
       <h3>The settings worth knowing</h3>

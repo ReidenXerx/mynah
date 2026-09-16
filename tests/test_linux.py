@@ -782,3 +782,77 @@ def test_the_bands_ride_with_the_level(tmp_path):
         assert published == [{"event": "level", "level": 0.5, "bands": [0.1, 0.9, 0.4]}]
     finally:
         srv.stop()
+
+
+# ---------------------------------------------------------------------------
+# Where the extra comes from
+# ---------------------------------------------------------------------------
+
+
+def test_the_extra_is_never_requested_by_bare_name(monkeypatch):
+    """`mynah` on PyPI belongs to someone else — an unrelated 0.0.0 package.
+
+    Asking pip for `mynah[linux]` resolves to that, downloads it and runs its
+    build. The extra is requested from the same place the running code came
+    from, or by naming its dependencies, and never by the bare name.
+    """
+    from mynah import preflight
+
+    monkeypatch.setattr(preflight, "_origin", lambda: "git+https://github.com/ReidenXerx/mynah.git@abc123")
+    spec = preflight._extra_spec()
+    assert spec.endswith("@ git+https://github.com/ReidenXerx/mynah.git@abc123")
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(preflight.subprocess, "run",
+                        lambda argv, **kw: calls.append(argv) or mock.Mock(returncode=0))
+    preflight._inject_extra()
+    assert calls[0][:3] == ["pipx", "inject", "mynah"]
+    assert calls[0][3] == spec
+
+    # With no recorded origin — a local or editable install — the extra's own
+    # dependencies are named instead, so the `mynah` name is never resolved.
+    calls.clear()
+    monkeypatch.setattr(preflight, "_origin", lambda: "")
+    preflight._inject_extra()
+    assert all(not pkg.startswith("mynah") for pkg in calls[0][3:]), calls[0]
+    assert "sounddevice" in calls[0]
+
+
+def test_the_fallback_list_matches_pyproject():
+    """A dependency added to an extra and forgotten here would be missing on a
+    first run that has no install origin to ask."""
+    import tomllib
+
+    from mynah import preflight
+
+    root = Path(__file__).resolve().parent.parent
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    extras = data["project"]["optional-dependencies"]
+    for name, listed in preflight.EXTRA_PACKAGES.items():
+        declared = {
+            dep.split(">")[0].split("<")[0].split("=")[0].split("[")[0].strip()
+            for dep in extras[name]
+        }
+        assert set(listed) == declared, f"{name}: {set(listed) ^ declared}"
+
+
+def test_the_origin_is_only_trusted_when_it_is_a_url(monkeypatch):
+    """direct_url.json can record a local directory; that is not something to
+    hand to pip as a package spec."""
+    from mynah import preflight
+
+    class FakeDistribution:
+        @staticmethod
+        def from_name(_name):
+            class D:
+                @staticmethod
+                def read_text(_file):
+                    return '{"url": "file:///home/someone/Projects/mynah", "dir_info": {"editable": true}}'
+            return D()
+
+    monkeypatch.setitem(__import__("sys").modules, "importlib.metadata", FakeDistribution)
+    # The real function imports Distribution inside, so patch the attribute it uses.
+    import importlib.metadata as meta
+
+    monkeypatch.setattr(meta, "Distribution", FakeDistribution)
+    assert preflight._origin() == ""

@@ -1,4 +1,4 @@
-"""Tests for the whiz dictate module.
+"""Tests for the mynah module.
 
 Covers: provider selection/registry, VAD wrapper, engine settings resolution
 (initial-prompt default, overrides), session lifecycle, idle-timeout unload,
@@ -22,10 +22,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from whiz import config as cfg
-from whiz.dictate import engine as eng
-from whiz.dictate.providers import base, list_providers
-from whiz.dictate.providers.mlx import DEFAULT_MODEL, WHISPER_SAMPLE_RATE
+from mynah import config as cfg
+from mynah import engine as eng
+from mynah.providers import base, list_providers
+from mynah.providers.mlx import DEFAULT_MODEL, WHISPER_SAMPLE_RATE
 
 
 # Inject fake sounddevice + numpy so the engine's _capture_loop can import them
@@ -266,19 +266,19 @@ def test_list_providers_returns_stt_injector_indicator():
 
 def test_select_indicator_returns_null_when_disabled():
     config = cfg.Config()
-    config.dictate_show_indicator = False
+    config.show_indicator = False
     ind = __import__(
-        "whiz.dictate.providers", fromlist=["select_indicator"]
+        "mynah.providers", fromlist=["select_indicator"]
     ).select_indicator(config)
     assert isinstance(ind, base.NullIndicator)
 
 
 def test_select_stt_provider_override():
     """A valid config override selects that provider by name."""
-    from whiz.dictate.providers import select_stt_provider
+    from mynah.providers import select_stt_provider
 
     config = cfg.Config()
-    config.dictate_stt_provider = "mlx"
+    config.stt_provider = "mlx"
     # On macOS this should work; on other platforms the import thunk will
     # still resolve the name (it's registered regardless of platform).
     if sys.platform == "darwin":
@@ -293,7 +293,7 @@ def test_select_stt_provider_override():
 
 def test_vad_unavailable_fails_open():
     """When webrtcvad isn't installed, is_speech returns True (transcribe all)."""
-    from whiz.dictate.vad import VoiceActivityDetector
+    from mynah.vad import VoiceActivityDetector
 
     vad = VoiceActivityDetector()
     # webrtcvad is not installed in the test environment, so VAD should be
@@ -306,7 +306,7 @@ def test_vad_unavailable_fails_open():
 
 
 def test_vad_frame_bytes_is_960_for_16khz_30ms():
-    from whiz.dictate.vad import frame_bytes_for
+    from mynah.vad import frame_bytes_for
 
     assert frame_bytes_for(16000, 30) == 960
     assert frame_bytes_for(8000, 30) == 480
@@ -319,21 +319,21 @@ def test_vad_frame_bytes_is_960_for_16khz_30ms():
 
 def test_resolve_settings_uses_default_russian_prompt_when_empty():
     config = cfg.Config()
-    config.dictate_prompt = ""
+    config.prompt = ""
     s = eng.resolve_settings(config)
     assert s.initial_prompt == eng.DEFAULT_RUSSIAN_PROMPT
 
 
 def test_resolve_settings_user_prompt_overrides_default():
     config = cfg.Config()
-    config.dictate_prompt = "my custom prompt"
+    config.prompt = "my custom prompt"
     s = eng.resolve_settings(config)
     assert s.initial_prompt == "my custom prompt"
 
 
 def test_resolve_settings_cli_prompt_overrides_config():
     config = cfg.Config()
-    config.dictate_prompt = "config prompt"
+    config.prompt = "config prompt"
     s = eng.resolve_settings(config, prompt="cli prompt")
     assert s.initial_prompt == "cli prompt"
 
@@ -804,21 +804,21 @@ def test_resolve_settings_default_trigger_is_toggle():
 
 def test_resolve_settings_trigger_from_config():
     config = cfg.Config()
-    config.dictate_trigger = "ptt"
+    config.trigger = "ptt"
     s = eng.resolve_settings(config)
     assert s.trigger == "ptt"
 
 
 def test_resolve_settings_trigger_cli_overrides_config():
     config = cfg.Config()
-    config.dictate_trigger = "toggle"
+    config.trigger = "toggle"
     s = eng.resolve_settings(config, trigger="ptt")
     assert s.trigger == "ptt"
 
 
 def test_resolve_settings_trigger_normalized_lowercase():
     config = cfg.Config()
-    config.dictate_trigger = "PTT"
+    config.trigger = "PTT"
     s = eng.resolve_settings(config)
     assert s.trigger == "ptt"
 
@@ -881,162 +881,159 @@ def test_toggle_mode_uses_toggle_session():
 
 
 def test_dictate_friendly_keys_map_to_config_fields():
-    from whiz.cli import _DICTATE_FRIENDLY_KEYS
+    from mynah.cli import FRIENDLY
 
-    assert _DICTATE_FRIENDLY_KEYS["hotkey"] == "dictate_hotkey"
-    assert _DICTATE_FRIENDLY_KEYS["trigger"] == "dictate_trigger"
-    assert _DICTATE_FRIENDLY_KEYS["language"] == "dictate_language"
-    assert _DICTATE_FRIENDLY_KEYS["lang"] == "dictate_language"  # alias
-    assert _DICTATE_FRIENDLY_KEYS["idle"] == "dictate_idle_timeout"  # alias
-    assert _DICTATE_FRIENDLY_KEYS["silence"] == "dictate_auto_stop_silence"  # alias
-    assert _DICTATE_FRIENDLY_KEYS["indicator"] == "dictate_show_indicator"  # alias
+    assert FRIENDLY["hotkey"] == "hotkey"
+    assert FRIENDLY["trigger"] == "trigger"
+    assert FRIENDLY["language"] == "language"
+    assert FRIENDLY["lang"] == "language"  # alias
+    assert FRIENDLY["idle"] == "idle_timeout"  # alias
+    assert FRIENDLY["silence"] == "auto_stop_silence"  # alias
+    assert FRIENDLY["indicator"] == "show_indicator"  # alias
 
 
 def test_dictate_friendly_keys_cover_all_dictate_config_fields():
     """Every dictate_* config field should be reachable via a friendly name."""
-    from whiz.cli import _DICTATE_FRIENDLY_KEYS
+    from mynah.cli import FRIENDLY
 
-    mapped_fields = set(_DICTATE_FRIENDLY_KEYS.values())
+    mapped_fields = set(FRIENDLY.values())
     for field_name in cfg.Config.__dataclass_fields__:
-        if field_name.startswith("dictate_"):
-            assert field_name in mapped_fields, f"{field_name} has no friendly key"
+        assert field_name in mapped_fields, f"{field_name} has no friendly key"
 
 
 def test_dictate_config_fields_table_has_all_fields():
-    from whiz.cli import _DICTATE_CONFIG_FIELDS
+    from mynah.cli import FIELDS
 
-    field_keys = {key for key, _, _ in _DICTATE_CONFIG_FIELDS}
+    field_keys = {key for key, _, _ in FIELDS}
     for field_name in cfg.Config.__dataclass_fields__:
-        if field_name.startswith("dictate_"):
-            assert field_name in field_keys, f"{field_name} missing from config table"
+        assert field_name in field_keys, f"{field_name} missing from config table"
 
 
 def test_cmd_dictate_set_hotkey(tmp_path, monkeypatch):
-    """`whiz dictate set hotkey=<f8>` persists dictate_hotkey."""
-    from whiz import cli
+    """`mynah set hotkey=<f8>` persists hotkey."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="hotkey=<f8>")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
     saved = cfg.load()
-    assert saved.dictate_hotkey == "<f8>"
+    assert saved.hotkey == "<f8>"
 
 
 def test_cmd_dictate_set_trigger_ptt(tmp_path, monkeypatch):
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="trigger=ptt")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
     saved = cfg.load()
-    assert saved.dictate_trigger == "ptt"
+    assert saved.trigger == "ptt"
 
 
 def test_cmd_dictate_set_trigger_invalid_rejected(tmp_path, monkeypatch):
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="trigger=bogus")
     with pytest.raises(SystemExit):
-        cli.cmd_dictate_set(args)
+        cli.cmd_set(args)
 
 
 def test_cmd_dictate_set_unknown_key_rejected(tmp_path, monkeypatch):
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="bogus_key=value")
     with pytest.raises(SystemExit):
-        cli.cmd_dictate_set(args)
+        cli.cmd_set(args)
 
 
 def test_cmd_dictate_set_missing_equals_rejected(tmp_path, monkeypatch):
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="hotkey")
     with pytest.raises(SystemExit):
-        cli.cmd_dictate_set(args)
+        cli.cmd_set(args)
 
 
 def test_cmd_dictate_set_lang_alias(tmp_path, monkeypatch):
-    """The 'lang' alias should map to dictate_language."""
-    from whiz import cli
+    """The 'lang' alias should map to language."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="lang=en")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
     saved = cfg.load()
-    assert saved.dictate_language == "en"
+    assert saved.language == "en"
 
 
 def test_cmd_dictate_set_bool_indicator(tmp_path, monkeypatch):
-    """Setting indicator (bool) to false persists dictate_show_indicator=false."""
-    from whiz import cli
+    """Setting indicator (bool) to false persists show_indicator=false."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="indicator=false")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
     saved = cfg.load()
-    assert saved.dictate_show_indicator is False
+    assert saved.show_indicator is False
 
 
 def test_cmd_dictate_config_shows_settings(tmp_path, monkeypatch):
-    """`whiz dictate config` should print all dictate settings without error."""
-    from whiz import cli
+    """`mynah config` should print all dictate settings without error."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock()
-    rc = cli.cmd_dictate_config(args)
+    rc = cli.cmd_config(args)
     assert rc == 0
 
 
 def test_dictate_parser_bare_runs_dictation():
-    """`whiz dictate` (no subcommand) should set func=cmd_dictate."""
-    from whiz import cli
+    """`mynah` (no subcommand) should set func=cmd_dictate."""
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate"])
-    assert args.func is cli.cmd_dictate
-    assert args.dictate_command is None
+    args = parser.parse_args([])
+    assert args.func is cli.cmd_run
 
 
 def test_dictate_parser_config_subcommand():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate", "config"])
-    assert args.func is cli.cmd_dictate_config
+    args = parser.parse_args(["config"])
+    assert args.func is cli.cmd_config
 
 
 def test_dictate_parser_set_subcommand():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate", "set", "hotkey=<f8>"])
-    assert args.func is cli.cmd_dictate_set
+    args = parser.parse_args(["set", "hotkey=<f8>"])
+    assert args.func is cli.cmd_set
     assert args.assignment == "hotkey=<f8>"
 
 
 def test_dictate_parser_trigger_flag():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate", "--trigger", "ptt"])
+    args = parser.parse_args(["--trigger", "ptt"])
     assert args.trigger == "ptt"
-    assert args.func is cli.cmd_dictate
+    assert args.func is cli.cmd_run
 
 
 # ---------------------------------------------------------------------------
@@ -1335,25 +1332,25 @@ def test_auto_stop_ends_session_from_capture_loop(monkeypatch):
 
 
 def test_cmd_config_set_validates_dictate_trigger(tmp_path, monkeypatch):
-    """`whiz config set dictate_trigger=bogus` must be rejected."""
-    from whiz import cli
+    """`mynah set trigger=bogus` must be rejected."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
-    args = mock.Mock(assignment="dictate_trigger=bogus")
+    args = mock.Mock(assignment="trigger=bogus")
     with pytest.raises(SystemExit):
-        cli.cmd_config_set(args)
+        cli.cmd_set(args)
 
 
 def test_cmd_config_set_accepts_valid_dictate_trigger(tmp_path, monkeypatch):
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
-    args = mock.Mock(assignment="dictate_trigger=ptt")
-    rc = cli.cmd_config_set(args)
+    args = mock.Mock(assignment="trigger=ptt")
+    rc = cli.cmd_set(args)
     assert rc == 0
-    assert cfg.load().dictate_trigger == "ptt"
+    assert cfg.load().trigger == "ptt"
 
 
 # W2-M16: provider-selection keys validate against the live registry at BOTH
@@ -1362,69 +1359,69 @@ def test_cmd_config_set_accepts_valid_dictate_trigger(tmp_path, monkeypatch):
 
 
 def test_cmd_config_set_rejects_unknown_stt_provider(tmp_path, monkeypatch):
-    """`whiz config set dictate_stt_provider=mlxx` must be rejected — a typo
+    """`mynah set stt_provider=mlxx` must be rejected — a typo
     must not silently degrade to auto-detect."""
-    from whiz import cli
-
-    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
-    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
-    args = mock.Mock(assignment="dictate_stt_provider=mlxx")
-    with pytest.raises(SystemExit):
-        cli.cmd_config_set(args)
-
-
-def test_cmd_dictate_set_rejects_unknown_stt_provider(tmp_path, monkeypatch):
-    """The friendly entry point enforces the same validation: `whiz dictate
-    set stt_provider=mlxx` must be rejected, not saved."""
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="stt_provider=mlxx")
     with pytest.raises(SystemExit):
-        cli.cmd_dictate_set(args)
+        cli.cmd_set(args)
+
+
+def test_cmd_dictate_set_rejects_unknown_stt_provider(tmp_path, monkeypatch):
+    """The friendly entry point enforces the same validation: `mynah
+    set stt_provider=mlxx` must be rejected, not saved."""
+    from mynah import cli
+
+    monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
+    args = mock.Mock(assignment="stt_provider=mlxx")
+    with pytest.raises(SystemExit):
+        cli.cmd_set(args)
 
 
 def test_cmd_dictate_set_rejects_unknown_injector(tmp_path, monkeypatch):
     """The injector key validates too (not just STT)."""
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="injector=maac")
     with pytest.raises(SystemExit):
-        cli.cmd_dictate_set(args)
+        cli.cmd_set(args)
 
 
 def test_cmd_dictate_set_accepts_empty_provider_as_auto(tmp_path, monkeypatch):
     """Empty string stays valid at both entry points — it means auto-detect."""
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="stt_provider=")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
-    assert cfg.load().dictate_stt_provider == ""
+    assert cfg.load().stt_provider == ""
 
 
 def test_cmd_dictate_set_accepts_known_provider(tmp_path, monkeypatch):
     """A registered name is accepted — `mac` is registered in the injector
     table on every platform (the name check never constructs the provider,
     so this does not import pyobjc)."""
-    from whiz import cli
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="injector=mac")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
-    assert cfg.load().dictate_injector == "mac"
+    assert cfg.load().injector == "mac"
 
 
 # W2-H2: a rumps/pyobjc failure under the LaunchAgent must exit rc=1, not
 # rc=0 — KeepAlive turns a rc=0 exit into an invisible relaunch loop while
-# `whiz dictate service status` keeps reporting healthy.
+# `mynah service status` keeps reporting healthy.
 
 
 def test_run_with_appkit_exits_1_when_menu_bar_fails_under_service(monkeypatch):
@@ -1476,23 +1473,23 @@ def test_run_with_appkit_terminal_fallback_returns_0(monkeypatch):
 
 # W2-M10: idle_timeout=0 means "never unload" — the sentinel-default
 # resolution must let an explicit zero reach the engine (the old or-chain
-# `float(overrides.get("idle_timeout") or config.dictate_idle_timeout)` made
+# `float(overrides.get("idle_timeout") or config.idle_timeout)` made
 # a configured/overridden 0 unreachable).
 
 
 def test_resolve_settings_idle_timeout_zero_override_wins():
     """An explicit --idle-timeout=0 override must win over any config value."""
     config = cfg.Config()
-    config.dictate_idle_timeout = 45
+    config.idle_timeout = 45
     s = eng.resolve_settings(config, idle_timeout=0)
     assert s.idle_timeout == 0
 
 
 def test_resolve_settings_idle_timeout_zero_config_wins():
-    """A configured dictate_idle_timeout=0 must reach the settings unchanged —
+    """A configured idle_timeout=0 must reach the settings unchanged —
     not silently replaced by the built-in default 45."""
     config = cfg.Config()
-    config.dictate_idle_timeout = 0
+    config.idle_timeout = 0
     s = eng.resolve_settings(config)
     assert s.idle_timeout == 0
 
@@ -1615,7 +1612,7 @@ def test_resolve_settings_idle_visible_default_false():
 
 def test_resolve_settings_idle_visible_override():
     config = cfg.Config()
-    config.dictate_idle_visible = True
+    config.idle_visible = True
     s = eng.resolve_settings(config)
     assert s.idle_visible is True
     s = eng.resolve_settings(config, idle_visible=True)
@@ -1686,39 +1683,39 @@ def test_end_session_hides_when_idle_visible_false():
 
 
 def test_dictate_set_idle_visible(tmp_path, monkeypatch):
-    """`whiz dictate set idle_visible=false` persists dictate_idle_visible."""
-    from whiz import cli
+    """`mynah set idle_visible=false` persists idle_visible."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="idle_visible=false")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
-    assert cfg.load().dictate_idle_visible is False
+    assert cfg.load().idle_visible is False
 
 
 def test_dictate_set_idle_badge_alias(tmp_path, monkeypatch):
-    """The 'idle_badge' alias maps to dictate_idle_visible."""
-    from whiz import cli
+    """The 'idle_badge' alias maps to idle_visible."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="idle_badge=true")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
-    assert cfg.load().dictate_idle_visible is True
+    assert cfg.load().idle_visible is True
 
 
 # --- LaunchAgent service module ---
 
 
 def test_service_build_plist_contains_required_keys(monkeypatch):
-    from whiz.dictate import service
+    from mynah import service
 
-    # Force a deterministic whiz binary resolution. Disable the runner binary
+    # Force a deterministic mynah binary resolution. Disable the runner binary
     # path so this test exercises the console-script fallback.
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
-    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
     xml = service.build_plist()
     assert service.LABEL in xml
     assert "<key>RunAtLoad</key>" in xml
@@ -1727,22 +1724,22 @@ def test_service_build_plist_contains_required_keys(monkeypatch):
     assert "<key>ThrottleInterval</key>" in xml
     assert "<key>ProcessType</key>" in xml
     assert "Interactive" in xml
-    assert "/usr/local/bin/whiz" in xml
+    assert "/usr/local/bin/mynah" in xml
     assert "dictate" in xml  # ProgramArguments includes the subcommand
-    assert "whiz-dictate.log" in xml
+    assert "mynah.log" in xml
 
 
 def test_service_build_plist_uses_runner_when_available(monkeypatch):
     """When _ensure_runner returns a path, the plist launches via the runner
-    binary so Activity Monitor shows 'whiz' instead of 'Python'."""
-    from whiz.dictate import service
+    binary so Activity Monitor shows 'mynah' instead of 'Python'."""
+    from mynah import service
 
-    monkeypatch.setattr(service, "_ensure_runner", lambda: "/stable/whiz")
+    monkeypatch.setattr(service, "_ensure_runner", lambda: "/stable/mynah")
     monkeypatch.setattr(service, "_venv_site_packages", lambda: "/venv/site-packages")
     xml = service.build_plist()
-    assert "/stable/whiz" in xml
+    assert "/stable/mynah" in xml
     assert "-m" in xml
-    assert "whiz" in xml
+    assert "mynah" in xml
     assert "dictate" in xml
     assert "EnvironmentVariables" in xml
     assert "PYTHONPATH" in xml
@@ -1750,25 +1747,25 @@ def test_service_build_plist_uses_runner_when_available(monkeypatch):
 
 
 def test_service_build_plist_falls_back_to_python_m(monkeypatch):
-    from whiz.dictate import service
+    from mynah import service
 
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: None)
     xml = service.build_plist()
     assert "-m" in xml
-    assert "whiz" in xml
+    assert "mynah" in xml
     assert "dictate" in xml
 
 
 def test_service_install_writes_plist_and_loads(monkeypatch, tmp_path):
-    from whiz.dictate import service
+    from mynah import service
 
     plist = tmp_path / f"{service.LABEL}.plist"
-    log = tmp_path / "whiz-dictate.log"
+    log = tmp_path / "mynah.log"
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
     monkeypatch.setattr(service, "_LOG_PATH", log)
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
-    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
 
     calls = []
 
@@ -1789,15 +1786,15 @@ def test_service_install_writes_plist_and_loads(monkeypatch, tmp_path):
 
 def test_service_unload_on_reinstall(monkeypatch, tmp_path):
     """install() unloads an existing plist before loading the new one."""
-    from whiz.dictate import service
+    from mynah import service
 
     plist = tmp_path / f"{service.LABEL}.plist"
-    log = tmp_path / "whiz-dictate.log"
+    log = tmp_path / "mynah.log"
     plist.write_text("<old/>")
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
     monkeypatch.setattr(service, "_LOG_PATH", log)
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
-    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
 
     calls = []
 
@@ -1813,7 +1810,7 @@ def test_service_unload_on_reinstall(monkeypatch, tmp_path):
 
 
 def test_service_uninstall_removes_plist(monkeypatch, tmp_path):
-    from whiz.dictate import service
+    from mynah import service
 
     plist = tmp_path / f"{service.LABEL}.plist"
     plist.write_text("<old/>")
@@ -1841,13 +1838,13 @@ def test_service_plist_emits_service_env_on_every_path(monkeypatch):
     and rc=1 on a menu-bar failure — the env key is only load-bearing if
     the agent process actually receives it, whichever binary resolution
     won."""
-    from whiz.dictate import service
+    from mynah import service
 
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
     monkeypatch.setattr(service.shutil, "which", lambda _name: None)
     monkeypatch.delenv("WHIZ_CONFIG_DIR", raising=False)
 
-    # Path 3: python -m whiz fallback — the previously bare path.
+    # Path 3: python -m mynah fallback — the previously bare path.
     xml = service.build_plist()
     assert "EnvironmentVariables" in xml
     assert "WHIZ_DICTATE_SERVICE" in xml
@@ -1855,12 +1852,12 @@ def test_service_plist_emits_service_env_on_every_path(monkeypatch):
 
 def test_service_plist_passes_through_whiz_config_dir(monkeypatch, tmp_path):
     """W2-M14: WHIZ_CONFIG_DIR set in the installer's environment is
-    emitted into the plist. whiz.config reads it at import, so a custom
+    emitted into the plist. mynah.config reads it at import, so a custom
     config dir used for the CLI must survive into the agent."""
-    from whiz.dictate import service
+    from mynah import service
 
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
-    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
     monkeypatch.setenv("WHIZ_CONFIG_DIR", str(tmp_path))
 
     xml = service.build_plist()
@@ -1873,10 +1870,10 @@ def test_service_plist_omits_whiz_config_dir_when_unset(monkeypatch):
     """W2-M14 flip side: with no custom config dir, the key is absent from
     the plist — an empty-string WHIZ_CONFIG_DIR would be worse than none
     (config.py treats the empty string as a real override)."""
-    from whiz.dictate import service
+    from mynah import service
 
     monkeypatch.setattr(service, "_ensure_runner", lambda: None)
-    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/whiz")
+    monkeypatch.setattr(service.shutil, "which", lambda _name: "/usr/local/bin/mynah")
     monkeypatch.delenv("WHIZ_CONFIG_DIR", raising=False)
 
     xml = service.build_plist()
@@ -1884,7 +1881,7 @@ def test_service_plist_omits_whiz_config_dir_when_unset(monkeypatch):
 
 
 def test_service_uninstall_when_not_installed(monkeypatch, tmp_path):
-    from whiz.dictate import service
+    from mynah import service
 
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
 
@@ -1898,7 +1895,7 @@ def test_service_uninstall_when_not_installed(monkeypatch, tmp_path):
 
 
 def test_service_status_not_loaded(monkeypatch, tmp_path):
-    from whiz.dictate import service
+    from mynah import service
 
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
 
@@ -1912,7 +1909,7 @@ def test_service_status_not_loaded(monkeypatch, tmp_path):
 
 
 def test_service_status_loaded_parses_pid(monkeypatch, tmp_path):
-    from whiz.dictate import service
+    from mynah import service
 
     monkeypatch.setattr(service, "_LAUNCH_AGENTS_DIR", tmp_path)
     sample = '{\n    "PID" = 4242;\n    "LastExitStatus" = 0;\n}'
@@ -1927,20 +1924,20 @@ def test_service_status_loaded_parses_pid(monkeypatch, tmp_path):
 
 
 def test_dictate_parser_service_subcommands():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
     for action in ("install", "uninstall", "status"):
-        args = parser.parse_args(["dictate", "service", action])
-        assert args.func is cli.cmd_dictate_service
+        args = parser.parse_args(["service", action])
+        assert args.func is cli.cmd_service
         assert args.service_action == action
 
 
 def test_dictate_parser_service_remove_alias():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate", "service", "remove"])
+    args = parser.parse_args(["service", "remove"])
     assert args.service_action == "uninstall"
 
 
@@ -1948,7 +1945,7 @@ def test_cmd_dictate_service_install_refuses_without_extra(monkeypatch, capsys):
     """install must refuse (rc=1) when the dictate extra isn't installed,
     rather than writing a LaunchAgent that would crash-loop on startup."""
     import builtins
-    from whiz import cli
+    from mynah import cli
 
     real_import = builtins.__import__
 
@@ -1959,21 +1956,21 @@ def test_cmd_dictate_service_install_refuses_without_extra(monkeypatch, capsys):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     args = mock.Mock(service_action="install")
-    rc = cli.cmd_dictate_service(args)
+    rc = cli.cmd_service(args)
     assert rc == 1
     out = capsys.readouterr()
-    assert "dictate' extra is not installed" in out.err
+    assert "speech runtime is not installed" in out.err
     assert "crash-loop" in out.err
 
 
 # ---------------------------------------------------------------------------
-# Guided first-time setup / doctor (whiz dictate setup)
+# Guided first-time setup / doctor (mynah setup)
 # ---------------------------------------------------------------------------
 
 
 def test_setup_check_extra_passes_when_importable(monkeypatch):
     """_check_extra reports ok when the dictate extra deps import cleanly."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     # The test env injects fake sounddevice; force the rest to import ok.
     monkeypatch.setitem(sys.modules, "pynput", types.ModuleType("pynput"))
@@ -1988,7 +1985,7 @@ def test_setup_check_extra_passes_when_importable(monkeypatch):
 
 def test_setup_check_extra_fails_when_missing(monkeypatch):
     """_check_extra reports not-ok and an inject hint when deps are missing."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     import builtins
 
@@ -2007,7 +2004,7 @@ def test_setup_check_extra_fails_when_missing(monkeypatch):
 
 
 def test_setup_check_accessibility_passes_when_trusted(monkeypatch):
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     fake_appsvc = types.ModuleType("ApplicationServices")
     fake_appsvc.AXIsProcessTrustedWithOptions = lambda opts: True
@@ -2024,7 +2021,7 @@ def test_setup_check_accessibility_passes_when_trusted(monkeypatch):
 
 
 def test_setup_check_accessibility_fails_when_not_trusted(monkeypatch):
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     fake_appsvc = types.ModuleType("ApplicationServices")
     fake_appsvc.AXIsProcessTrustedWithOptions = lambda opts: False
@@ -2042,7 +2039,7 @@ def test_setup_check_accessibility_fails_when_not_trusted(monkeypatch):
 
 def test_setup_check_microphone_passes(monkeypatch):
     """_check_microphone reports ok when an InputStream opens cleanly."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     class _OkStream:
         def __init__(self, **kw):
@@ -2062,7 +2059,7 @@ def test_setup_check_microphone_passes(monkeypatch):
 def test_setup_check_microphone_fails_on_denial(monkeypatch):
     """_check_microphone reports not-ok with a grant hint when the stream
     raises an input/device error (the macOS permission-denied shape)."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     class _DenyStream:
         def __init__(self, **kw):
@@ -2077,7 +2074,7 @@ def test_setup_check_microphone_fails_on_denial(monkeypatch):
 
 def test_setup_check_hotkey_passes_on_valid_default(monkeypatch, tmp_path):
     """_check_hotkey reports ok when the configured hotkey parses with pynput."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     # Install a fake pynput.keyboard with a parse that accepts the default.
     fake_kb = types.ModuleType("pynput.keyboard")
@@ -2096,7 +2093,7 @@ def test_setup_check_hotkey_passes_on_valid_default(monkeypatch, tmp_path):
 
 def test_setup_check_hotkey_fails_on_invalid(monkeypatch, tmp_path):
     """_check_hotkey reports not-ok with a fix hint when parse raises."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     fake_kb = types.ModuleType("pynput.keyboard")
     fake_kb.HotKey = mock.Mock()
@@ -2110,11 +2107,11 @@ def test_setup_check_hotkey_fails_on_invalid(monkeypatch, tmp_path):
     r = setup_mod._check_hotkey()
     assert r.ok is False
     assert "Invalid" in r.detail
-    assert "whiz dictate set hotkey" in r.hint
+    assert "mynah set hotkey" in r.hint
 
 
 def test_setup_run_checks_returns_three_results():
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     results = setup_mod.run_checks()
     assert len(results) == 4
@@ -2125,7 +2122,7 @@ def test_setup_run_checks_returns_three_results():
 def test_setup_all_pass_points_at_service(monkeypatch, capsys):
     """When all checks pass and the service isn't loaded, setup auto-installs
     the login service (the one-command onboarding flow)."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
@@ -2136,7 +2133,7 @@ def test_setup_all_pass_points_at_service(monkeypatch, capsys):
     ])
     monkeypatch.setattr(setup_mod, "_service_loaded", lambda: False)
     # Mock service.install so it doesn't actually write a plist.
-    from whiz.dictate import service
+    from mynah import service
     monkeypatch.setattr(service, "install", lambda: 0)
     rc = setup_mod.setup()
     assert rc == 0
@@ -2147,7 +2144,7 @@ def test_setup_all_pass_points_at_service(monkeypatch, capsys):
 
 def test_setup_all_pass_notes_running_service(monkeypatch, capsys):
     """When all checks pass and the service is already loaded, note that."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
@@ -2165,7 +2162,7 @@ def test_setup_all_pass_notes_running_service(monkeypatch, capsys):
 
 def test_setup_no_service_flag_skips_install(monkeypatch, capsys):
     """install_service=False skips the service install and points at it."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
@@ -2179,12 +2176,12 @@ def test_setup_no_service_flag_skips_install(monkeypatch, capsys):
     assert rc == 0
     out = capsys.readouterr()
     assert "All checks passed" in out.err
-    assert "whiz dictate service install" in out.err
+    assert "mynah service install" in out.err
 
 
 def test_setup_failure_returns_one_and_recheck_hint(monkeypatch, capsys):
     """A failing check returns rc=1 and tells the user to re-run setup."""
-    from whiz.dictate import setup as setup_mod
+    from mynah import preflight as setup_mod
 
     monkeypatch.setattr(setup_mod, "_dictate_extra_installed", lambda: True)
     monkeypatch.setattr(setup_mod, "run_checks", lambda: [
@@ -2197,31 +2194,31 @@ def test_setup_failure_returns_one_and_recheck_hint(monkeypatch, capsys):
     assert rc == 1
     out = capsys.readouterr()
     assert "Some checks failed" in out.err
-    assert "whiz dictate setup" in out.err
+    assert "mynah setup" in out.err
 
 
 def test_dictate_parser_setup_subcommand():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate", "setup"])
-    assert args.func is cli.cmd_dictate_setup
+    args = parser.parse_args(["setup"])
+    assert args.func is cli.cmd_setup
 
 
 def test_dictate_parser_doctor_alias():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate", "doctor"])
-    assert args.func is cli.cmd_dictate_setup
+    args = parser.parse_args(["doctor"])
+    assert args.func is cli.cmd_setup
 
 
 def test_dictate_parser_setup_no_service_alias():
-    from whiz import cli
+    from mynah import cli
 
     parser = cli.build_parser()
-    args = parser.parse_args(["dictate", "setup-no-service"])
-    assert args.func is cli.cmd_dictate_setup
+    args = parser.parse_args(["setup", "--no-service"])
+    assert args.func is cli.cmd_setup
     assert getattr(args, "no_service", False) is True
 
 
@@ -2232,11 +2229,11 @@ def test_dictate_parser_setup_no_service_alias():
 
 def test_indicator_panel_disables_hides_on_deactivate(monkeypatch):
     """_create_panel must call setHidesOnDeactivate_(False) — NSPanel defaults
-    to True, which makes the overlay invisible when whiz runs as a background
+    to True, which makes the overlay invisible when mynah runs as a background
     LaunchAgent (always 'deactivated'). This is the root cause of the missing
     indicator under the login service.
     """
-    import whiz.dictate.providers.macos_indicator as mi
+    import mynah.providers.macos_indicator as mi
 
     calls: dict[str, bool] = {"hides_on_deactivate_set": False}
 
@@ -2316,129 +2313,8 @@ def test_indicator_panel_disables_hides_on_deactivate(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# whiz upgrade — one-command update flow
+# mynah upgrade — one-command update flow
 # ---------------------------------------------------------------------------
-
-
-def test_upgrade_parser_registered():
-    """`whiz upgrade` and alias `whiz up` resolve to cmd_upgrade."""
-    from whiz import cli
-
-    parser = cli.build_parser()
-    args = parser.parse_args(["upgrade"])
-    assert args.func is cli.cmd_upgrade
-    args = parser.parse_args(["up"])
-    assert args.func is cli.cmd_upgrade
-
-
-def test_upgrade_reinstalls_and_restarts_service(monkeypatch):
-    """cmd_upgrade re-runs pipx install, re-injects the extra if present,
-    restarts the service if installed, and re-verifies — the full dance.
-    The verification runs checks ONLY (M12): setup() is called with
-    install_service=False so an upgrade never adds a new login service."""
-    from whiz import cli
-
-    calls: list[list[str]] = []
-
-    def fake_run(cmd):
-        calls.append(cmd)
-        return 0
-    monkeypatch.setattr(cli, "_run_live", fake_run)
-    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: True)
-    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: False)
-    monkeypatch.setattr(cli, "_service_plist_exists", lambda: True)
-
-    # Stub the service module so uninstall/install don't touch launchd.
-    from whiz.dictate import service as service_mod
-
-    monkeypatch.setattr(service_mod, "uninstall", lambda: 0)
-    monkeypatch.setattr(service_mod, "install", lambda: 0)
-
-    # Stub setup to return ok — and record the call (M12): the upgrade's
-    # verification must run checks ONLY, never install the LaunchAgent via
-    # setup()'s install_service default.
-    from whiz.dictate import setup as setup_mod
-
-    setup_calls: list[dict] = []
-    monkeypatch.setattr(setup_mod, "setup",
-                         lambda **kw: setup_calls.append(kw) or 0)
-
-    args = mock.Mock()
-    rc = cli.cmd_upgrade(args)
-    assert rc == 0
-    # pipx install --force + pipx inject were both called.
-    assert any("install" in c and "--force" in c for c in calls), calls
-    assert any("inject" in c and "whiz[dictate]" in c for c in calls), calls
-    # M12: verify-only — setup() must never auto-install the login service.
-    assert setup_calls == [{"install_service": False}]
-
-
-def test_upgrade_skips_extra_when_not_installed(monkeypatch):
-    """If the dictate extra was never installed, upgrade skips the inject step
-    so a transcription-only user isn't surprised by a 1.6 GB mlx download —
-    and skips the verification setup entirely (M12): its step-0 auto-inject
-    would re-attempt exactly that download at the last mile."""
-    from whiz import cli
-
-    calls: list[list[str]] = []
-    monkeypatch.setattr(cli, "_run_live", lambda cmd: calls.append(cmd) or 0)
-    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: False)
-    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: False)
-    monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
-    from whiz.dictate import setup as setup_mod
-
-    setup_calls: list[dict] = []
-    monkeypatch.setattr(setup_mod, "setup",
-                         lambda **kw: setup_calls.append(kw) or 0)
-
-    rc = cli.cmd_upgrade(mock.Mock())
-    assert rc == 0
-    # pipx install happened, but NO inject call.
-    assert any("install" in c for c in calls)
-    assert not any("inject" in c for c in calls), calls
-    # M12: with the extra absent, the verification setup is skipped too —
-    # its step-0 auto-inject would re-attempt the exact 1.6 GB install
-    # step 2 chose to skip.
-    assert setup_calls == []
-
-
-def test_upgrade_aborts_when_pipx_install_fails(monkeypatch):
-    """If the pipx reinstall fails, upgrade aborts early (rc=1) — no point
-    restarting the service with stale code or re-injecting a broken extra."""
-    from whiz import cli
-
-    monkeypatch.setattr(cli, "_run_live", lambda cmd: mock.Mock(returncode=1))
-    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: True)
-    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: False)
-    monkeypatch.setattr(cli, "_service_plist_exists", lambda: True)
-
-    rc = cli.cmd_upgrade(mock.Mock())
-    assert rc == 1
-
-
-def test_upgrade_reinjects_diarize_extra_when_present(monkeypatch):
-    """The diarize extra (sherpa-onnx — possibly auto-installed by the
-    proactive setup) must survive `pipx install --force`: step 2b
-    re-injects whiz[diarize] whenever sherpa-onnx was importable before
-    the upgrade, and stays quiet (no surprise download) when it wasn't."""
-    from whiz import cli
-
-    calls: list[list[str]] = []
-
-    monkeypatch.setattr(cli, "_run_live", lambda cmd: calls.append(cmd) or 0)
-    monkeypatch.setattr(cli, "_dictate_extra_installed", lambda: False)
-    monkeypatch.setattr(cli, "_diarize_extra_installed", lambda: True)
-    monkeypatch.setattr(cli, "_service_plist_exists", lambda: False)
-    from whiz.dictate import setup as setup_mod
-
-    monkeypatch.setattr(setup_mod, "setup", lambda **kw: 0)
-
-    rc = cli.cmd_upgrade(mock.Mock())
-    assert rc == 0
-    # The diarize extra was present → it gets re-injected after the reinstall.
-    assert any("inject" in c and "whiz[diarize]" in c for c in calls), calls
-    # The absent dictate extra is still skipped — no surprise downloads.
-    assert not any("whiz[dictate]" in c for c in calls), calls
 
 
 # ---------------------------------------------------------------------------
@@ -2447,9 +2323,9 @@ def test_upgrade_reinjects_diarize_extra_when_present(monkeypatch):
 
 
 def test_config_menu_bar_default_true():
-    """dictate_menu_bar defaults to True so the menu bar item is on by default."""
+    """menu_bar defaults to True so the menu bar item is on by default."""
     config = cfg.Config()
-    assert config.dictate_menu_bar is True
+    assert config.menu_bar is True
 
 
 def test_resolve_settings_menu_bar_default_true():
@@ -2460,49 +2336,49 @@ def test_resolve_settings_menu_bar_default_true():
 
 def test_resolve_settings_menu_bar_override():
     config = cfg.Config()
-    config.dictate_menu_bar = False
+    config.menu_bar = False
     s = eng.resolve_settings(config)
     assert s.menu_bar is False
     s = eng.resolve_settings(config, menu_bar=True)
     assert s.menu_bar is True
-    config.dictate_menu_bar = True
+    config.menu_bar = True
     s = eng.resolve_settings(config, menu_bar=False)
     assert s.menu_bar is False
 
 
 def test_dictate_set_menu_bar_persists(tmp_path, monkeypatch):
-    """`whiz dictate set menu_bar=false` persists dictate_menu_bar."""
-    from whiz import cli
+    """`mynah set menu_bar=false` persists menu_bar."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="menu_bar=false")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
-    assert cfg.load().dictate_menu_bar is False
+    assert cfg.load().menu_bar is False
 
 
 def test_dictate_set_menubar_alias(tmp_path, monkeypatch):
-    """The 'menubar' alias maps to dictate_menu_bar."""
-    from whiz import cli
+    """The 'menubar' alias maps to menu_bar."""
+    from mynah import cli
 
     monkeypatch.setattr(cfg, "CONFIG_DIR", tmp_path)
     monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.toml")
     args = mock.Mock(assignment="menubar=true")
-    rc = cli.cmd_dictate_set(args)
+    rc = cli.cmd_set(args)
     assert rc == 0
-    assert cfg.load().dictate_menu_bar is True
+    assert cfg.load().menu_bar is True
 
 
 def test_menu_bar_friendly_key_and_config_table_covered():
-    """dictate_menu_bar is reachable via friendly keys AND the config table
+    """menu_bar is reachable via friendly keys AND the config table
     — the existing coverage tests assert EVERY dictate_* field is mapped, so
     this guards against a future field being added without a friendly name."""
-    from whiz import cli
+    from mynah import cli
 
-    assert "dictate_menu_bar" in cli._DICTATE_FRIENDLY_KEYS.values()
-    field_keys = {k for k, _, _ in cli._DICTATE_CONFIG_FIELDS}
-    assert "dictate_menu_bar" in field_keys
+    assert "menu_bar" in cli.FRIENDLY.values()
+    field_keys = {k for k, _, _ in cli.FIELDS}
+    assert "menu_bar" in field_keys
 
 
 def test_set_state_notifies_listeners():
@@ -2569,7 +2445,7 @@ def test_run_setup_menu_bar_noop_off_macos(monkeypatch):
 def test_indicator_pill_starts_transparent_and_fades(monkeypatch):
     """The redesigned pill panel starts at alpha 0 (so show() can fade it in)
     and still calls setHidesOnDeactivate_(False) for the LaunchAgent fix."""
-    import whiz.dictate.providers.macos_indicator as mi
+    import mynah.providers.macos_indicator as mi
 
     calls: dict[str, object] = {"hides_on_deactivate_set": None, "alpha_set": None}
 
@@ -2637,7 +2513,7 @@ def test_menubar_toggle_action_calls_engine_toggle():
     the hotkey — so the menu bar can start/stop a real session. do_toggle
     dispatches to a background thread so the AppKit run loop isn't blocked,
     so we poll until the session flips (bounded wait)."""
-    from whiz.dictate.providers.macos_rumps import MacMenuBar
+    from mynah.providers.macos_rumps import MacMenuBar
 
     engine = _make_engine()
     mb = MacMenuBar(engine=engine)
@@ -2655,7 +2531,7 @@ def test_menubar_quit_action_calls_engine_stop(monkeypatch):
     do_quit dispatches to a background thread, so we poll for the stop
     event + session-end rather than asserting synchronously. rumps is
     stubbed so do_quit's rumps.quit_application() call doesn't need the lib."""
-    from whiz.dictate.providers.macos_rumps import MacMenuBar
+    from mynah.providers.macos_rumps import MacMenuBar
 
     # Stub rumps so do_quit's rumps.quit_application() doesn't fail.
     fake_rumps = types.ModuleType("rumps")
@@ -2679,7 +2555,7 @@ def test_menubar_toggle_does_not_block_calling_thread():
     We patch toggle_session to sleep and check do_toggle returned fast."""
     import time as _time
 
-    from whiz.dictate.providers.macos_rumps import MacMenuBar
+    from mynah.providers.macos_rumps import MacMenuBar
 
     engine = _make_engine()
     mb = MacMenuBar(engine=engine)
@@ -2703,7 +2579,7 @@ def test_menubar_toggle_does_not_block_calling_thread():
 def test_menubar_on_state_updates_internal_state():
     """on_state (the engine state-listener callback) records the state so
     _update_labels can sync the menu — and is safe before setup() runs."""
-    from whiz.dictate.providers.macos_rumps import MacMenuBar
+    from mynah.providers.macos_rumps import MacMenuBar
 
     engine = _make_engine()
     mb = MacMenuBar(engine=engine)
@@ -2717,7 +2593,7 @@ def test_menubar_on_state_updates_menu_labels_and_icon():
     """on_state must update the toggle item title, state label, and swap the
     icon — the rumps-based menu bar handles all UI updates via rumps
     properties, which dispatch to the main thread internally."""
-    from whiz.dictate.providers.macos_rumps import MacMenuBar
+    from mynah.providers.macos_rumps import MacMenuBar
 
     mb = MacMenuBar(engine=_make_engine())
     # Simulate setup() having run: create fake rumps app + menu items.
@@ -2746,7 +2622,7 @@ def test_menubar_on_state_updates_menu_labels_and_icon():
 def test_menubar_on_state_safe_before_setup():
     """on_state must not raise when setup() hasn't created the app yet —
     the engine may fire state changes before the menu bar is wired."""
-    from whiz.dictate.providers.macos_rumps import MacMenuBar
+    from mynah.providers.macos_rumps import MacMenuBar
 
     mb = MacMenuBar(engine=_make_engine())
     mb.on_state("listening")  # no app set — must not raise
@@ -2756,7 +2632,7 @@ def test_menubar_on_state_safe_before_setup():
 def test_menubar_setup_noop_if_already_setup(monkeypatch):
     """setup() is idempotent — a second call does nothing (guard against
     double-creating the rumps App)."""
-    from whiz.dictate.providers.macos_rumps import MacMenuBar
+    from mynah.providers.macos_rumps import MacMenuBar
 
     mb = MacMenuBar(engine=_make_engine())
     mb._app = object()  # pretend setup already ran
@@ -2771,7 +2647,7 @@ def test_indicator_show_dispatches_fade_to_view_not_panel():
     under the bare except, leaving the indicator invisible for the whole
     session because the panel started at alpha 0 and was never ordered front.
     """
-    import whiz.dictate.providers.macos_indicator as mi
+    import mynah.providers.macos_indicator as mi
 
     ind = mi.MacIndicator()
     view = mock.Mock()
@@ -2796,7 +2672,7 @@ def test_indicator_show_dispatches_fade_to_view_not_panel():
 def test_indicator_show_noop_when_view_not_created():
     """show()/hide() must be a no-op (not raise) when the view isn't set up
     yet — the engine may call show() before setup() on a non-macOS box."""
-    import whiz.dictate.providers.macos_indicator as mi
+    import mynah.providers.macos_indicator as mi
 
     ind = mi.MacIndicator()
     ind._view = None

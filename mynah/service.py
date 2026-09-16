@@ -1,6 +1,6 @@
-"""launchd LaunchAgent management for ``whiz dictate``.
+"""launchd LaunchAgent management for ``mynah``.
 
-Manages a per-user LaunchAgent that starts ``whiz dictate`` at login and
+Manages a per-user LaunchAgent that starts ``mynah`` at login and
 keeps it running (``KeepAlive``). This is the \"always-on\" service: the
 dictation engine runs in the background, the idle indicator stays visible,
 and the hotkey is armed without keeping a terminal open.
@@ -9,10 +9,10 @@ Stdlib-only (no new dependency): the plist is emitted by hand and the
 ``launchctl`` tool is invoked via ``subprocess``.
 
 Layout:
-- ``~/Library/LaunchAgents/com.reidenxerx.whiz.dictate.plist``
-- ``~/Library/Logs/whiz-dictate.log`` (combined stdout/stderr)
+- ``~/Library/LaunchAgents/com.reidenxerx.mynah.plist``
+- ``~/Library/Logs/mynah.log`` (combined stdout/stderr)
 
-The agent runs as a separate process from any terminal ``whiz``, so it
+The agent runs as a separate process from any terminal ``mynah``, so it
 needs its own Accessibility grant in System Settings → Privacy & Security
 (pynput global hotkey + CGEvent text injection both require it).
 """
@@ -26,19 +26,19 @@ import sys
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-LABEL = "com.reidenxerx.whiz.dictate"
+LABEL = "com.reidenxerx.mynah"
 
 _LAUNCH_AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
-_LOG_PATH = Path.home() / "Library" / "Logs" / "whiz-dictate.log"
+_LOG_PATH = Path.home() / "Library" / "Logs" / "mynah.log"
 # A renamed copy of the framework Python binary, placed at a stable path
 # outside the pipx venv so it survives ``pipx install --force`` during
-# ``whiz upgrade``. The kernel process name (``p_comm``) is set from the
-# binary basename at ``execve``, so a binary named ``whiz`` shows as
-# "whiz" in Activity Monitor / Force Quit — not "Python". Because the path
+# ``mynah upgrade``. The kernel process name (``p_comm``) is set from the
+# binary basename at ``execve``, so a binary named ``mynah`` shows as
+# "mynah" in Activity Monitor / Force Quit — not "Python". Because the path
 # is stable, the Accessibility/TCC permission granted to it persists
 # across upgrades (the pipx venv rebuild doesn't touch it).
-_RUNNER_DIR = Path.home() / ".local" / "share" / "whiz"
-_RUNNER_NAME = "whiz"
+_RUNNER_DIR = Path.home() / ".local" / "share" / "mynah"
+_RUNNER_NAME = "mynah"
 
 
 def plist_path() -> Path:
@@ -47,17 +47,17 @@ def plist_path() -> Path:
 
 
 def _venv_bin_dir() -> Path | None:
-    """Return the pipx venv ``bin`` dir that owns the ``whiz`` script, or None.
+    """Return the pipx venv ``bin`` dir that owns the ``mynah`` script, or None.
 
-    ``shutil.which("whiz")`` resolves to ``~/.local/bin/whiz`` (a pipx app
+    ``shutil.which("mynah")`` resolves to ``~/.local/bin/mynah`` (a pipx app
     symlink). We resolve through it to the real script inside the venv and
     return its parent directory.
     """
-    which = shutil.which("whiz")
+    which = shutil.which("mynah")
     if not which:
         return None
     real = Path(which).resolve()
-    if real.name == "whiz":
+    if real.name == "mynah":
         return real.parent
     return None
 
@@ -69,7 +69,7 @@ def _framework_python_binary() -> Path | None:
     *stub* that re-execs from ``Python.app/Contents/MacOS/Python``. A copy
     of the stub inherits that behaviour, so the kernel process name still
     resolves to "Python". We must copy the actual ``Python.app`` binary
-    instead — a copy of that, named ``whiz``, reports ``comm=whiz``.
+    instead — a copy of that, named ``mynah``, reports ``comm=mynah``.
     """
     venv_bin = _venv_bin_dir()
     if venv_bin is None:
@@ -105,25 +105,25 @@ def _venv_site_packages() -> str | None:
 
 
 def _ensure_runner() -> str | None:
-    """Create a renamed copy of the framework Python binary named ``whiz``.
+    """Create a renamed copy of the framework Python binary named ``mynah``.
 
     Activity Monitor and Force Quit display the *kernel process name*
     (``proc_name``/``p_comm``), set at ``execve`` from the actual binary's
     basename — NOT from ``argv[0]`` (which ``setproctitle`` changes). The
-    pipx ``whiz`` console script is a Python text file with a ``#!/.../python``
+    pipx ``mynah`` console script is a Python text file with a ``#!/.../python``
     shebang, so the real executable is always
     ``.../Python.app/Contents/MacOS/Python`` and the system UI shows
     "Python".
 
-    A *copy* of the framework ``Python.app`` binary named ``whiz`` placed
-    at a stable path (``~/.local/share/whiz/whiz``) reports ``comm=whiz`` —
-    so Activity Monitor shows "whiz". Since it's outside the venv, the
+    A *copy* of the framework ``Python.app`` binary named ``mynah`` placed
+    at a stable path (``~/.local/share/mynah/mynah``) reports ``comm=mynah`` —
+    so Activity Monitor shows "mynah". Since it's outside the venv, the
     venv's ``site-packages`` is injected via ``PYTHONPATH`` in the plist.
     The stable path means the Accessibility/TCC permission granted to it
-    persists across ``pipx install --force`` during ``whiz upgrade``.
+    persists across ``pipx install --force`` during ``mynah upgrade``.
 
     Returns the absolute path to the runner binary, or None if it can't
-    be built (the caller falls back to the plain ``whiz`` script).
+    be built (the caller falls back to the plain ``mynah`` script).
     """
     src = _framework_python_binary()
     if src is None:
@@ -150,9 +150,9 @@ def _ensure_runner() -> str | None:
         except OSError:
             return None
 
-    # Sanity check: the runner must start and find whiz via PYTHONPATH —
-    # and not just the top-level package: `whiz dictate` immediately
-    # imports whiz.dictate.engine, so an install where that module (or
+    # Sanity check: the runner must start and find mynah via PYTHONPATH —
+    # and not just the top-level package: `mynah` immediately
+    # imports mynah.engine, so an install where that module (or
     # its imports) breaks must fall back to the plain script HERE (L5,
     # wave-2) instead of yielding a LaunchAgent that crash-loops on
     # launch. The heavy deps (mlx_whisper, sounddevice, pynput) stay lazy
@@ -160,7 +160,7 @@ def _ensure_runner() -> str | None:
     env = os.environ.copy()
     env["PYTHONPATH"] = site
     probe = subprocess.run(
-        [str(runner), "-c", "import whiz.dictate.engine"],
+        [str(runner), "-c", "import mynah.engine"],
         capture_output=True, text=True, check=False, timeout=15,
         env=env,
     )
@@ -170,14 +170,14 @@ def _ensure_runner() -> str | None:
 
 
 def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
-    """Resolve the command (and env vars) to launch ``whiz dictate``.
+    """Resolve the command (and env vars) to launch ``mynah``.
 
-    Prefer a renamed Python runner binary (``whiz``) so the process shows
-    as ``whiz`` (not ``Python``) in Activity Monitor / Force Quit. The
+    Prefer a renamed Python runner binary (``mynah``) so the process shows
+    as ``mynah`` (not ``Python``) in Activity Monitor / Force Quit. The
     runner needs ``PYTHONPATH`` pointed at the venv's ``site-packages``.
-    Fall back to the ``whiz`` console script on PATH (what pipx installs
-    into ``~/.local/bin``); fall back further to ``python -m whiz`` using
-    the current interpreter so the agent still works when whiz is installed
+    Fall back to the ``mynah`` console script on PATH (what pipx installs
+    into ``~/.local/bin``); fall back further to ``python -m mynah`` using
+    the current interpreter so the agent still works when mynah is installed
     editable or run from a venv without the console script.
 
     Env vars emitted on EVERY argv path (M14, wave-2):
@@ -188,7 +188,7 @@ def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
       relaunch loop) and returning 1 on a menu-bar setup failure, so
       the agent must actually receive it whichever argv path resolved.
     - ``WHIZ_CONFIG_DIR`` — passed through when set in the installer's
-      environment: whiz.config reads it at import, so a custom config
+      environment: mynah.config reads it at import, so a custom config
       dir used for the CLI must survive into the agent too.
 
     Returns ``(argv, env_vars)`` where ``env_vars`` is a dict to emit as
@@ -203,17 +203,17 @@ def _resolve_whiz_bin() -> tuple[list[str], dict[str, str]]:
     if runner:
         site = _venv_site_packages() or ""
         env["PYTHONPATH"] = site
-        return [runner, "-m", "whiz"], env
-    which = shutil.which("whiz")
+        return [runner, "-m", "mynah"], env
+    which = shutil.which("mynah")
     if which:
         return [which], env
-    return [sys.executable, "-m", "whiz"], env
+    return [sys.executable, "-m", "mynah"], env
 
 
 def build_plist() -> str:
     """Build the LaunchAgent plist XML (string)."""
     argv, env_vars = _resolve_whiz_bin()
-    # Ensure the dictation command is explicit (not just bare `whiz`).
+    # Ensure the dictation command is explicit (not just bare `mynah`).
     if argv[-1] != "dictate" and "dictate" not in argv:
         argv = argv + ["dictate"]
 
@@ -293,18 +293,18 @@ def install() -> int:
         )
         return 1
 
-    print(f"Installed whiz dictate service (LaunchAgent {LABEL}).")
+    print(f"Installed mynah service (LaunchAgent {LABEL}).")
     print(f"  plist: {plist}")
     print(f"  log:   {_LOG_PATH}")
     print()
     print("The service starts at login and stays running (KeepAlive).")
-    print("Manage with: whiz dictate service status | uninstall")
+    print("Manage with: mynah service status | uninstall")
     print()
     print(
-        "NOTE: the background agent is a separate process from terminal whiz "
+        "NOTE: the background agent is a separate process from terminal mynah "
         "and needs its own Accessibility permission. Grant it in System "
         "Settings → Privacy & Security → Accessibility, then restart the "
-        "agent: whiz dictate service uninstall && whiz dictate service install"
+        "agent: mynah service uninstall && mynah service install"
     )
     return 0
 
@@ -315,11 +315,11 @@ def uninstall() -> int:
     if plist.exists():
         _run(["launchctl", "unload", str(plist)])
         plist.unlink(missing_ok=True)
-        print(f"Uninstalled whiz dictate service (removed {plist}).")
+        print(f"Uninstalled mynah service (removed {plist}).")
     else:
         # Best-effort unload in case the file was removed out of band.
         _run(["launchctl", "remove", LABEL])
-        print("whiz dictate service was not installed (no plist found).")
+        print("mynah service was not installed (no plist found).")
     return 0
 
 
@@ -327,9 +327,9 @@ def status() -> int:
     """Print the service status: loaded/not-loaded, PID, last exit."""
     res = _run(["launchctl", "list", LABEL])
     if res.returncode != 0:
-        print(f"whiz dictate service: not loaded ({LABEL}).")
+        print(f"mynah service: not loaded ({LABEL}).")
         print(f"  plist present: {plist_path().exists()}")
-        print("Install with: whiz dictate service install")
+        print("Install with: mynah service install")
         return 0
 
     # `launchctl list <label>` output format (modern launchctl):
@@ -342,7 +342,7 @@ def status() -> int:
     out = res.stdout
     pid = _extract_field(out, "PID") or "-"
     last_exit = _extract_field(out, "LastExitStatus") or "-"
-    print(f"whiz dictate service: loaded ({LABEL})")
+    print(f"mynah service: loaded ({LABEL})")
     print(f"  PID:            {pid}")
     print(f"  LastExitStatus: {last_exit}")
     print(f"  plist:          {plist_path()}")

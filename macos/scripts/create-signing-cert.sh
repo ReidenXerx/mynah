@@ -4,7 +4,7 @@
 # Why: an ad-hoc signature (`codesign -s -`) has no stable identity, so its
 # cdhash changes with every rebuild and macOS treats each build as a different
 # app. TCC then drops the Accessibility grant, silently — dictation appears to
-# work while typing nothing, and the settings list fills with stale "whiz"
+# work while typing nothing, and the settings list fills with stale "mynah"
 # entries.
 #
 # A self-signed certificate gives a designated requirement that stays constant
@@ -20,17 +20,17 @@
 # Run once:  macos/scripts/create-signing-cert.sh
 #
 # To undo, removing both the trust setting and the key:
-#   security remove-trusted-cert ~/Desktop/whiz-dev.cer   # if you exported it
-#   security delete-identity -c whiz-dev
+#   security remove-trusted-cert ~/Desktop/mynah-dev.cer   # if you exported it
+#   security delete-identity -c mynah-dev
 set -euo pipefail
 
-NAME="whiz-dev"
+NAME="mynah-dev"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
 # Is the identity actually usable? Test by signing something, not by reading
 # `security find-identity`: even with -v ("valid identities only") it still
 # *lists* broken ones, annotated like
-#     1) A470... "whiz-dev" (Invalid Key Usage for policy)
+#     1) A470... "mynah-dev" (Invalid Key Usage for policy)
 # so grepping for the name matches a certificate codesign will refuse. A trial
 # signature is the only answer that means anything.
 identity_is_usable() {
@@ -78,7 +78,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
 # -legacy is also passed where supported: OpenSSL 3.x defaults to AES-256-CBC +
 # SHA-256, which older Security framework builds cannot read. LibreSSL
 # (/usr/bin/openssl) has no such flag and already writes the legacy encoding.
-P12_PASSWORD="whiz-dev-transient"
+P12_PASSWORD="mynah-dev-transient"
 PKCS12_COMPAT=""
 if openssl pkcs12 -help 2>&1 | grep -q -- "-legacy"; then
   PKCS12_COMPAT="-legacy"
@@ -108,7 +108,7 @@ fi
 
 echo
 echo "done. Build signed with it:"
-echo "  WHIZ_SIGN_IDENTITY=$NAME macos/scripts/build-app.sh"
+echo "  MYNAH_SIGN_IDENTITY=$NAME macos/scripts/build-app.sh"
 echo
 echo "Grant Accessibility once after the first signed build; it will survive"
 echo "subsequent rebuilds."

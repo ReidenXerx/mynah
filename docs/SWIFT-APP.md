@@ -10,7 +10,7 @@ The dictation daemon is a Python process impersonating a Mac app, and most of
 its complexity is the cost of that impersonation:
 
 - `dictate/service.py` copies Apple's framework Python binary to
-  `~/.local/share/whiz/whiz` so Activity Monitor shows "whiz" instead of
+  `~/.local/share/mynah/mynah` so Activity Monitor shows "mynah" instead of
   "Python", and keeps it at a fixed path so the TCC Accessibility grant survives
   `pipx install --force`.
 - `providers/macos_indicator.py` drives AppKit through stringly-typed selectors
@@ -28,7 +28,7 @@ construction, so all of the above stops being necessary rather than being fixed.
 
 | Area | File | Replaces |
 |---|---|---|
-| Entry point, menu bar item | `WhizApp.swift` | `macos_rumps.py` |
+| Entry point, menu bar item | `MynahApp.swift` | `macos_rumps.py` |
 | Menu contents | `UI/MenuBarContent.swift` | `macos_rumps.py` |
 | Floating pill | `UI/IndicatorPanel.swift` | `macos_indicator.py` (519 → ~150 lines) |
 | W monogram | `UI/WhizLogo.swift` | `macos_logo.py` |
@@ -38,10 +38,10 @@ construction, so all of the above stops being necessary rather than being fixed.
 | Text injection | `Input/TextInjector.swift` | `macos_inject.py` |
 | Accessibility | `System/Permissions.swift` | `macos_inject.py` |
 | Start at login | `System/LoginItem.swift` | `service.py` (343 lines → 2 calls) |
-| Config | `Config/FlatTOML.swift`, `Config/WhizConfig.swift` | shares `config.py`'s file |
+| Config | `Config/FlatTOML.swift`, `Config/MynahConfig.swift` | shares `config.py`'s file |
 | Speech recognition | `STT/WhisperEngine.swift`, `Sources/CWhisper` | `providers/mlx.py` |
 | Voice activity detection | `STT/SileroVAD.swift` | `webrtcvad` via `vad.py` |
-| Model resolution + download | `STT/WhisperModel.swift`, `STT/ModelDownloader.swift` | `whiz models download` |
+| Model resolution + download | `STT/WhisperModel.swift`, `STT/ModelDownloader.swift` | `mynah models download` |
 | Language list | `STT/WhisperLanguages.swift` | — |
 | ggml backend registration | `STT/GGMLBackends.swift` | — |
 | Gates + hallucination filter | `STT/TranscriptFilter.swift` | `engine.py` constants |
@@ -89,7 +89,7 @@ whisper.cpp, linked in-process through its C API (`Sources/CWhisper`), running
 ### Why
 
 The criterion was reuse: which engine preserves the tuning already paid for in
-`whiz/dictate/`? That tuning is the asset, not any particular runtime.
+`mynah/dictate/`? That tuning is the asset, not any particular runtime.
 
 | Asset | Origin | Transfers to whisper.cpp? |
 |---|---|---|
@@ -101,7 +101,7 @@ The criterion was reuse: which engine preserves the tuning already paid for in
 
 Supporting reasons:
 
-- **Already a dependency.** whiz requires `whisper-cli` for batch transcription
+- **Already a dependency.** mynah requires `whisper-cli` for batch transcription
   and every entry in `models.py:KNOWN_MODELS` is ggml. Dictation previously kept
   a *second* model in a *second* format (mlx safetensors, 1.6 GB, under
   `~/.cache/huggingface`). One engine now means one model file.
@@ -257,13 +257,13 @@ processing / AGC, should that ever be added — AGC deliberately destroys the
 stable relationship between loudness and speech that the energy gates depend on.
 
 The model is the same one the batch pipeline downloads via
-`whiz models download-vad`; there is no second asset.
+`mynah models download-vad`; there is no second asset.
 
 ## Models
 
 `ModelDownloader` fetches from the same HuggingFace repositories as
-`whiz/models.py`, into the same `~/.cache/whisper`. One cache, both tools:
-`whiz models list` sees what the app downloads and vice versa. This removed the
+`mynah/models.py`, into the same `~/.cache/whisper`. One cache, both tools:
+`mynah models list` sees what the app downloads and vice versa. This removed the
 last reason a dictation-only user needed the Python package installed.
 
 `WhisperModel.preference` puts **unquantized** turbo first, matching
@@ -309,18 +309,18 @@ implementation and hallucination behaviour can change between releases.
 
 ## Config is co-owned
 
-Both binaries read and write `~/.config/whiz/config.toml`. Python owns the
+Both binaries read and write `~/.config/mynah/config.toml`. Python owns the
 pipeline keys, Swift owns `dictate_*`, and neither may clobber the other's, so
-`WhizConfig.save()` is always read-modify-write.
+`MynahConfig.save()` is always read-modify-write.
 
 `FlatTOML.swift` is a ~120-line parser rather than a TOML dependency, for the
 same reason `config.py` hand-rolls `_emit_toml`: the schema is one flat table of
 scalars and string arrays. It keeps the package dependency-free and buildable
 offline. Round-trip compatibility in both directions is what
-`Tests/WhizAppTests/ConfigTests.swift` exists to pin.
+`Tests/MynahAppTests/ConfigTests.swift` exists to pin.
 
-Defaults are duplicated in `WhizConfig` and must be kept in step with
-`whiz/config.py`. If they drift, the same file means two different things
+Defaults are duplicated in `MynahConfig` and must be kept in step with
+`mynah/config.py`. If they drift, the same file means two different things
 depending on which binary read it.
 
 ## Building
@@ -328,13 +328,13 @@ depending on which binary read it.
 ```sh
 macos/scripts/build-app.sh          # debug
 macos/scripts/build-app.sh release  # release
-open macos/build/Whiz.app
+open macos/build/Mynah.app
 ```
 
 The script prefers SwiftPM and falls back to invoking `swiftc` over the sources
 directly when SwiftPM is unavailable (see below). Either path produces the same
 binary; the fallback just cannot run the test suite. It then wraps the binary
-into `Whiz.app` with `Info.plist` and ad-hoc signs it.
+into `Mynah.app` with `Info.plist` and ad-hoc signs it.
 
 Run the bundle, not the raw binary — TCC keys permissions to the bundle
 identifier.
@@ -345,16 +345,16 @@ identifier.
    whichever starts first wins, so leaving it running makes the Swift app look
    broken:
    ```sh
-   launchctl unload ~/Library/LaunchAgents/com.reidenxerx.whiz.dictate.plist
+   launchctl unload ~/Library/LaunchAgents/com.reidenxerx.mynah.dictate.plist
    ```
 2. **Get the right model.** NS-15: unquantized always. Without unquantized
    turbo on disk the resolver falls back down the preference list — the
    quantized fallbacks are explicitly informed last resorts (the q5_0
    warning from commit `ea49da8` is in the open-issues log):
    ```sh
-   whiz models download ggml-large-v3-turbo.bin
+   mynah models download ggml-large-v3-turbo.bin
    ```
-3. `open macos/build/Whiz.app` — a W appears in the menu bar; there is no Dock
+3. `open macos/build/Mynah.app` — a W appears in the menu bar; there is no Dock
    icon or window (`LSUIElement`).
 4. Grant **Accessibility** (menu → "Grant Accessibility…") and allow the
    microphone at the first prompt. Ad-hoc signatures change on every rebuild, so
@@ -364,7 +364,7 @@ identifier.
 
 To restore the Python agent:
 ```sh
-launchctl load ~/Library/LaunchAgents/com.reidenxerx.whiz.dictate.plist
+launchctl load ~/Library/LaunchAgents/com.reidenxerx.mynah.dictate.plist
 ```
 
 ### Known environment issue
@@ -386,7 +386,7 @@ swiftc -sdk "$(xcrun --show-sdk-path)" -target arm64-apple-macosx13.0 \
   -swift-version 6 -parse-as-library \
   -Xcc -I/opt/homebrew/include -I macos/Sources/CWhisper \
   -L/opt/homebrew/lib -lwhisper -lggml -lggml-base \
-  $(find macos/Sources/WhizApp -name '*.swift') -o /tmp/WhizApp
+  $(find macos/Sources/MynahApp -name '*.swift') -o /tmp/MynahApp
 ```
 
 ### Running the tests
@@ -425,8 +425,8 @@ same binary.
    paid Apple Developer account. Still arm64-only; a universal build is a
    `CMAKE_OSX_ARCHITECTURES` change plus the matching swiftc target.
 5. **Bundle Python** — embed a relocatable interpreter (python-build-standalone)
-   under `Contents/Resources/python` for `whiz analyze` and friends, plus a
-   `/usr/local/bin/whiz` shim. Every bundled dylib needs individual signing for
+   under `Contents/Resources/python` for `mynah analyze` and friends, plus a
+   `/usr/local/bin/mynah` shim. Every bundled dylib needs individual signing for
    notarization. Not started; unlike phase 3 this is not on the critical path,
    since dictation no longer needs Python at all.
 6. **Cutover** — delete `service.py`, `setup.py`, and the `macos_*` providers.

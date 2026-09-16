@@ -25,19 +25,19 @@ let testFrameworkFlags: [String] =
         ? ["-F", cltFrameworks]
         : []
 
-// The whiz macOS app.
+// The mynah macOS app.
 //
 // Deliberately dependency-free. The one thing an external package would buy
-// us is TOML parsing, but whiz's config schema is a flat `key = value` file
-// (see `whiz/config.py:_emit_toml`), so `FlatTOML.swift` handles it in ~120
+// us is TOML parsing, but mynah's config schema is a flat `key = value` file
+// (see `mynah/config.py:_emit_toml`), so `FlatTOML.swift` handles it in ~120
 // lines and the package builds offline.
 //
 // SwiftPM produces a bare executable; `scripts/build-app.sh` wraps it into a
-// proper `Whiz.app` bundle with Info.plist. That is what gives us a stable
+// proper `Mynah.app` bundle with Info.plist. That is what gives us a stable
 // bundle identifier, and therefore a TCC permission grant that survives
 // upgrades.
 let package = Package(
-    name: "WhizApp",
+    name: "MynahApp",
     // macOS 13 (Ventura) is the floor, and it is a deliberate choice: it is the
     // oldest release that has both `MenuBarExtra` and `SMAppService`. Those two
     // are exactly what let us delete `macos_rumps.py` and `service.py`, so
@@ -57,9 +57,9 @@ let package = Package(
             path: "Sources/CWhisper"
         ),
         .executableTarget(
-            name: "WhizApp",
+            name: "MynahApp",
             dependencies: ["CWhisper"],
-            path: "Sources/WhizApp",
+            path: "Sources/MynahApp",
             // Headers and libraries come from the vendored whisper.cpp build in
             // `vendor/install`, produced by `scripts/build-whisper.sh` from the
             // pinned submodule — never from Homebrew.
@@ -103,9 +103,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "WhizAppTests",
-            dependencies: ["WhizApp"],
-            path: "Tests/WhizAppTests",
+            name: "MynahAppTests",
+            dependencies: ["MynahApp"],
+            path: "Tests/MynahAppTests",
             swiftSettings: [.unsafeFlags(testFrameworkFlags)],
             linkerSettings: [.unsafeFlags(testFrameworkFlags)]
         ),

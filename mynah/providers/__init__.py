@@ -2,7 +2,7 @@
 
 The engine calls ``select_stt_provider(config)`` etc. to get the right
 concrete provider for the current platform. Config overrides
-(``dictate_stt_provider`` / ``dictate_injector`` / ``dictate_indicator``)
+(``stt_provider`` / ``injector`` / ``indicator``)
 let a user force a specific provider by name; empty = auto-detect by
 platform.
 
@@ -18,7 +18,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING
 
-from whiz.dictate.providers.base import (
+from mynah.providers.base import (
     DictationIndicator,
     NullIndicator,
     STTProvider,
@@ -26,11 +26,11 @@ from whiz.dictate.providers.base import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from whiz.config import Config
+    from mynah.config import Config
 
 # Provider name -> (constructor, platform). Constructors are thunks so we
 # never import a platform's heavy deps (mlx_whisper, pyobjc, ...) unless
-# that provider is actually selected. This keeps ``whiz dictate
+# that provider is actually selected. This keeps ``mynah
 # --list-providers`` and tests fast and import-safe on non-macOS.
 
 _STT_PROVIDERS: dict[str, tuple[str, callable]] = {}
@@ -45,11 +45,11 @@ def _register_macos() -> None:
         # non-macOS machine doesn't crash on the pyobjc import.
         pass
     _STT_PROVIDERS["mlx"] = ("darwin", lambda: _import_attr(
-        "whiz.dictate.providers.mlx", "MlxWhisperProvider"))
+        "mynah.providers.mlx", "MlxWhisperProvider"))
     _INJECTORS["mac"] = ("darwin", lambda: _import_attr(
-        "whiz.dictate.providers.macos_inject", "MacTextInjector"))
+        "mynah.providers.macos_inject", "MacTextInjector"))
     _INDICATORS["mac"] = ("darwin", lambda: _import_attr(
-        "whiz.dictate.providers.macos_indicator", "MacIndicator"))
+        "mynah.providers.macos_indicator", "MacIndicator"))
 
 
 def _import_attr(module: str, attr: str):
@@ -68,7 +68,7 @@ def _platform_default(platform: str | None, table: dict[str, tuple[str, callable
 
 def select_stt_provider(config: Config) -> STTProvider:
     """Return the STT provider for this platform (or the configured override)."""
-    override = (config.dictate_stt_provider or "").strip()
+    override = (config.stt_provider or "").strip()
     if override and override in _STT_PROVIDERS:
         _supports, ctor = _STT_PROVIDERS[override]
         return ctor()
@@ -76,14 +76,14 @@ def select_stt_provider(config: Config) -> STTProvider:
     if name is None:
         raise RuntimeError(
             f"No STT provider available for platform '{sys.platform}'. "
-            "Set one with: whiz config set dictate_stt_provider=..."
+            "Set one with: mynah set stt_provider=..."
         )
     return _STT_PROVIDERS[name][1]()
 
 
 def select_injector(config: Config) -> TextInjector:
     """Return the text injector for this platform (or the configured override)."""
-    override = (config.dictate_injector or "").strip()
+    override = (config.injector or "").strip()
     if override and override in _INJECTORS:
         return _INJECTORS[override][1]()
     name = _platform_default(None, _INJECTORS)
@@ -96,9 +96,9 @@ def select_injector(config: Config) -> TextInjector:
 
 def select_indicator(config: Config) -> DictationIndicator:
     """Return the dictation indicator, or a NullIndicator when disabled."""
-    if not config.dictate_show_indicator:
+    if not config.show_indicator:
         return NullIndicator()
-    override = (config.dictate_indicator or "").strip()
+    override = (config.indicator or "").strip()
     if override and override in _INDICATORS:
         return _INDICATORS[override][1]()
     name = _platform_default(None, _INDICATORS)
@@ -113,7 +113,7 @@ def list_providers(platform: str | None = None) -> dict[str, list[tuple[str, str
     """List available providers for ``platform`` (default: current).
 
     Returns ``{"stt": [(name, supports_platform, current_platform)], ...}``.
-    Used by ``whiz dictate --list-providers``.
+    Used by ``mynah providers``.
     """
     plat = platform or sys.platform
     out: dict[str, list[tuple[str, str, bool]]] = {"stt": [], "injector": [], "indicator": []}

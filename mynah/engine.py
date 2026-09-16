@@ -1,6 +1,6 @@
 """The dictation engine — platform-agnostic session orchestration.
 
-This is the core of ``whiz dictate``. It ties together:
+This is the core of ``mynah``. It ties together:
 - a global hotkey listener (pynput) with toggle semantics
 - mic capture (sounddevice) at 16 kHz mono
 - WebRTC VAD (vad.py) for utterance segmentation
@@ -49,7 +49,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
-from whiz.dictate.providers import (
+from mynah.providers import (
     DictationIndicator,
     STTProvider,
     TextInjector,
@@ -57,15 +57,15 @@ from whiz.dictate.providers import (
     select_injector,
     select_stt_provider,
 )
-from whiz.dictate.providers.mlx import WHISPER_SAMPLE_RATE
-from whiz.dictate.vad import VoiceActivityDetector
+from mynah.providers.mlx import WHISPER_SAMPLE_RATE
+from mynah.vad import VoiceActivityDetector
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from whiz.config import Config
+    from mynah.config import Config
 
 logger = logging.getLogger(__name__)
 
-# Default ``initial_prompt`` when the user hasn't set ``dictate_prompt``.
+# Default ``initial_prompt`` when the user hasn't set ``prompt``.
 # A Russian sentence in informal/jargon register that biases Whisper away
 # from self-censoring obscenity/slang. The model treats the prompt as prior
 # context, so seeing informal Russian makes it more likely to reproduce
@@ -86,8 +86,8 @@ _TICK = 0.05
 
 # NOTE: the static energy floors (per-frame RMS, whole-utterance RMS,
 # minimum utterance length) live in DictateSettings, resolved from
-# whiz/config.py (dictate_frame_energy / dictate_min_energy /
-# dictate_min_utterance) and pinned against tuning/tuning.toml. There are
+# mynah/config.py (frame_energy / min_energy /
+# min_utterance) and pinned against tuning/tuning.toml. There are
 # no module-level copies; the adaptive calibration raises them at session
 # start via _effective_frame_energy / _effective_min_energy.
 
@@ -233,7 +233,7 @@ class DictateSettings:
     menu_bar: bool = True
     # Energy floors and minimum utterance length.
     #
-    # `whiz/config.py` is the single source of truth for these defaults, and
+    # `mynah/config.py` is the single source of truth for these defaults, and
     # `resolve_settings` always passes them explicitly — so these values are
     # only reached by code constructing DictateSettings directly, such as test
     # helpers. They previously mirrored the legacy module constants
@@ -247,29 +247,29 @@ class DictateSettings:
 
 def resolve_settings(config: Config, **overrides: object) -> DictateSettings:
     """Merge config values with CLI overrides into a DictateSettings."""
-    prompt = (overrides.get("prompt") or config.dictate_prompt or "").strip()
+    prompt = (overrides.get("prompt") or config.prompt or "").strip()
     if not prompt:
         prompt = DEFAULT_RUSSIAN_PROMPT
     return DictateSettings(
-        language=(overrides.get("language") or config.dictate_language or "ru"),
+        language=(overrides.get("language") or config.language or "ru"),
         initial_prompt=prompt,
         # 0 is a meaningful value ("never unload") — use the sentinel-default
         # pattern like auto_stop_silence below, not an or-chain, or a
         # configured/overridden 0 can never win (W2-M10).
-        idle_timeout=float(overrides.get("idle_timeout", config.dictate_idle_timeout)),
+        idle_timeout=float(overrides.get("idle_timeout", config.idle_timeout)),
         auto_stop_silence=float(
-            overrides.get("auto_stop_silence", config.dictate_auto_stop_silence)
+            overrides.get("auto_stop_silence", config.auto_stop_silence)
         ),
-        hotkey=(overrides.get("hotkey") or config.dictate_hotkey or "<cmd>+<shift>+."),
-        trigger=(overrides.get("trigger") or config.dictate_trigger or "toggle").strip().lower(),
-        vad_enabled=bool(overrides.get("vad", config.dictate_vad)),
-        show_indicator=bool(overrides.get("show_indicator", config.dictate_show_indicator)),
-        idle_visible=bool(overrides.get("idle_visible", config.dictate_idle_visible)),
-        model=(overrides.get("model") or config.dictate_model or ""),
-        menu_bar=bool(overrides.get("menu_bar", config.dictate_menu_bar)),
-        frame_energy=float(config.dictate_frame_energy),
-        min_energy=float(config.dictate_min_energy),
-        min_utterance=float(config.dictate_min_utterance),
+        hotkey=(overrides.get("hotkey") or config.hotkey or "<cmd>+<shift>+."),
+        trigger=(overrides.get("trigger") or config.trigger or "toggle").strip().lower(),
+        vad_enabled=bool(overrides.get("vad", config.vad)),
+        show_indicator=bool(overrides.get("show_indicator", config.show_indicator)),
+        idle_visible=bool(overrides.get("idle_visible", config.idle_visible)),
+        model=(overrides.get("model") or config.model or ""),
+        menu_bar=bool(overrides.get("menu_bar", config.menu_bar)),
+        frame_energy=float(config.frame_energy),
+        min_energy=float(config.min_energy),
+        min_utterance=float(config.min_utterance),
     )
 
 
@@ -384,7 +384,7 @@ class DictationEngine:
             print(hint, file=sys.stderr)
             if not _wait_for_accessibility(self.injector):
                 return 1
-            print("Accessibility granted — starting whiz dictate.", file=sys.stderr)
+            print("Accessibility granted — starting mynah.", file=sys.stderr)
 
         # On macOS, run the AppKit event loop on the main thread whenever
         # ANY AppKit UI is live — the indicator OR the menu bar. The menu
@@ -476,7 +476,7 @@ class DictationEngine:
                 print(
                     f"STT model failed to load: {e}\n"
                     "The session was not started. Check the model setting "
-                    "(whiz dictate config) and press the hotkey to retry.",
+                    "(mynah config) and press the hotkey to retry.",
                     file=sys.stderr,
                 )
                 logger.warning("Cold STT load failed", exc_info=True)
@@ -667,7 +667,7 @@ class DictationEngine:
         except ImportError:
             print(
                 "sounddevice not installed. Install the dictate extra:\n"
-                "  pipx inject whiz 'whiz[dictate]'",
+                "  pipx inject mynah 'mynah[macos]'",
                 file=sys.stderr,
             )
             self._stop_event.set()
@@ -972,7 +972,7 @@ class DictationEngine:
             logger.debug("_setup_menu_bar: skipped (menu_bar=%s, macos=%s)", self.s.menu_bar, _is_macos())
             return
         try:
-            from whiz.dictate.providers.macos_rumps import MacMenuBar
+            from mynah.providers.macos_rumps import MacMenuBar
         except ImportError:
             logger.debug("menu bar provider unavailable (rumps/pyobjc?)", exc_info=True)
             return
@@ -1033,7 +1033,7 @@ class DictationEngine:
         # macos_rumps defers `import rumps` inside MacMenuBar.setup(). The
         # reachable rumps-missing signal is `self._menu_bar is None` after
         # _setup_menu_bar() (checked below).
-        from whiz.dictate.providers.macos_rumps import MacMenuBar  # noqa: F401
+        from mynah.providers.macos_rumps import MacMenuBar  # noqa: F401
 
         # Create the rumps-based menu bar (sets up NSStatusItem + NSMenu).
         self._setup_menu_bar()
@@ -1046,7 +1046,7 @@ class DictationEngine:
             # broken — see the setup warning in the log). Under the
             # LaunchAgent the menu bar is the service's ONLY UI
             # (Start/Stop/Quit); a silent hotkey-only fallback looks healthy
-            # in `whiz dictate service status` while KeepAlive relaunches it
+            # in `mynah service status` while KeepAlive relaunches it
             # uselessly. Exit 1 so the LastExitStatus churn is visible
             # (W2-H2). In a terminal the degraded mode is visible and
             # interactive — the plain-loop fallback stays.
@@ -1054,8 +1054,8 @@ class DictationEngine:
                 "rumps/pyobjc unavailable — the dictation service cannot show "
                 "its menu bar, so it will not start. Reinstall the dictate "
                 "extra, then reinstall the service:\n"
-                "  pipx inject whiz 'whiz[dictate]' --force\n"
-                "  whiz dictate service uninstall && whiz dictate service install",
+                "  pipx inject mynah 'mynah[macos]' --force\n"
+                "  mynah service uninstall && mynah service install",
                 file=sys.stderr,
             )
             return 1
@@ -1115,7 +1115,7 @@ class DictationEngine:
         except ImportError:
             print(
                 "pynput not installed — cannot listen for the hotkey.\n"
-                "Install the dictate extra: pipx inject whiz 'whiz[dictate]'\n"
+                "Install the dictate extra: pipx inject mynah 'mynah[macos]'\n"
                 "Or press Ctrl+C to quit (dictation won't toggle without a hotkey).",
                 file=sys.stderr,
             )
@@ -1133,8 +1133,8 @@ class DictationEngine:
             print(f"Invalid hotkey '{self.s.hotkey}': {e}", file=sys.stderr)
             print(
                 "The hotkey listener could not start, so dictation cannot be "
-                "triggered. Fix the hotkey (e.g. whiz dictate set hotkey=\"<cmd>+<shift>+.\")\n"
-                "then restart whiz dictate.",
+                "triggered. Fix the hotkey (e.g. mynah set hotkey=\"<cmd>+<shift>+.\")\n"
+                "then restart mynah.",
                 file=sys.stderr,
             )
             # Stop the engine instead of running with no way to trigger it —
@@ -1170,8 +1170,8 @@ class DictationEngine:
             print(f"Invalid hotkey '{self.s.hotkey}': {e}", file=sys.stderr)
             print(
                 "The hotkey listener could not start, so dictation cannot be "
-                "triggered. Fix the hotkey (e.g. whiz dictate set hotkey=\"<cmd>+<shift>+.\")\n"
-                "then restart whiz dictate.",
+                "triggered. Fix the hotkey (e.g. mynah set hotkey=\"<cmd>+<shift>+.\")\n"
+                "then restart mynah.",
                 file=sys.stderr,
             )
             self._stop_event.set()
@@ -1248,7 +1248,7 @@ def run_dictate(config: Config, **overrides: object) -> int:
     model_name = getattr(stt, "_model_ref", "?")
     trigger_label = "push-to-talk" if settings.trigger == "ptt" else "toggle"
     print(
-        f"whiz dictate — {trigger_label}: {settings.hotkey}  |  model: {model_name}  "
+        f"mynah — {trigger_label}: {settings.hotkey}  |  model: {model_name}  "
         f"|  language: {settings.language}",
         file=sys.stderr,
     )

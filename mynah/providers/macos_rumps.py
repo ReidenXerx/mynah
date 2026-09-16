@@ -11,13 +11,13 @@ listening / amber transcribing). A click opens an NSMenu with:
 
 - **Start Dictation / Stop Dictation** — toggles the session.
 - a disabled state line showing the current status.
-- **Open Config File** — opens ``~/.config/whiz/config.toml`` in the default
+- **Open Config File** — opens ``~/.config/mynah/config.toml`` in the default
   editor.
-- **About whiz** — version, model, hotkey.
-- **Quit whiz dictate** — ``engine.stop()``.
+- **About mynah** — version, model, hotkey.
+- **Quit mynah** — ``engine.stop()``.
 
 State icon changes use pre-rendered PNG files (generated at import time via
-the existing ``draw_whiz_logo`` NSBezierPath drawing) so rumps can swap them
+the existing ``draw_mynah_logo`` NSBezierPath drawing) so rumps can swap them
 via ``app.icon = path`` — no manual NSImage lifecycle to manage.
 """
 
@@ -31,7 +31,7 @@ import threading
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from whiz.dictate.engine import DictationEngine
+    from mynah.engine import DictationEngine
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +58,9 @@ _ICON_PNGS: dict[str, str] = {}
 
 
 def _ensure_icon_pngs() -> dict[str, str]:
-    """Generate whiz W logo PNGs for each state, return paths.
+    """Generate mynah W logo PNGs for each state, return paths.
 
-    Uses the existing ``draw_whiz_logo`` NSBezierPath drawing to render
+    Uses the existing ``draw_mynah_logo`` NSBezierPath drawing to render
     the W into an NSImage, then saves as PNG. Called once; cached in
     ``_ICON_PNGS``. On non-macOS or if pyobjc is unavailable, returns
     empty dict (rumps won't show an icon, just text).
@@ -70,26 +70,26 @@ def _ensure_icon_pngs() -> dict[str, str]:
     try:
         import AppKit
         from Foundation import NSRect, NSSize, NSPoint
-        from whiz.dictate.providers.macos_logo import draw_whiz_logo
+        from mynah.providers.macos_logo import draw_mynah_logo
     except ImportError:
         logger.debug("icon PNG generation skipped (no pyobjc)")
         return _ICON_PNGS
 
-    tmpdir = os.path.join(tempfile.gettempdir(), "whiz-icons")
+    tmpdir = os.path.join(tempfile.gettempdir(), "mynah-icons")
     try:
         os.makedirs(tmpdir, exist_ok=True)
     except OSError:
         return _ICON_PNGS
 
     for state, color in _STATE_COLORS.items():
-        path = os.path.join(tmpdir, f"whiz-w-{state}.png")
+        path = os.path.join(tmpdir, f"mynah-w-{state}.png")
         try:
             size = _ICON_SIZE
             img = AppKit.NSImage.alloc().initWithSize_(NSSize(size, size))
             img.lockFocus()
             try:
                 tint = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color)
-                draw_whiz_logo(AppKit, NSRect((0, 0), (size, size)), tint)
+                draw_mynah_logo(AppKit, NSRect((0, 0), (size, size)), tint)
             finally:
                 img.unlockFocus()
             # Save as PNG via NSBitmapImageRep (representationUsingType_properties_
@@ -140,13 +140,13 @@ class MacMenuBar:
         except ImportError:
             logger.warning(
                 "rumps not available — dictation menu bar item disabled. "
-                "Install: pipx inject whiz 'whiz[dictate]'"
+                "Install: pipx inject mynah 'mynah[macos]'"
             )
             return
         try:
             self._icons = _ensure_icon_pngs()
             app = rumps.App(
-                name="whiz dictate",
+                name="mynah",
                 title="",
                 icon=self._icons.get("idle"),
                 quit_button=None,  # we add our own quit
@@ -165,8 +165,8 @@ class MacMenuBar:
         self._state_item = rumps.MenuItem("○ Idle", callback=None)
         self._state_item.set_callback(None)  # disabled
         self._open_config_item = rumps.MenuItem("Open Config File", callback=self._on_open_config)
-        self._about_item = rumps.MenuItem("About whiz", callback=self._on_about)
-        self._quit_item = rumps.MenuItem("Quit whiz dictate", callback=self._on_quit)
+        self._about_item = rumps.MenuItem("About mynah", callback=self._on_about)
+        self._quit_item = rumps.MenuItem("Quit mynah", callback=self._on_quit)
 
         self._app.menu = [
             self._toggle_item,
@@ -251,12 +251,12 @@ class MacMenuBar:
         self.do_toggle()
 
     def _on_open_config(self, sender):  # noqa: ARG002
-        """Open Config File → open ~/.config/whiz/config.toml in default editor."""
+        """Open Config File → open ~/.config/mynah/config.toml in default editor."""
         import subprocess
 
         def _open() -> None:
             try:
-                from whiz.config import CONFIG_PATH, Config, save
+                from mynah.config import CONFIG_PATH, Config, save
 
                 path = CONFIG_PATH
                 if not path.exists():
@@ -287,7 +287,7 @@ class MacMenuBar:
         threading.Thread(target=_open, daemon=True).start()
 
     def _on_about(self, sender):  # noqa: ARG002
-        """About whiz → alert with version/model/hotkey (stderr fallback).
+        """About mynah → alert with version/model/hotkey (stderr fallback).
 
         A bare stderr print is useless under the LaunchAgent — there is no
         terminal, so the user clicked About and nothing visibly happened
@@ -295,7 +295,7 @@ class MacMenuBar:
         headless/no-rumps contexts.
         """
         try:
-            from whiz import __version__
+            from mynah import __version__
 
             engine = self._engine
             model = getattr(engine.stt, "_model_ref", "?")
@@ -307,13 +307,13 @@ class MacMenuBar:
             try:
                 import rumps
 
-                rumps.alert(f"whiz {__version__} — dictate", message)
+                rumps.alert(f"mynah {__version__} — dictate", message)
             except Exception:  # noqa: BLE001
                 logger.debug("about alert failed; falling back to stderr", exc_info=True)
-                print(f"whiz {__version__} — dictate\n{message}", file=sys.stderr)
+                print(f"mynah {__version__} — dictate\n{message}", file=sys.stderr)
         except Exception:  # noqa: BLE001
             logger.debug("about failed", exc_info=True)
 
     def _on_quit(self, sender):  # noqa: ARG002
-        """Quit whiz dictate menu callback → do_quit."""
+        """Quit mynah menu callback → do_quit."""
         self.do_quit()

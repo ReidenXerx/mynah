@@ -5,7 +5,7 @@ an ``NSVisualEffectView`` (HUD-window vibrancy material) so the overlay
 blurs the content behind it — the native macOS HUD look — instead of an
 opaque dark box. Inside the pill:
 
-- the whiz waveform-W logo (a custom-drawn monogram), tinted by state
+- the mynah waveform-W logo (a custom-drawn monogram), tinted by state
   (cyan listening / amber transcribing / gray idle)
 - 5 live waveform bars whose heights track the mic amplitude
 
@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from whiz.dictate.providers.base import DictationIndicator
+from mynah.providers.base import DictationIndicator
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,7 @@ class MacIndicator(DictationIndicator):
         except ImportError:
             logger.warning(
                 "PyObjC not available — dictation indicator disabled. "
-                "Install: pipx inject whiz 'whiz[dictate]'"
+                "Install: pipx inject mynah 'mynah[macos]'"
             )
             self._panel = None
         except Exception:  # noqa: BLE001
@@ -180,7 +180,7 @@ class MacIndicator(DictationIndicator):
         # Don't activate the app when the panel shows.
         self._panel.setBecomesKeyOnlyIfNeeded_(True)
         # CRITICAL for background agents: NSPanel defaults to
-        # hidesOnDeactivate=True, so when whiz runs as a LaunchAgent
+        # hidesOnDeactivate=True, so when mynah runs as a LaunchAgent
         # (accessory app, always "deactivated" — no Dock presence) the
         # panel hides itself and the indicator is invisible. Disabling
         # this keeps the overlay on screen regardless of activation state.
@@ -309,14 +309,14 @@ class WhizIndicatorView:
             bg_path.setLineWidth_(0.5)
             bg_path.stroke()
 
-            # 3. whiz waveform-W logo on the left, tinted by state.
-            from whiz.dictate.providers.macos_logo import draw_whiz_logo
+            # 3. mynah waveform-W logo on the left, tinted by state.
+            from mynah.providers.macos_logo import draw_mynah_logo
 
             glyph_size = 20
             glyph_x = 14
             glyph_y = (h - glyph_size) / 2
             tint = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(*color)
-            draw_whiz_logo(
+            draw_mynah_logo(
                 AppKit,
                 NSRect((glyph_x, glyph_y), (glyph_size, glyph_size)),
                 tint,

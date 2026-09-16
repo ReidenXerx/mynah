@@ -109,7 +109,7 @@ class DictationIndicator(ABC):
 
 
 # Sentinel returned by a no-op indicator when the overlay is disabled
-# (``--no-indicator`` or ``dictate_show_indicator = false``). Avoids a None
+# (``--no-indicator`` or ``show_indicator = false``). Avoids a None
 # check on every engine → indicator call.
 class NullIndicator(DictationIndicator):
     """A no-op indicator for headless/quiet use — all methods are inert."""

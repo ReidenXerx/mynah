@@ -1,0 +1,112 @@
+import Foundation
+
+/// Rejects Whisper's known failure output before it reaches the user's keyboard.
+///
+/// Every constant here is ported from `mynah/dictate/engine.py`, and they are
+/// *measured* values, not defaults — tuned against a real mic in a real room
+/// with a MacBook cooler running. Do not tidy them without re-testing.
+///
+/// Caveat worth keeping in mind: whisper.cpp reimplemented Whisper's decoding
+/// loop independently of the reference implementation that mlx-whisper ports,
+/// so the exact hallucination phrases it emits on silence may differ from this
+/// list. The list is a starting point carried over from a year of mlx use, not
+/// a guarantee. Add to it as testing turns up new artifacts.
+enum TranscriptFilter {
+
+    // The duration and energy floors that used to live here were dead: the
+    // gating moved to `SessionController.enqueue`, driven by
+    // `dictate_min_utterance` / `dictate_min_energy` / `dictate_frame_energy`.
+    // Keeping them meant two sources of truth, and the copy here still held the
+    // old, too-high values (0.35 / 0.025 / 0.03) that the config keys were added
+    // to replace — so wiring them back up would have silently restored the
+    // "you have to shout" behaviour. Defaults now live in `mynah/config.py` and
+    // `MynahConfig`.
+
+    /// Silence that ends an utterance within a session. Shorter is snappier but
+    /// clips slow speech; longer feels natural but delays the text appearing.
+    static let utteranceSilence: Double = 0.8
+
+    // Adaptive noise floor. The static thresholds above suit a quiet room; in a
+    // noisy one, steady background noise exceeds them and gets misclassified as
+    // speech, seeding exactly the near-silence hallucinations we are guarding
+    // against. Measuring ambient level at session start and scaling the gates
+    // keeps the static values as floors while adapting upward when needed.
+    static let noiseCalibrationDuration: Double = 1.0
+    static let noiseFrameMultiplier: Double = 3.5   // ~11 dB above the floor
+    static let noiseUtteranceMultiplier: Double = 3.0  // ~10 dB above the floor
+    static let noiseMinimumSamples = 5
+
+    /// Calibration frames at or above this RMS are speech, not noise —
+    /// excluded from the median regardless of the gates in force. An
+    /// absolute discrimination line, not a gate: the legacy measured
+    /// per-frame floor (0.03 ≈ -30 dB), between real MacBook-cooler
+    /// noise (~0.02) and quiet speech (~0.04). If fewer than
+    /// `noiseMinimumSamples` quiet frames remain, calibration aborts to
+    /// the static gates — the median must never be measured on speech
+    /// (that poisoned the floor and silently dropped the first word).
+    static let calibrationSpeechFloor: Double = 0.03
+
+    /// Known Whisper hallucination phrases, lowercased — split into two
+    /// match modes over the trimmed, lowercased transcript (NS-6):
+    ///
+    /// - `hallucinationArtifactPhrases` — distinctive training-data
+    ///   boilerplate. Matched by SUBSTRING: not plausible real dictation
+    ///   anywhere in an utterance.
+    /// - `hallucinationVocabPhrases` — ordinary single words that ARE
+    ///   plausible real dictation ("Отправь перевод на карту"). Matched
+    ///   only when the whole transcript EQUALS the phrase.
+    ///
+    /// Fed silence or noise, Whisper emits these artifacts — mostly Russian
+    /// subtitle-credit boilerplate, since that is what dominates its
+    /// Russian training data.
+    static let hallucinationArtifactPhrases: Set<String> = [
+        "спасибо за субтитры",
+        "субтитры создавал",
+        "субтитры выполнил",
+        "субтитры делал",
+        "субтитры подготовил",
+        "редактор субтитров",
+        "продолжение следует",
+        "спасибо за просмотр",
+        "спасибо за внимание",
+        "подписывайтесь на канал",
+        "by follows",
+        "by following",
+        "amara.org",
+        "расскажите о себе",
+        // Observed specifically on MacBook cooler/fan noise.
+        "следите за обновлениями",
+        "оставайтесь с нами",
+        "не забудьте подписаться",
+        "вы можете поддержать",
+    ]
+
+    /// Ordinary vocabulary — whole-utterance equality only. A dictation
+    /// containing one of these words as part of a longer phrase must pass.
+    static let hallucinationVocabPhrases: Set<String> = [
+        "субтитры",
+        "перевод",
+        "корректор",
+    ]
+
+    /// RMS amplitude of normalised float samples, 0...1.
+    static func rms(_ samples: [Float]) -> Double {
+        guard !samples.isEmpty else { return 0 }
+        var sum: Double = 0
+        for sample in samples { sum += Double(sample) * Double(sample) }
+        return (sum / Double(samples.count)).squareRoot()
+    }
+
+    /// Whether transcribed text is a hallucination and should be dropped.
+    static func isHallucination(_ text: String) -> Bool {
+        let normalized = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.isEmpty { return true }
+        // Artifacts match by substring anywhere; vocab words match only as
+        // the whole utterance (substring matching there silently dropped
+        // real speech — the wave-1 audit's CRITICAL).
+        if hallucinationArtifactPhrases.contains(where: { normalized.contains($0) }) {
+            return true
+        }
+        return hallucinationVocabPhrases.contains(normalized)
+    }
+}

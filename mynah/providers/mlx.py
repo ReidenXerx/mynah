@@ -8,8 +8,8 @@ faster for the same model on M-series chips.
 The model (default ``mlx-community/whisper-large-v3-turbo``) is
 auto-downloaded from HuggingFace on first use and cached under
 ``~/.cache/huggingface``. This is a separate format (MLX weights) from
-whiz's batch-mode ggml ``.bin`` models, so dictate maintains its own
-cache — no sharing with ``whiz transcribe``.
+mynah's batch-mode ggml ``.bin`` models, so dictate maintains its own
+cache — no sharing with ``mynah transcribe``.
 
 mlx_whisper.transcribe uses a module-level ``ModelHolder`` singleton that
 caches the loaded model. ``unload()`` nulls those class variables so the
@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from whiz.dictate.providers.base import STTProvider
+from mynah.providers.base import STTProvider
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import numpy as np
@@ -73,7 +73,7 @@ class MlxWhisperProvider(STTProvider):
         """Load the model into memory (cold start — may take seconds)."""
         if self._loaded:
             return
-        import mlx_whisper  # lazy: keeps `whiz dictate --list-providers` light
+        import mlx_whisper  # lazy: keeps `mynah providers` light
 
         # Touch the model so it downloads + loads now. transcribe() uses
         # ModelHolder.get_model() internally, so we force a load by calling

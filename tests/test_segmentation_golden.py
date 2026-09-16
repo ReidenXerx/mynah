@@ -54,8 +54,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
 
-from whiz.dictate import engine as eng
-from whiz.dictate.providers import base
+from mynah import engine as eng
+from mynah.providers import base
 
 GOLDEN_DIR = Path(__file__).resolve().parent.parent / "tuning" / "golden"
 EXPECTED = GOLDEN_DIR / "expected.json"

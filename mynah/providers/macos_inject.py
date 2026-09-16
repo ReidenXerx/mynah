@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import time
 
-from whiz.dictate.providers.base import TextInjector
+from mynah.providers.base import TextInjector
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class MacTextInjector(TextInjector):
             return False, (
                 "Accessibility permission required. Grant it in:\n"
                 "  System Settings → Privacy & Security → Accessibility\n"
-                "  Add whiz and enable it — whiz will start automatically once granted."
+                "  Add mynah and enable it — mynah will start automatically once granted."
             )
         except ImportError:
             # Fallback to the simpler API if ApplicationServices isn't available.
@@ -94,12 +94,12 @@ class MacTextInjector(TextInjector):
                 return False, (
                     "Accessibility permission required. Grant it in:\n"
                     "  System Settings → Privacy & Security → Accessibility\n"
-                    "  Add whiz and enable it — whiz will start automatically once granted."
+                    "  Add mynah and enable it — mynah will start automatically once granted."
                 )
             except ImportError:
                 return False, (
                     "PyObjC (pyobjc-framework-ApplicationServices) not installed.\n"
-                    "Install the dictate extra: pipx inject whiz 'whiz[dictate]'"
+                    "Install the dictate extra: pipx inject mynah 'mynah[macos]'"
                 )
 
     # ---------- internal: keystroke path ----------

@@ -23,8 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
 
-from whiz import config as cfg
-from whiz.dictate import engine as eng
+from mynah import config as cfg
+from mynah import engine as eng
 
 TUNING_PATH = Path(__file__).resolve().parent.parent / "tuning" / "tuning.toml"
 
@@ -57,22 +57,22 @@ def test_whisper_decoder_thresholds_match_tuning(tuning: dict) -> None:
     tuning.toml and every engine pins against it — the mlx provider here,
     WhisperEngine.swift in the Swift TuningTests mirror. Both are
     deliberately stricter than the Whisper defaults (0.6 / -1.0)."""
-    from whiz.dictate.providers.mlx import LOGPROB_THRESHOLD, NO_SPEECH_THRESHOLD
+    from mynah.providers.mlx import LOGPROB_THRESHOLD, NO_SPEECH_THRESHOLD
 
     assert NO_SPEECH_THRESHOLD == tuning["whisper_no_speech_threshold"]
     assert LOGPROB_THRESHOLD == tuning["whisper_logprob_threshold"]
 
 
 # ---------------------------------------------------------------------------
-# Config defaults — whiz/config.py and DictateSettings
+# Config defaults — mynah/config.py and DictateSettings
 # ---------------------------------------------------------------------------
 
 
 def test_config_defaults_match_tuning(tuning: dict) -> None:
     config = cfg.Config()
-    assert config.dictate_frame_energy == tuning["frame_energy_default"]
-    assert config.dictate_min_energy == tuning["min_energy_default"]
-    assert config.dictate_min_utterance == tuning["min_utterance_default"]
+    assert config.frame_energy == tuning["frame_energy_default"]
+    assert config.min_energy == tuning["min_energy_default"]
+    assert config.min_utterance == tuning["min_utterance_default"]
 
 
 def test_dictate_settings_defaults_match_tuning(tuning: dict) -> None:

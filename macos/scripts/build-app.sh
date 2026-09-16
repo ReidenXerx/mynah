@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Assemble Whiz.app.
+# Assemble Mynah.app.
 #
 # SwiftPM emits a bare binary; macOS needs a bundle for LSUIElement, for the
 # microphone usage string, and above all for a stable bundle identifier — which
@@ -15,7 +15,7 @@ set -euo pipefail
 
 CONFIGURATION="${1:-debug}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT/build/Whiz.app"
+APP="$ROOT/build/Mynah.app"
 VENDOR="$ROOT/vendor/install"
 
 # Match Package.swift and build-whisper.sh. Keep in sync.
@@ -72,8 +72,8 @@ build_with_swiftc() {
     -lc++ \
     -framework Metal -framework MetalKit -framework Accelerate \
     -framework Foundation -framework CoreML \
-    $(find "$ROOT/Sources/WhizApp" -name '*.swift') \
-    -o "$out/WhizApp" || return 1
+    $(find "$ROOT/Sources/MynahApp" -name '*.swift') \
+    -o "$out/MynahApp" || return 1
   echo "$out"
 }
 
@@ -90,18 +90,18 @@ fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN_DIR/WhizApp" "$APP/Contents/MacOS/WhizApp"
+cp "$BIN_DIR/MynahApp" "$APP/Contents/MacOS/MynahApp"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
 # Signing. An ad-hoc signature changes on every rebuild, so macOS sees a
 # different app each time and silently drops the Accessibility grant. Set
-# WHIZ_SIGN_IDENTITY to a stable self-signed identity to avoid that — create one
+# MYNAH_SIGN_IDENTITY to a stable self-signed identity to avoid that — create one
 # with scripts/create-signing-cert.sh. Distribution needs a Developer ID
 # certificate plus notarization, and every bundled dylib signed individually
 # once the Python runtime is embedded.
-IDENTITY="${WHIZ_SIGN_IDENTITY:-}"
-if [ -z "$IDENTITY" ] && security find-certificate -c whiz-dev >/dev/null 2>&1; then
-  IDENTITY="whiz-dev"   # use it automatically once it exists
+IDENTITY="${MYNAH_SIGN_IDENTITY:-}"
+if [ -z "$IDENTITY" ] && security find-certificate -c mynah-dev >/dev/null 2>&1; then
+  IDENTITY="mynah-dev"   # use it automatically once it exists
 fi
 
 if [ -n "$IDENTITY" ]; then

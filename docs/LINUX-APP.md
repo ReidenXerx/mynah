@@ -1,6 +1,6 @@
 # The Linux dictation adapter
 
-`whiz-daemon` (P1 in docs/ARCHITECTURE.md) brings native dictation to Linux:
+`mynah-daemon` (P1 in docs/ARCHITECTURE.md) brings native dictation to Linux:
 the same segmentation pipeline, pinned to the same tuning contract and golden
 corpus, in a small daemon instead of a port of the PyObjC daemon.
 
@@ -42,7 +42,7 @@ until the portal-registered hotkey starts a session. Per session:
    keeping the frames (the PR #1 lesson — speech in the window is segmented,
    not dropped).
 2. Capture 16 kHz mono via PipeWire in 30 ms frames.
-3. Run the energy-gate state machine (`whiz-core`'s detector — the same
+3. Run the energy-gate state machine (`mynah-core`'s detector — the same
    logic the golden corpus pins).
 4. Close utterances at `utterance_silence`, trim trailing silence to
    `trailing_padding` (following the Swift policy — see divergences in
@@ -79,7 +79,7 @@ daemon; the daemon retries the permission on the next session attempt.
 | X11 sessions (any DE) | ❌ no X11 path | ❌ no X11 path | by decision — see above |
 
 The P1 acceptance bar is the first row: GNOME or KDE on Wayland,
-end-to-end dictate, golden corpus green through `whiz-core`'s detector.
+end-to-end dictate, golden corpus green through `mynah-core`'s detector.
 
 ## Open issues
 
@@ -100,7 +100,7 @@ end-to-end dictate, golden corpus green through `whiz-core`'s detector.
    (see ARCHITECTURE.md): calibration frames at or above
    `calibration_speech_floor` are excluded from the noise median, and
    fewer than `noise_min_samples` quiet frames aborts calibration to
-   the static gates. `whiz-core` ports that exactly; the corpus cases
+   the static gates. `mynah-core` ports that exactly; the corpus cases
    `speech_during_calibration` and `speech_over_noise_in_calibration`
    pin it for every implementation, Rust included.
 
@@ -110,5 +110,5 @@ end-to-end dictate, golden corpus green through `whiz-core`'s detector.
 - Diarization/analyze (that is P2 — this daemon is dictation only).
 - UI (P3; the daemon exposes enough D-Bus surface for a tray, which
   satisfies P1 without a separate UI process).
-- Model downloads: P1 uses the same `whiz models download` layout and the
+- Model downloads: P1 uses the same `mynah models download` layout and the
   user's existing models dir; a first-class Linux downloader can come later.

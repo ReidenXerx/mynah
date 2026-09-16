@@ -1,11 +1,17 @@
-"""whiz dictate — system-wide voice dictation.
+"""mynah — say it, and it types where you are.
 
-Public entry point: ``from whiz.dictate import run_dictate``.
+A hotkey opens a session, your speech is segmented into utterances and each one
+is transcribed and typed into whatever window has focus. Everything runs on the
+machine you are sitting at.
+
+Public entry point: ``from mynah import run_dictate``.
 """
 
 from __future__ import annotations
 
-from whiz.dictate.engine import (
+__version__ = "0.1.0"
+
+from mynah.engine import (
     DEFAULT_RUSSIAN_PROMPT,
     DictateSettings,
     DictationEngine,
@@ -19,4 +25,5 @@ __all__ = [
     "DictationEngine",
     "resolve_settings",
     "run_dictate",
+    "__version__",
 ]

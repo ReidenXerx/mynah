@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>Whiz</string>
+  <string>Mynah</string>
   <key>CFBundleDisplayName</key>
-  <string>whiz</string>
+  <string>mynah</string>
   <key>CFBundleExecutable</key>
-  <string>WhizApp</string>
+  <string>MynahApp</string>
   <!-- The stable identity TCC keys Accessibility and Microphone grants to.
        Changing this invalidates every user's granted permission. -->
   <key>CFBundleIdentifier</key>
-  <string>com.reidenxerx.whiz</string>
+  <string>com.reidenxerx.mynah</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -24,7 +24,7 @@
   <key>LSUIElement</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>
-  <string>whiz uses the microphone to transcribe your speech into the app you are typing in.</string>
+  <string>mynah uses the microphone to transcribe your speech into the app you are typing in.</string>
   <key>NSHighResolutionCapable</key>
   <true/>
 </dict>

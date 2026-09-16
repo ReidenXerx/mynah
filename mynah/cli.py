@@ -264,13 +264,23 @@ def cmd_service(args: argparse.Namespace) -> int:
 
 def cmd_providers(args: argparse.Namespace) -> int:
     """What can listen, type and show an indicator on this machine."""
-    from mynah.providers import list_providers
+    from mynah.providers import chosen_names, list_providers
 
     found = list_providers()
+    chosen = chosen_names(cfg.load())
     ui.header("providers")
     for kind, title in (("stt", "speech"), ("injector", "typing"), ("indicator", "indicator")):
-        rows = [[name, supports, "yes" if current else ""] for name, supports, current in found[kind]]
-        ui.table(title, [("Name", "left"), ("Platform", "left"), ("In use", "right")], rows)
+        rows = []
+        for name, supports, current in found[kind]:
+            if name == chosen.get(kind):
+                state = "chosen"
+            elif current:
+                state = "available"
+            else:
+                state = ""
+            rows.append([name, supports, state])
+        ui.table(title, [("Name", "left"), ("Platform", "left"), ("Here", "right")], rows)
+    ui.muted("\nForce one with:  mynah set injector=clipboard   (empty = chosen for you)")
     return 0
 
 

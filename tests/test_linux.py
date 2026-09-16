@@ -677,3 +677,21 @@ def test_wtype_chord_presses_and_releases_in_order():
     assert run.call_args[0][0] == [
         "/usr/bin/wtype", "-M", "ctrl", "-M", "shift", "-P", "V", "-p", "V", "-m", "shift", "-m", "ctrl",
     ]
+
+
+def test_the_listing_names_the_one_that_will_be_used():
+    """Three injectors run on Linux; exactly one is chosen. A listing that
+    marks all three "in use" answers neither question."""
+    from mynah import config as cfg
+    from mynah.providers import chosen_names
+
+    config = cfg.Config()
+    chosen = chosen_names(config)
+    if sys.platform.startswith("linux"):
+        assert chosen["injector"] == "smart"
+        config.injector = "clipboard"
+        assert chosen_names(config)["injector"] == "clipboard"
+        # An unknown name cannot win: _validate rejects it at the CLI, and
+        # here it falls back to the platform's choice rather than to nothing.
+        config.injector = "nonsense"
+        assert chosen_names(config)["injector"] == "smart"

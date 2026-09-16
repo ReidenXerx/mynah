@@ -159,6 +159,28 @@ def select_indicator(config: Config) -> DictationIndicator:
     return _INDICATORS[name][1]()
 
 
+def chosen_names(config: Config) -> dict[str, str]:
+    """Which provider each job would actually use, by name.
+
+    "Runs on this platform" and "is the one being used" are different things,
+    and a listing that marks three injectors as in use answers neither.
+    """
+    out: dict[str, str] = {}
+    for kind, table, override in (
+        ("stt", _STT_PROVIDERS, config.stt_provider),
+        ("injector", _INJECTORS, config.injector),
+        ("indicator", _INDICATORS, config.indicator),
+    ):
+        forced = (override or "").strip()
+        if forced and forced in table:
+            out[kind] = forced
+            continue
+        name = _platform_default(None, table)
+        if name is not None:
+            out[kind] = name
+    return out
+
+
 def list_providers(platform: str | None = None) -> dict[str, list[tuple[str, str, bool]]]:
     """List available providers for ``platform`` (default: current).
 

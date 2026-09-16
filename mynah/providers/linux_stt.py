@@ -49,9 +49,13 @@ LOGPROB_THRESHOLD = -0.5
 # checkout on a user's machine may still be the old name.
 BINARIES = ("whisper-cli", "whisper-cpp", "whisper", "main")
 
+# Where mynah puts a model it was told to download: under the user's data
+# directory, because a model is data, and because nothing there needs root.
+DEFAULT_MODEL_DIR = "~/.local/share/mynah/models"
+
 # Where a ggml model may be sitting. Ordered most-specific first.
 MODEL_DIRS = (
-    "~/.local/share/mynah/models",
+    DEFAULT_MODEL_DIR,
     "~/.cache/whisper.cpp",
     "/usr/share/whisper.cpp/models",
     "/usr/share/whisper.cpp",
@@ -111,7 +115,7 @@ def find_model(name: str = "") -> Path | None:
 
 def download_command(name: str = DEFAULT_MODEL) -> str:
     """The exact command that fetches a model, for a hint the user can paste."""
-    target = Path(MODEL_DIRS[0]).expanduser() / f"ggml-{name}.bin"
+    target = Path(DEFAULT_MODEL_DIR).expanduser() / f"ggml-{name}.bin"
     return f"curl -L --create-dirs -o {target} {MODEL_URL.format(name=name)}"
 
 
@@ -129,7 +133,7 @@ class WhisperCppProvider(STTProvider):
     name = "whisper-cpp"
 
     def __init__(self, model: str = "", binary: str | None = None) -> None:
-        self._configured = model
+        self.model_ref = model
         self._binary = binary
         self._model_path: Path | None = None
 
@@ -150,12 +154,13 @@ class WhisperCppProvider(STTProvider):
                 "  Or point mynah at a build: MYNAH_WHISPER_CLI=/path/to/whisper-cli"
             )
         self._binary = binary
-        model = find_model(self._configured)
+        model = find_model(self.model_ref)
         if model is None:
-            wanted = (self._configured or DEFAULT_MODEL).strip()
+            wanted = (self.model_ref or DEFAULT_MODEL).strip()
             size = MODEL_SIZES.get(wanted, "")
             raise RuntimeError(
-                f"No whisper model named {wanted!r} in {', '.join(MODEL_DIRS)}.\n"
+                f"No whisper model named {wanted!r} in "
+                f"{', '.join(MODEL_DIRS) or DEFAULT_MODEL_DIR}.\n"
                 f"  Download it{f' ({size})' if size else ''}:\n"
                 f"    {download_command(wanted if wanted in MODEL_SIZES else DEFAULT_MODEL)}\n"
                 "  Or set a path:  mynah set model=/path/to/ggml-small.bin"

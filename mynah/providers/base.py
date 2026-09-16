@@ -23,7 +23,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 
 class STTProvider(ABC):
-    """A speech-to-text backend (e.g. mlx-whisper on macOS, faster-whisper elsewhere)."""
+    """A speech-to-text backend (e.g. mlx-whisper on macOS, whisper.cpp elsewhere)."""
+
+    #: Which model to use. What the string means is the provider's business — a
+    #: Hugging Face repo id for mlx-whisper, a ggml file or a size name for
+    #: whisper.cpp — but the engine sets it from ``model`` before the first
+    #: load, and shows it at startup, so every provider must honour it. The
+    #: empty string means "your default".
+    model_ref: str = ""
 
     @abstractmethod
     def load(self) -> None:

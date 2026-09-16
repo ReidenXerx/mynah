@@ -1294,12 +1294,12 @@ def run_dictate(config: Config, **overrides: object) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
-    # Override the STT model if a custom one was passed.
-    if settings.model and hasattr(stt, "_model_ref"):
-        stt._model_ref = settings.model  # noqa: SLF001
+    # The configured model, or the provider's own default when it is empty.
+    if settings.model:
+        stt.model_ref = settings.model
 
     engine = DictationEngine(settings, stt, injector, indicator)
-    model_name = getattr(stt, "_model_ref", "?")
+    model_name = stt.model_ref or "the provider's default"
     trigger_label = "push-to-talk" if settings.trigger == "ptt" else "toggle"
     print(
         f"mynah — {trigger_label}: {settings.hotkey}  |  model: {model_name}  "

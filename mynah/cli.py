@@ -94,22 +94,33 @@ def _validate(key: str, value: object) -> None:
 
 
 def _needs_runtime() -> None:
-    """Fail with an install hint rather than an ImportError traceback."""
-    try:
-        import sounddevice  # noqa: F401
-        import pynput  # noqa: F401
-    except ImportError:
-        platform = "macos" if sys.platform == "darwin" else "linux"
-        raise SystemExit(
-            f"Mynah's speech runtime is not installed. Add it with:\n"
-            f"  pipx inject mynah 'mynah[{platform}]'\n\n"
-            + (
-                "Then grant Accessibility and Microphone in System Settings → "
-                "Privacy & Security."
-                if platform == "macos"
-                else "Then run: mynah setup"
-            )
+    """Fail with an install hint rather than an ImportError traceback.
+
+    What the runtime *is* differs by platform — Linux needs no pynput, because
+    the compositor owns the hotkey — so the list comes from preflight, which is
+    the same list `mynah setup` checks.
+    """
+    from mynah import preflight
+
+    missing = []
+    for module in preflight._required_modules():
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(module)
+    if not missing:
+        return
+    extra = preflight.extra_name()
+    raise SystemExit(
+        f"Mynah's speech runtime is not installed ({', '.join(missing)}). Add it with:\n"
+        f"  pipx inject mynah 'mynah[{extra}]'\n\n"
+        + (
+            "Then grant Accessibility and Microphone in System Settings → "
+            "Privacy & Security."
+            if extra == "macos"
+            else "Then run: mynah setup"
         )
+    )
 
 
 def cmd_run(args: argparse.Namespace) -> int:

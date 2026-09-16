@@ -62,7 +62,7 @@ class MlxWhisperProvider(STTProvider):
     """Speech-to-text via mlx-whisper (Apple MLX, Metal GPU)."""
 
     def __init__(self, model: str = DEFAULT_MODEL) -> None:
-        self._model_ref = model
+        self.model_ref = model
         self._loaded = False
 
     @property
@@ -81,13 +81,13 @@ class MlxWhisperProvider(STTProvider):
         # errors before the user starts speaking.
         import numpy as np
 
-        logger.info("Loading mlx-whisper model: %s", self._model_ref)
+        logger.info("Loading mlx-whisper model: %s", self.model_ref)
         # A 1-second silent float32 buffer triggers model load without
         # producing meaningful output.
         silent = np.zeros(WHISPER_SAMPLE_RATE, dtype=np.float32)
         mlx_whisper.transcribe(
             silent,
-            path_or_hf_repo=self._model_ref,
+            path_or_hf_repo=self.model_ref,
             language="ru",
             verbose=None,
         )
@@ -120,7 +120,7 @@ class MlxWhisperProvider(STTProvider):
 
         result = mlx_whisper.transcribe(
             audio,
-            path_or_hf_repo=self._model_ref,
+            path_or_hf_repo=self.model_ref,
             language=language or "ru",
             initial_prompt=initial_prompt or None,
             # False: don't carry prior utterances as context. With True, one

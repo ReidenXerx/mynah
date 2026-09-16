@@ -298,7 +298,7 @@ class MacMenuBar:
             from mynah import __version__
 
             engine = self._engine
-            model = getattr(engine.stt, "_model_ref", "?")
+            model = getattr(engine.stt, "model_ref", "") or "default"
             message = (
                 f"model:  {model}\n"
                 f"hotkey: {engine.s.hotkey}\n"

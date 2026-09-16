@@ -320,6 +320,9 @@ def test_a_path_is_taken_as_given(tmp_path, monkeypatch):
 
 def test_a_missing_model_names_the_download(tmp_path, monkeypatch):
     monkeypatch.setenv("MYNAH_MODEL_DIR", str(tmp_path))
+    # MYNAH_MODEL_DIR only prepends; the standard directories are still
+    # searched, and this machine may well have a model in one of them.
+    monkeypatch.setattr(linux_stt, "MODEL_DIRS", ())
     provider = linux_stt.WhisperCppProvider(binary="/usr/bin/whisper-cli")
     with pytest.raises(RuntimeError) as excinfo:
         provider.load()
@@ -330,6 +333,7 @@ def test_a_missing_model_names_the_download(tmp_path, monkeypatch):
 
 def test_a_missing_binary_names_the_package(tmp_path, monkeypatch):
     monkeypatch.setenv("MYNAH_MODEL_DIR", str(tmp_path))
+    monkeypatch.setattr(linux_stt, "MODEL_DIRS", ())
     monkeypatch.setenv("MYNAH_WHISPER_CLI", "/nowhere/whisper-cli")
     with pytest.raises(RuntimeError, match="pacman -S whisper-cpp"):
         linux_stt.WhisperCppProvider().load()
@@ -456,3 +460,26 @@ def test_status_is_not_ok_when_the_unit_is_missing(tmp_path, monkeypatch):
 
     monkeypatch.setattr(systemd, "_UNIT_DIR", tmp_path / "none")
     assert systemd.status() == 1
+
+
+def test_the_configured_model_reaches_the_provider(tmp_path, monkeypatch):
+    """`mynah set model=base` was silently ignored on Linux: the engine poked
+    a private attribute that only the mlx provider had."""
+    from mynah import config as cfg, engine as eng
+
+    monkeypatch.setenv("MYNAH_MODEL_DIR", str(tmp_path))
+    monkeypatch.setattr(linux_stt, "MODEL_DIRS", ())
+    (tmp_path / "ggml-base.bin").write_bytes(b"x")
+
+    provider = linux_stt.WhisperCppProvider(binary="/usr/bin/whisper-cli")
+    config = cfg.Config()
+    config.model = "base"
+    monkeypatch.setattr(eng, "select_stt_provider", lambda _c: provider)
+    monkeypatch.setattr(eng, "select_injector", lambda _c: mock.Mock())
+    monkeypatch.setattr(eng, "select_indicator", lambda _c: mock.Mock())
+    monkeypatch.setattr(eng.DictationEngine, "run", lambda self: 0)
+
+    assert eng.run_dictate(config) == 0
+    assert provider.model_ref == "base"
+    provider.load()
+    assert provider._model_path == tmp_path / "ggml-base.bin"

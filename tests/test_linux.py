@@ -118,7 +118,9 @@ def test_unknown_command_is_refused_not_ignored(server):
     assert engine.calls == []
 
 
-def test_a_failing_handler_answers_instead_of_hanging(tmp_path):
+def test_a_failing_handler_does_not_break_the_socket(tmp_path):
+    """The reply is an acknowledgement, so a handler that raises afterwards
+    reaches subscribers as an event rather than as a broken connection."""
     def explode() -> None:
         raise RuntimeError("no microphone")
 
@@ -127,11 +129,47 @@ def test_a_failing_handler_answers_instead_of_hanging(tmp_path):
         state=lambda: "idle", path=tmp_path / "s" / "control.sock",
     )
     srv.start()
+    published: list[dict] = []
     try:
-        reply = _talk(srv.path, "toggle")[0]
+        with mock.patch.object(srv, "publish", published.append):
+            reply = _talk(srv.path, "toggle")[0]
+            deadline = time.monotonic() + 2
+            while not published and time.monotonic() < deadline:
+                time.sleep(0.01)
+        assert reply == {"ok": True, "state": "idle"}
+        assert published == [{"event": "error", "command": "toggle", "error": "no microphone"}]
+        # And the socket still works afterwards.
+        assert _talk(srv.path, "status")[0]["ok"] is True
     finally:
         srv.stop()
-    assert reply == {"ok": False, "error": "no microphone"}
+
+
+def test_a_slow_handler_does_not_hold_the_reply(tmp_path):
+    """Ending a session drains the transcription queue — seconds of whisper.
+    Holding the reply for that makes the key that stopped dictation look
+    wedged, and the client times out with nothing to show for it."""
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow() -> None:
+        started.set()
+        release.wait(5)
+
+    srv = control.ControlServer(
+        on_toggle=slow, on_start=slow, on_stop=slow, on_quit=slow,
+        state=lambda: "listening", path=tmp_path / "s" / "control.sock",
+    )
+    srv.start()
+    try:
+        began = time.monotonic()
+        reply = _talk(srv.path, "stop")[0]
+        answered_in = time.monotonic() - began
+        assert reply["ok"] is True
+        assert answered_in < 1.0, f"the reply waited {answered_in:.1f}s for the handler"
+        assert started.wait(2), "the handler never ran"
+    finally:
+        release.set()
+        srv.stop()
 
 
 def test_subscribers_receive_events(server):
@@ -483,3 +521,44 @@ def test_the_configured_model_reaches_the_provider(tmp_path, monkeypatch):
     assert provider.model_ref == "base"
     provider.load()
     assert provider._model_path == tmp_path / "ggml-base.bin"
+
+
+def test_a_lua_binding_is_recognised_by_its_description(monkeypatch):
+    """The Omarchy plugin binds the key through `hl.bind`, and Hyprland then
+    reports the dispatcher as "__lua" with an index for an argument — the
+    command is nowhere in the binding. Its description is."""
+    from mynah import preflight
+
+    monkeypatch.setattr(preflight, "_hyprland_binds", lambda: [
+        ("SUPER+ALT+D", "__lua 339", "Mynah: dictate"),
+        ("SUPER+RETURN", "exec kitty", ""),
+    ])
+    result = preflight._check_compositor_hotkey()
+    assert result.ok is True
+    assert "SUPER+ALT+D" in result.detail
+
+
+def test_no_binding_says_what_to_add(monkeypatch):
+    from mynah import preflight
+
+    monkeypatch.setattr(preflight, "_hyprland_binds", lambda: [("SUPER+RETURN", "exec kitty", "")])
+    result = preflight._check_compositor_hotkey()
+    assert result.ok is False
+    assert "mynah toggle" in result.hint
+
+
+def test_a_compositor_we_cannot_ask_is_not_a_failure(monkeypatch):
+    """Only Hyprland can be asked. Everywhere else the check has no verdict,
+    and a check that cannot run must not fail the user."""
+    from mynah import preflight
+
+    monkeypatch.setattr(preflight, "_hyprland_binds", lambda: None)
+    assert preflight._check_compositor_hotkey().ok is True
+
+
+def test_modmask_spells_the_combo():
+    from mynah import preflight
+
+    assert preflight._combo(72, "D") == "SUPER+ALT+D"
+    assert preflight._combo(65, "M") == "SUPER+SHIFT+M"
+    assert preflight._combo(0, "F8") == "F8"

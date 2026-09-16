@@ -171,10 +171,26 @@ def cmd_setup(args: argparse.Namespace) -> int:
 def cmd_config(args: argparse.Namespace) -> int:
     config = cfg.load()
     ui.header("settings")
-    rows = [[label, _shown(getattr(config, key)), description] for key, label, description in FIELDS]
+    rows = [
+        [label, _shown(getattr(config, key)), _describe(key, description)]
+        for key, label, description in FIELDS
+    ]
     ui.table(str(cfg.CONFIG_PATH), [("Setting", "left"), ("Value", "left"), ("What it does", "left")], rows)
     ui.muted("\nChange one with:  mynah set <key>=<value>     e.g.  mynah set hotkey=<f8>")
     return 0
+
+
+def _describe(key: str, description: str) -> str:
+    """The description, corrected for what this platform actually does.
+
+    `hotkey` is the one that lies: on Wayland no client may grab a global key,
+    so the setting is inert there and the compositor's own binding is what
+    starts a session. Showing the stored value with no explanation sends people
+    to change a setting that cannot do anything.
+    """
+    if key == "hotkey" and not sys.platform == "darwin":
+        return "Not used here — your compositor binds a key to: mynah toggle"
+    return description
 
 
 def _shown(value: object) -> str:
@@ -274,8 +290,11 @@ def cmd_control(args: argparse.Namespace) -> int:
     if not reply.get("ok"):
         print(f"mynah: {reply.get('error', 'refused')}", file=sys.stderr)
         return 1
+    # Only `status` reports a state. The others are requests: what came of one
+    # shows up as an event, not in the acknowledgement, because the engine may
+    # still be finishing the last utterance when it answers.
     state = reply.get("state")
-    if state and args.control_cmd != "quit":
+    if state and args.control_cmd == "status":
         print(state)
     return 0
 

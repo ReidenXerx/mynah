@@ -222,12 +222,23 @@ class ControlServer:
         handler = self._handlers.get(cmd)
         if handler is None:
             return {"ok": False, "error": f"unknown command {cmd!r}"}, False
+        # Ending a session waits for the transcription queue to drain, which is
+        # seconds of whisper. Running that here would hold the reply for the
+        # whole time, and the key that stopped dictation would look wedged. So
+        # the command is acknowledged now and carried out on its own thread;
+        # what actually happened arrives as state events, which is where a
+        # caller should be reading the truth from anyway.
+        threading.Thread(
+            target=self._carry_out, args=(cmd, handler), name=f"mynah-{cmd}", daemon=True
+        ).start()
+        return {"ok": True, "state": self._state()}, False
+
+    def _carry_out(self, cmd: str, handler: Callable[[], None]) -> None:
         try:
             handler()
         except Exception as e:  # noqa: BLE001
-            logger.debug("control command %s failed", cmd, exc_info=True)
-            return {"ok": False, "error": str(e)}, False
-        return {"ok": True, "state": self._state()}, False
+            logger.warning("control command %s failed: %s", cmd, e)
+            self.publish({"event": "error", "command": cmd, "error": str(e)})
 
     @staticmethod
     def _send(conn: socket.socket, payload: dict[str, Any]) -> None:
@@ -333,8 +344,18 @@ def command(cmd: str, path: Path | None = None, timeout: float = 5.0) -> dict[st
         conn.sendall((json.dumps({"cmd": cmd}) + "\n").encode("utf-8"))
         with conn.makefile("r", encoding="utf-8") as reader:
             line = reader.readline()
-        if not line:
-            raise ControlError("mynah closed the connection without replying")
-        return json.loads(line)
+    except TimeoutError:
+        raise ControlError(
+            f"mynah did not answer {cmd!r} within {timeout:g}s. It may be busy "
+            "starting up; try again, or check: journalctl --user -u mynah -n 20"
+        ) from None
+    except OSError as e:
+        raise ControlError(f"lost the connection to mynah ({e})") from None
     finally:
         conn.close()
+    if not line:
+        raise ControlError("mynah closed the connection without replying")
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError:
+        raise ControlError("mynah answered with something that was not JSON") from None

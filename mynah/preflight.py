@@ -307,9 +307,18 @@ def _check_compositor_hotkey() -> CheckResult:
             detail="Bound in your compositor (mynah cannot read it from here)",
             hint="Bind a key to:  mynah toggle",
         )
-    for combo, dispatched in binds:
-        if "mynah" in dispatched and ("toggle" in dispatched or dispatched.endswith("mynah")):
-            return CheckResult(ok=True, title="Hotkey", detail=f"{combo} → {dispatched}")
+    for combo, dispatched, description in binds:
+        # A binding made in Lua — which is how the Omarchy plugin makes ours —
+        # reports its dispatcher as "__lua" and its argument as an index into
+        # Hyprland's own table, so the command is not in the binding at all.
+        # Its description is, which is why the plugin sets one.
+        haystack = f"{dispatched} {description}".lower()
+        if "mynah" in haystack:
+            return CheckResult(
+                ok=True,
+                title="Hotkey",
+                detail=f"{combo} → {description or dispatched}",
+            )
     return CheckResult(
         ok=False,
         title="Hotkey",
@@ -323,8 +332,21 @@ def _check_compositor_hotkey() -> CheckResult:
     )
 
 
-def _hyprland_binds() -> list[tuple[str, str]] | None:
-    """Hyprland's bindings as (combo, dispatched) pairs, or None if not asked.
+# Hyprland's modmask bits, in the order people say them.
+_MODS = ((64, "SUPER"), (4, "CTRL"), (8, "ALT"), (1, "SHIFT"))
+
+
+def _combo(modmask: object, key: str) -> str:
+    """"SUPER+ALT+D" from a modmask and a key name."""
+    if not isinstance(modmask, int):
+        return key
+    parts = [name for bit, name in _MODS if modmask & bit]
+    parts.append(key)
+    return "+".join(parts)
+
+
+def _hyprland_binds() -> list[tuple[str, str, str]] | None:
+    """Hyprland's bindings as (combo, dispatched, description), or None.
 
     None means "no verdict": not Hyprland, no hyprctl, or a version whose JSON
     we do not recognize. A check that cannot run must not fail the user.
@@ -350,9 +372,12 @@ def _hyprland_binds() -> list[tuple[str, str]] | None:
         if not isinstance(bind, dict):
             continue
         key = str(bind.get("key", ""))
-        mods = bind.get("modmask", 0)
-        combo = f"{'SUPER+' if isinstance(mods, int) and mods & 64 else ''}{key}"
-        out.append((combo, f"{bind.get('dispatcher', '')} {bind.get('arg', '')}".strip()))
+        combo = _combo(bind.get("modmask", 0), key)
+        out.append((
+            combo,
+            f"{bind.get('dispatcher', '')} {bind.get('arg', '')}".strip(),
+            str(bind.get("description", "")),
+        ))
     return out
 
 

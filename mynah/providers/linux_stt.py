@@ -3,7 +3,7 @@
 macOS gets mlx-whisper, which runs in-process on the Apple GPU. Linux has no
 single equivalent, and the honest default on a distro is the binary the distro
 already packages: `whisper-cli` from whisper.cpp (`pacman -S whisper-cpp`,
-`apt install whisper.cpp`, or the vendored build in `vendor/whisper.cpp`).
+`apt install whisper.cpp`, or the vendored build in `third_party/whisper.cpp`).
 
 That makes this provider a subprocess per utterance rather than a resident
 model, which sounds worse than it is: whisper.cpp mmaps the model file, so

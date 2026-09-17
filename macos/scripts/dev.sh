@@ -19,7 +19,7 @@ APP="$ROOT/build/Mynah.app"
 BUNDLE_ID="com.reidenxerx.mynah"
 
 # --- 1. vendored whisper.cpp -------------------------------------------------
-if [ ! -f "$ROOT/vendor/whisper.cpp/CMakeLists.txt" ]; then
+if [ ! -f "$REPO/third_party/whisper.cpp/CMakeLists.txt" ]; then
   echo "checking out whisper.cpp submodule…"
   git -C "$REPO" submodule update --init --recursive
 fi

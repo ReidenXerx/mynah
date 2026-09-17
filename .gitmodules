@@ -1,5 +1,5 @@
-[submodule "macos/vendor/whisper.cpp"]
-	path = macos/vendor/whisper.cpp
+[submodule "third_party/whisper.cpp"]
+	path = third_party/whisper.cpp
 	url = https://github.com/ggml-org/whisper.cpp
 	# Pinned to v1.9.2 — the version the STT integration was written and
 	# tested against. Bump deliberately, then re-run the Russian test set:

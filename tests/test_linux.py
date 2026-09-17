@@ -818,6 +818,33 @@ def test_the_extra_is_never_requested_by_bare_name(monkeypatch):
     assert "sounddevice" in calls[0]
 
 
+def test_no_hint_requests_the_extra_by_bare_name():
+    """`pipx inject mynah 'mynah[macos]'` fetches an unrelated PyPI package.
+
+    The fix for that routed every install hint through
+    `preflight.inject_command()` — and a later audit still found three hints
+    the review had missed (cli.py, two providers), each telling the user to
+    run the dangerous command verbatim. So this scans the shipped sources
+    instead of trusting the review: any `pipx inject mynah "mynah[…` that
+    does not carry a direct-reference `@ origin` fails here.
+    """
+    import re
+
+    from mynah import preflight
+
+    root = Path(preflight.__file__).resolve().parent
+    pattern = re.compile(r"pipx\s+inject\s+mynah\s+['\"]?\s*mynah\[[^\]]*\]")
+    for path in sorted(root.rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        for match in pattern.finditer(text):
+            tail = text[match.end():match.end() + 12].lstrip()
+            assert tail.startswith("@"), (
+                f"{path}: '{match.group(0)}' resolves the bare `mynah` name "
+                "against PyPI, where it belongs to an unrelated package — "
+                "build the hint with preflight.inject_command() instead."
+            )
+
+
 def test_the_fallback_list_matches_pyproject():
     """A dependency added to an extra and forgotten here would be missing on a
     first run that has no install origin to ask."""

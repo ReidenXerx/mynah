@@ -55,7 +55,7 @@ def extra_name() -> str:
 EXTRA_PACKAGES = {
     "linux": ("sounddevice", "webrtcvad-wheels", "numpy"),
     "macos": (
-        "mlx-whisper", "sounddevice", "webrtcvad", "pynput",
+        "mlx-whisper", "sounddevice", "webrtcvad-wheels", "pynput",
         "pyobjc-framework-Cocoa", "pyobjc-framework-Quartz",
         "pyobjc-framework-ApplicationServices", "rumps", "setproctitle",
     ),

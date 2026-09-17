@@ -10,9 +10,8 @@ import Foundation
 /// hallucinated subtitle credits.
 ///
 /// This is energy-based rather than model-based. `engine.py` layered webrtcvad
-/// on top; whisper.cpp ships Silero VAD (and `mynah models download-vad` already
-/// fetches the model), so that is the natural upgrade once the basic loop is
-/// validated. See `docs/SWIFT-APP.md`.
+/// on top; whisper.cpp ships Silero VAD, so that is the natural upgrade once
+/// the basic loop is validated. See `docs/SWIFT-APP.md`.
 struct UtteranceDetector {
 
     /// Emitted when silence closes an utterance.

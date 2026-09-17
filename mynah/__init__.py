@@ -9,7 +9,7 @@ Public entry point: ``from mynah import run_dictate``.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.14.0"
 
 from mynah.engine import (
     DEFAULT_RUSSIAN_PROMPT,

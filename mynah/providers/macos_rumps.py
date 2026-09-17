@@ -138,9 +138,13 @@ class MacMenuBar:
         try:
             import rumps
         except ImportError:
+            # inject_command, never a bare `mynah[macos]`: that name on PyPI
+            # is an unrelated package, and this hint would fetch it.
+            from mynah import preflight
+
             logger.warning(
                 "rumps not available — dictation menu bar item disabled. "
-                "Install: pipx inject mynah 'mynah[macos]'"
+                "Install: " + preflight.inject_command("macos")
             )
             return
         try:

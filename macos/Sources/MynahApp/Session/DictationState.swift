@@ -10,7 +10,7 @@ enum DictationState: String, Sendable {
     case listening
     case transcribing
 
-    /// Tint applied to the W logo in both the menu bar and the pill.
+    /// Tint applied to the mynah bird in both the menu bar and the pill.
     /// RGBA values are carried over verbatim from `macos_indicator.py` and
     /// `macos_rumps.py` so the Swift app looks identical to what shipped.
     var tint: (r: Double, g: Double, b: Double, a: Double) {

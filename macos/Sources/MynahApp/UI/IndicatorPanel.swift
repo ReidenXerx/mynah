@@ -85,7 +85,7 @@ final class IndicatorPanel {
     }
 }
 
-/// The pill's contents: vibrancy background, W logo, five waveform bars.
+/// The pill's contents: vibrancy background, the bird, five waveform bars.
 struct IndicatorView: View {
     @ObservedObject var controller: SessionController
 

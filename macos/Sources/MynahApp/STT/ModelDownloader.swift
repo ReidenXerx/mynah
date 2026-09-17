@@ -3,21 +3,21 @@ import Observation
 
 /// Downloads ggml models from HuggingFace.
 ///
-/// Removes the last reason a user needs the Python CLI installed: without this,
-/// a fresh install can do nothing until someone runs `mynah models download`,
-/// which means installing pipx and the whole package just to fetch two files.
+/// Removes the last reason a user needs the Python CLI installed: without
+/// this, a fresh install can do nothing until someone fetches the model files
+/// by hand, which means installing pipx and the whole package just for two
+/// files.
 ///
-/// Sources and destination deliberately match `mynah/models.py`, so a model
-/// fetched by either side is found by both — one cache, not two.
+/// Sources match the Python engine's whisper.cpp download (`MODEL_URL` in
+/// `mynah/providers/linux_stt.py`): the same files, from the same place.
 @MainActor
 final class ModelDownloader: ObservableObject {
 
-    /// Same repositories `mynah/models.py` uses.
+    /// The same repository the Python engine's `MODEL_URL` downloads from.
     private static let whisperBase = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
     private static let vadBase = "https://huggingface.co/ggml-org/whisper-vad/resolve/main"
 
-    /// Same destination as the Python CLI's default, and first in
-    /// `WhisperModel.searchDirectories`.
+    /// First in `WhisperModel.searchDirectories`, so what lands here resolves.
     static var destination: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/whisper")
     }

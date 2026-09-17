@@ -7,3 +7,4 @@ build/
 macos/build/
 macos/.build/
 .DS_Store
+macos/vendor/install/

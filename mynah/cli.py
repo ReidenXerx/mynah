@@ -113,7 +113,7 @@ def _needs_runtime() -> None:
     extra = preflight.extra_name()
     raise SystemExit(
         f"Mynah's speech runtime is not installed ({', '.join(missing)}). Add it with:\n"
-        f"  pipx inject mynah 'mynah[{extra}]'\n\n"
+        f"  {preflight.inject_command(extra)}\n\n"
         + (
             "Then grant Accessibility and Microphone in System Settings → "
             "Privacy & Security."

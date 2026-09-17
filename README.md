@@ -154,7 +154,7 @@ Your old settings are not lost: the first run imports the `dictate_*` keys from
 pip install pytest && python -m pytest
 ```
 
-197 of them, and the ones that matter most are the golden-corpus tests: recordings with known
+261 of them, and the ones that matter most are the golden-corpus tests: recordings with known
 boundaries, asserted against the segmentation contract.
 
 ## License

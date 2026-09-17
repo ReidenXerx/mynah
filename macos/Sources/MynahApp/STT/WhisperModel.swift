@@ -2,12 +2,11 @@ import Foundation
 
 /// Locates the ggml model file for dictation.
 ///
-/// Deliberately reuses the ggml models the batch pipeline already downloads
-/// (`mynah models download`), searching the same directories as
-/// `DEFAULT_MODEL_SEARCH_DIRS` in `mynah/config.py`. Before this, dictation kept
-/// a *second* model in a *second* format — mlx safetensors under
-/// `~/.cache/huggingface`, 1.6 GB, entirely separate from the ggml `.bin` files.
-/// One engine now means one model file.
+/// Before this, dictation kept a *second* model in a *second* format — mlx
+/// safetensors under `~/.cache/huggingface`, 1.6 GB, entirely separate from
+/// the ggml `.bin` files. One engine now means one model file, downloaded
+/// from Settings → Recognition (`ModelDownloader`) and searched for in the
+/// conventional whisper.cpp locations below.
 enum WhisperModel {
 
     /// Preference order, aligned with `models.py:PREFERENCE` by NS-15.
@@ -43,7 +42,10 @@ enum WhisperModel {
         "ggml-base-q5_0.bin",
     ]
 
-    /// Mirrors `DEFAULT_MODEL_SEARCH_DIRS` in `mynah/config.py`.
+    /// Where a ggml model may be sitting — the conventional whisper.cpp
+    /// locations, most user-specific first. (`~/.cache/whisper` is also where
+    /// `ModelDownloader` puts a download, so what Settings fetches, dictation
+    /// finds.)
     static var searchDirectories: [URL] {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return [
@@ -180,9 +182,8 @@ enum WhisperModel {
         alias.contains("turbo") ? "turbo" : alias
     }
 
-    /// The Silero VAD model, downloaded by `mynah models download-vad`.
-    /// `VAD_MODELS` in `mynah/models.py` lists v5.1.2 first for whisper-cli
-    /// compatibility, so match that ordering.
+    /// The Silero VAD model, downloaded from Settings → Recognition.
+    /// v5.1.2 is listed first for whisper-cli compatibility.
     static func resolveVAD() -> URL? {
         for name in ["ggml-silero-v5.1.2.bin", "ggml-silero-v6.2.0.bin"] {
             for directory in searchDirectories {

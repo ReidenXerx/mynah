@@ -463,11 +463,11 @@ final class SessionController: ObservableObject {
         guard config.vad, vad == nil else { return }
         guard let vadURL = WhisperModel.resolveVAD() else {
             Log.stt.notice(
-                "no Silero VAD model — energy gates only; get it with: mynah models download-vad")
+                "no Silero VAD model — energy gates only; get it in Settings → Recognition")
             isVADDegraded = true
             lastError = "Reject non-speech is ON but the Silero model is missing — "
                 + "only loudness gates are active. Download it in Settings → "
-                + "Recognition (0.8 MB), or run: mynah models download-vad"
+                + "Recognition (0.8 MB)."
             return
         }
         let detector = SileroVAD(modelURL: vadURL)

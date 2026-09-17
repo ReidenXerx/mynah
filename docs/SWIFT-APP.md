@@ -41,7 +41,7 @@ construction, so all of the above stops being necessary rather than being fixed.
 | Config | `Config/FlatTOML.swift`, `Config/MynahConfig.swift` | shares `config.py`'s file |
 | Speech recognition | `STT/WhisperEngine.swift`, `Sources/CWhisper` | `providers/mlx.py` |
 | Voice activity detection | `STT/SileroVAD.swift` | `webrtcvad` via `vad.py` |
-| Model resolution + download | `STT/WhisperModel.swift`, `STT/ModelDownloader.swift` | `mynah models download` |
+| Model resolution + download | `STT/WhisperModel.swift`, `STT/ModelDownloader.swift` | model resolution in `providers/mlx.py` / `linux_stt.py` |
 | Language list | `STT/WhisperLanguages.swift` | — |
 | ggml backend registration | `STT/GGMLBackends.swift` | — |
 | Gates + hallucination filter | `STT/TranscriptFilter.swift` | `engine.py` constants |
@@ -89,7 +89,8 @@ whisper.cpp, linked in-process through its C API (`Sources/CWhisper`), running
 ### Why
 
 The criterion was reuse: which engine preserves the tuning already paid for in
-`mynah/dictate/`? That tuning is the asset, not any particular runtime.
+the Python engine (`mynah/engine.py`, `tuning/tuning.toml`)? That tuning is
+the asset, not any particular runtime.
 
 | Asset | Origin | Transfers to whisper.cpp? |
 |---|---|---|
@@ -101,8 +102,9 @@ The criterion was reuse: which engine preserves the tuning already paid for in
 
 Supporting reasons:
 
-- **Already a dependency.** mynah requires `whisper-cli` for batch transcription
-  and every entry in `models.py:KNOWN_MODELS` is ggml. Dictation previously kept
+- **Already a dependency.** The Linux side already ran on whisper.cpp
+  (`mynah/providers/linux_stt.py`), and every model in its ggml cache is a
+  `.bin` file. Dictation previously kept
   a *second* model in a *second* format (mlx safetensors, 1.6 GB, under
   `~/.cache/huggingface`). One engine now means one model file.
 - **Not Apple-Silicon-only.** mlx is. Since Windows and Linux apps are planned,
@@ -130,8 +132,8 @@ Supporting reasons:
 Commit `ea49da8` is the strongest data point, and it is about the *model*, not
 the runtime: 4-bit turbo produced "garbled mixed-language output on real speech"
 because turbo has only 4 decoder layers and quantizes badly. That finding, and
-the user decision extending it to every quantized variant (NS-15), is why both
-`WhisperModel.preference` and `models.py:PREFERENCE` put unquantized first.
+the user decision extending it to every quantized variant (NS-15), is why
+`WhisperModel.preference` puts unquantized first.
 
 Measured here, `ggml-large-v3-turbo-q5_0.bin` on an M4 Pro, 4 s of pink noise at
 amplitude 0.02 (roughly cooler-fan level):
@@ -256,18 +258,19 @@ Being level-independent also makes Silero the right pairing for Apple's voice
 processing / AGC, should that ever be added — AGC deliberately destroys the
 stable relationship between loudness and speech that the energy gates depend on.
 
-The model is the same one the batch pipeline downloads via
-`mynah models download-vad`; there is no second asset.
+The model is downloaded from Settings → Recognition — there is no second asset
+to manage.
 
 ## Models
 
-`ModelDownloader` fetches from the same HuggingFace repositories as
-`mynah/models.py`, into the same `~/.cache/whisper`. One cache, both tools:
-`mynah models list` sees what the app downloads and vice versa. This removed the
-last reason a dictation-only user needed the Python package installed.
+`ModelDownloader` fetches from the same HuggingFace repository as the Python
+engine's `MODEL_URL` (`mynah/providers/linux_stt.py`), into `~/.cache/whisper`
+— first in `WhisperModel.searchDirectories`, so a download resolves
+immediately. This removed the last reason a dictation-only user needed the
+Python package installed.
 
-`WhisperModel.preference` puts **unquantized** turbo first, matching
-`models.py:PREFERENCE` (NS-15: unquantized always — quantization corrupts
+`WhisperModel.preference` puts **unquantized** turbo first (NS-15: unquantized
+always — quantization corrupts
 transcription quality; see the evidence in Decision 1).
 
 Non-2xx responses are rejected before the file is moved into place. A 404 body is
@@ -328,6 +331,15 @@ depending on which binary read it.
 ## Building
 
 ```sh
+make dev                            # build (debug), launch, stream the log; Ctrl+C quits
+```
+
+`make dev` (`scripts/dev.sh`) also checks out the whisper.cpp submodule when it is
+missing, sets `SDKROOT` when the default SDK cannot be linked by the active
+linker (Command Line Tools newer than Xcode), and warns about other agents
+holding the hotkey. The underlying steps:
+
+```sh
 macos/scripts/build-app.sh          # debug
 macos/scripts/build-app.sh release  # release
 open macos/build/Mynah.app
@@ -347,16 +359,14 @@ identifier.
    whichever starts first wins, so leaving it running makes the Swift app look
    broken:
    ```sh
-   launchctl unload ~/Library/LaunchAgents/com.reidenxerx.mynah.dictate.plist
+   launchctl unload ~/Library/LaunchAgents/com.reidenxerx.mynah.plist
    ```
 2. **Get the right model.** NS-15: unquantized always. Without unquantized
    turbo on disk the resolver falls back down the preference list — the
    quantized fallbacks are explicitly informed last resorts (the q5_0
-   warning from commit `ea49da8` is in the open-issues log):
-   ```sh
-   mynah models download ggml-large-v3-turbo.bin
-   ```
-3. `open macos/build/Mynah.app` — a W appears in the menu bar; there is no Dock
+   warning from commit `ea49da8` is in the open-issues log). Download it
+   in the app: bird → Settings… → Recognition ("Large v3 Turbo", ~1.6 GB).
+3. `open macos/build/Mynah.app` — a bird appears in the menu bar; there is no Dock
    icon or window (`LSUIElement`).
 4. Grant **Accessibility** (menu → "Grant Accessibility…") and allow the
    microphone at the first prompt. Ad-hoc signatures change on every rebuild, so
@@ -366,7 +376,7 @@ identifier.
 
 To restore the Python agent:
 ```sh
-launchctl load ~/Library/LaunchAgents/com.reidenxerx.mynah.dictate.plist
+launchctl load ~/Library/LaunchAgents/com.reidenxerx.mynah.plist
 ```
 
 ### Known environment issue

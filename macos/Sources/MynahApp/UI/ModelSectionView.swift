@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Model status and download controls for the Recognition settings tab.
 ///
-/// Before this the app could only tell the user to go and run
-/// `mynah models download` — which meant installing Python, pipx and the whole
-/// mynah package to fetch two files. That was the last hard dependency on the
-/// Python CLI for someone who only wants dictation.
+/// Before this the app could only tell the user to go and fetch the model
+/// files with the Python CLI — which meant installing Python, pipx and the
+/// whole mynah package. That was the last hard dependency on the Python CLI
+/// for someone who only wants dictation.
 struct ModelSectionView: View {
     @ObservedObject var controller: SessionController
     @StateObject private var downloader = ModelDownloader()

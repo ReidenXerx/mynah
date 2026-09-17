@@ -42,14 +42,14 @@ Requires macOS 13 (Ventura) or later, on Apple Silicon.
    macOS 15 and later the old right-click -> Open shortcut no longer works for
    unnotarized apps, so the command above is the way.
 
-3. Open Mynah.app. A "W" appears in the menu bar. There is no Dock icon and no
+3. Open Mynah.app. A bird appears in the menu bar. There is no Dock icon and no
    window - it is a menu bar app.
 
-4. Click the W -> Settings... -> Recognition, and download a speech model.
+4. Click the bird -> Settings... -> Recognition, and download a speech model.
    "Large v3 Turbo" is about 1.6 GB. It is stored in ~/.cache/whisper and is
    only downloaded once.
 
-5. Click the W -> "Grant Accessibility...", then enable mynah in
+5. Click the bird -> "Grant Accessibility...", then enable mynah in
    System Settings -> Privacy & Security -> Accessibility.
 
    Without this, mynah can hear you and transcribe correctly but cannot type the

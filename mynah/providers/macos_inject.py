@@ -97,9 +97,13 @@ class MacTextInjector(TextInjector):
                     "  Add mynah and enable it — mynah will start automatically once granted."
                 )
             except ImportError:
+                # inject_command, never a bare `mynah[macos]`: that name on
+                # PyPI is an unrelated package, and this hint would fetch it.
+                from mynah import preflight
+
                 return False, (
                     "PyObjC (pyobjc-framework-ApplicationServices) not installed.\n"
-                    "Install the macos extra: pipx inject mynah 'mynah[macos]'"
+                    "Install the macos extra: " + preflight.inject_command("macos")
                 )
 
     # ---------- internal: keystroke path ----------

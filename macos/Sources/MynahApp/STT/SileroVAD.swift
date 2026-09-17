@@ -20,8 +20,8 @@ import Foundation
 /// processing / AGC, which deliberately destroys the stable relationship between
 /// loudness and speech that the energy gates depend on.
 ///
-/// The model is the same one the batch pipeline downloads via
-/// `mynah models download-vad` — no second asset to manage.
+/// The model is the one `ModelDownloader` fetches from Settings → Recognition
+/// — no second asset to manage.
 actor SileroVAD {
 
     private var context: OpaquePointer?

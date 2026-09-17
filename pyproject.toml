@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mynah"
-version = "0.1.0"
+version = "0.14.0"
 description = "Say it, and it types where you are. Local, private voice dictation for Linux and macOS."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,7 +29,12 @@ dependencies = []
 macos = [
   "mlx-whisper>=0.1",
   "sounddevice>=0.4",
-  "webrtcvad>=2.0",
+  # webrtcvad-wheels, not webrtcvad — for the reasons under linux. On macOS
+  # it bites harder: the extra's own mlx-whisper pulls torch, which installs
+  # a modern setuptools, and the original's `import pkg_resources` then
+  # raises inside the very venv the inject just built. The engine reports
+  # "runtime is not installed" and points at the command that caused it.
+  "webrtcvad-wheels>=2.0.14",
   "pynput>=1.7",
   "pyobjc-framework-Cocoa>=10",
   "pyobjc-framework-Quartz>=10",

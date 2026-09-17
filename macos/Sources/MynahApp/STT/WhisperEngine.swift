@@ -158,8 +158,8 @@ enum WhisperError: LocalizedError {
             return "Whisper transcription failed (status \(code))."
         case .noModelFound:
             return """
-                No Whisper model found. Download one with:
-                  mynah models download ggml-large-v3-turbo.bin
+                No Whisper model found. Download one in Settings → Recognition
+                (the bird in the menu bar → Settings…).
                 """
         }
     }

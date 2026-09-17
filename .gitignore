@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 dist/
 build/
+.cache/
 *.egg-info/
 macos/build/
 macos/.build/

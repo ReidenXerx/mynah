@@ -151,10 +151,16 @@ Your old settings are not lost: the first run imports the `dictate_*` keys from
 ## Tests
 
 ```bash
-pip install pytest && python -m pytest
+pip install pytest && python -m pytest   # Python engine + config
+make core-test                          # C++ core (config, filter, pins)
 ```
 
-261 of them, and the ones that matter most are the golden-corpus tests: recordings with known
+The Python suite covers the shipping engine; `make core-test` builds `core/` —
+the C++ engine behind a C API that is replacing it ([the migration
+plan](docs/ENGINE-MIGRATION.md)) — and runs its suites: the config and TOML
+compatibility tests shared with Python and the Swift app, the hallucination
+filter, and the pins against `tuning/tuning.toml`. 261 Python tests, and the
+ones that matter most are the golden-corpus tests: recordings with known
 boundaries, asserted against the segmentation contract.
 
 ## License

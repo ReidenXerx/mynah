@@ -41,7 +41,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="$ROOT/vendor/whisper.cpp"
+REPO="$(cd "$ROOT/.." && pwd)"
+SRC="$REPO/third_party/whisper.cpp"
 BUILD="$ROOT/vendor/build"
 PREFIX="$ROOT/vendor/install"
 
@@ -52,6 +53,19 @@ if [ ! -f "$SRC/CMakeLists.txt" ]; then
   echo "error: vendored whisper.cpp missing. Run:" >&2
   echo "  git submodule update --init --recursive" >&2
   exit 1
+fi
+
+# A build directory configured against a different source tree cannot be
+# reused: CMake refuses with "source does not match the source used to
+# generate cache". That happens to every existing checkout once, because the
+# submodule moved from macos/vendor/whisper.cpp to third_party/whisper.cpp.
+# The build directory holds nothing but build output, so start it afresh.
+if [ -f "$BUILD/CMakeCache.txt" ]; then
+  cached_src="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$BUILD/CMakeCache.txt")"
+  if [ -n "$cached_src" ] && [ "$cached_src" != "$SRC" ]; then
+    echo "note: $BUILD was configured for $cached_src — starting that build directory afresh"
+    rm -rf "$BUILD"
+  fi
 fi
 
 # Skip the (slow) rebuild when the install tree is newer than the source.

@@ -279,8 +279,8 @@ a perfectly valid small file, and without that check it lands on disk named
 
 ## Vendored whisper.cpp
 
-`macos/vendor/whisper.cpp` is a submodule pinned to **v1.9.2**, built statically
-by `scripts/build-whisper.sh`. Linking Homebrew's copy made the app unshippable:
+`third_party/whisper.cpp` is a submodule pinned to **v1.9.2**, built statically
+by `scripts/build-whisper.sh` into `macos/vendor/install`. Linking Homebrew's copy made the app unshippable:
 absolute `/opt/homebrew` paths (broken on Intel, or on any machine without
 `whisper-cpp`), binaries built for a much newer macOS than the 13.0 floor, and
 ggml's compute backends living as loose `.so` files in `Cellar/*/libexec`.

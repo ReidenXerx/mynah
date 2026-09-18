@@ -49,6 +49,11 @@ public:
     }
     TmpDir(const TmpDir&) = delete;
     TmpDir& operator=(const TmpDir&) = delete;
+    // Move-out only: the source no longer owns anything to clean up.
+    TmpDir(TmpDir&& other) noexcept : path_(std::move(other.path_)) {
+        other.path_.clear();
+    }
+    TmpDir& operator=(TmpDir&&) = delete;
     const std::filesystem::path& path() const { return path_; }
 
 private:

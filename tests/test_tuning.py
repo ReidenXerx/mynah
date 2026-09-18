@@ -168,6 +168,7 @@ def test_golden_generator_constants_match_tuning(tuning: dict) -> None:
     assert gen.TRAILING_PADDING == tuning["trailing_padding"]
     assert gen.FRAME_ENERGY_DEFAULT == tuning["frame_energy_default"]
     assert gen.MIN_ENERGY_DEFAULT == tuning["min_energy_default"]
+    assert gen.MIN_UTTERANCE_DEFAULT == tuning["min_utterance_default"]
     assert gen.CAL_WINDOW == tuning["noise_calibration_seconds"]
     assert gen.FRAME_MULT == tuning["noise_frame_multiplier"]
     assert gen.UTT_MULT == tuning["noise_utterance_multiplier"]

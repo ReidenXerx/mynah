@@ -74,6 +74,7 @@ CASES = [
     "trailing_silence_trim",
     "gap_below_silence",
     "speech_over_noise_in_calibration",
+    "blip_below_min_utterance",
 ]
 
 

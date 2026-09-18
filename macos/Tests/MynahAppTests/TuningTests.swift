@@ -268,6 +268,7 @@ struct TuningTests {
         "trailing_silence_trim",
         "gap_below_silence",
         "speech_over_noise_in_calibration",
+        "blip_below_min_utterance",
     ]
 
     @Test("UtteranceDetector segments the golden corpus as pinned",

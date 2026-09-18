@@ -19,7 +19,7 @@ Determinism rules — the corpus must regenerate byte-identically:
 
 What the contract covers (and deliberately does not):
 
-expected.json pins TWO things per region:
+expected.json pins THREE things per region:
 - ``start`` / ``end``: the speech-region boundaries as produced by the
   energy-gate state machine. ``end`` is the start time of the frame
   that closed the region, so the region spans speech content plus
@@ -34,11 +34,16 @@ expected.json pins TWO things per region:
   (Python's full trailing silence, Swift's 0.2s trim) and refuses to
   write the corpus if they disagree — a case where the policies give
   different verdicts needs redesigned amplitudes, not a pinned lie.
+- ``rejected_by_min_utterance``: whether the TRIMMED buffer (speech +
+  trailing_padding — the P2 policy every implementation now shares)
+  falls under ``min_utterance_default``. This is pinnable since the
+  migration: Python used to measure the padded buffer (which can never
+  reject a silence-closed utterance, ~0.81s minimum) while Swift
+  measured the trimmed one — a documented divergence the single C++
+  core removes, so the verdict is now part of the contract.
 
-It does NOT pin the min-utterance length gate: Python applies it to the
-padded buffer (speech + 0.81s mandatory trailing silence, so it can
-never reject a silence-closed utterance) while Swift applies it to the
-trimmed one — a known, documented divergence. See docs/ARCHITECTURE.md.
+It does NOT pin secondary VAD (implementation-specific) or the decode
+itself — only the shared energy-gate segmentation.
 
 Cases:
 1. quiet_two_utterances    — 1.2s lead-in, speech/gap/speech. Two
@@ -75,6 +80,14 @@ Cases:
    the leftover tail opens nothing.
 7. gap_below_silence — a 0.78s (26-frame) gap between two phrases:
    below the close threshold, so the two phrases merge into ONE region.
+9. blip_below_min_utterance — ONE frame (0.03s) of loud speech. The
+   trimmed buffer is 0.03s + trailing_padding = 0.23s, under
+   min_utterance 0.25, so this is the case that pins the length gate
+   REJECTING something. Without it every pinned verdict is false and
+   the field cannot catch a regression in either direction — a gate
+   that stopped rejecting, or one that started rejecting real speech,
+   would both still pass.
+
 8. speech_over_noise_in_calibration — fan-level noise, then louder
    speech inside the window: the speech frames are excluded from the
    median while the noise frames raise the gates, and the speech still
@@ -107,6 +120,11 @@ NOISY_FLOOR_AMP = 0.03     # RMS 0.021 — above the 0.010 static floor,
                            # so ONLY calibration can reject it
 SPEECH_OVER_NOISE_AMP = 0.15  # case 8: RMS 0.106 — must clear the raised
                               # utterance gate (0.021 * 3.0 ≈ 0.064)
+BLIP_AMP = 0.3             # case 9: deliberately loud, so the ENERGY gate
+                           # cannot be what rejects it under either padding
+                           # policy (padded RMS 0.040, trimmed 0.077, both
+                           # far above 0.008) and the length gate is the
+                           # only thing the case can be measuring
 
 # From the tuning contract (duplicated here only to synthesize cases;
 # pinned against tuning/tuning.toml by tests/test_tuning.py).
@@ -114,6 +132,7 @@ UTTERANCE_SILENCE = 0.8
 TRAILING_PADDING = 0.2
 FRAME_ENERGY_DEFAULT = 0.010
 MIN_ENERGY_DEFAULT = 0.008
+MIN_UTTERANCE_DEFAULT = 0.25
 
 # The engine's no-VAD frame: 480 samples = 0.03s at 16 kHz.
 FRAME_SECONDS = 0.03
@@ -180,6 +199,7 @@ def reference_speech_regions(
     *,
     frame_energy: float,
     min_energy: float,
+    min_utterance: float = MIN_UTTERANCE_DEFAULT,
 ) -> list[dict[str, object]]:
     """The reference implementation, transcribed from engine.py.
 
@@ -204,13 +224,17 @@ def reference_speech_regions(
     CAL_SPEECH_FLOOR are excluded from the median, and fewer than
     MIN_SAMPLES quiet frames aborts calibration to the static gates.
 
-    Each returned region is {"start", "end", "rejected_by_energy_gate"}:
+    Each returned region is {"start", "end", "rejected_by_energy_gate",
+    "rejected_by_min_utterance"}:
     - start/end in seconds; end is the start time of the closing frame,
       so the buffered utterance spans [start, end + frame).
     - rejected_by_energy_gate compares the whole-buffer RMS against the
       calibrated utterance gate, and is verified to agree under both
       the full-trailing-silence (Python) and 0.2s-trim (Swift) padding
       policies.
+    - rejected_by_min_utterance applies the gate to the TRIMMED buffer
+      (the P2 policy: speech + trailing_padding), which every
+      implementation shares since the C++ core.
     """
     frames = _frames(samples)
 
@@ -227,31 +251,41 @@ def reference_speech_regions(
     regions: list[dict[str, object]] = []
     buffer: list[int] = []
 
-    def _energy_gate_verdict(buf: list[int], silent_frames: int) -> bool:
-        """True if the utterance fails the RMS gate, checked under both
-        padding policies (full trailing silence vs trailing_padding
-        trim). Raises instead of pinning a case the two policies
-        disagree on."""
-        padded_rms = _rms(buf)
+    def _trimmed(buf: list[int], silent_frames: int) -> list[int]:
+        """The P2 buffer: speech + trailing_padding of the closing silence."""
         keep = int(TRAILING_PADDING * SAMPLE_RATE)
         drop = max(0, int(silent_frames * FRAME_SECONDS * SAMPLE_RATE) - keep)
-        trimmed = buf[: len(buf) - drop] if 0 < drop < len(buf) else buf
-        trimmed_rms = _rms(trimmed)
+        return buf[: len(buf) - drop] if 0 < drop < len(buf) else buf
+
+    def _gate_verdicts(
+        buf: list[int], silent_frames: int
+    ) -> tuple[bool, bool]:
+        """(rejected_by_energy_gate, rejected_by_min_utterance). The energy
+        verdict is checked under both padding policies and raises instead
+        of pinning a case they disagree on."""
+        padded_rms = _rms(buf)
+        trimmed_rms = _rms(_trimmed(buf, silent_frames))
         if (padded_rms < eff_utt_gate) != (trimmed_rms < eff_utt_gate):
             raise SystemExit(
                 f"energy-gate verdict differs between padding policies "
                 f"(padded {padded_rms:.4f} vs trimmed {trimmed_rms:.4f} "
                 f"against gate {eff_utt_gate:.4f}) — redesign this case"
             )
-        return padded_rms < eff_utt_gate
+        trimmed = _trimmed(buf, silent_frames)
+        # Samples, not bytes — engine.py's 2* factor is the int16 byte width
+        # of its PCM buffers and does not apply here.
+        rejected_by_min = len(trimmed) < SAMPLE_RATE * min_utterance
+        return padded_rms < eff_utt_gate, rejected_by_min
 
     def close_region(idx: int) -> None:
         nonlocal in_speech, silence_frames, buffer
+        rejected_energy, rejected_min = _gate_verdicts(buffer, silence_frames)
         regions.append(
             {
                 "start": round(speech_start_frame * FRAME_SECONDS, 6),
                 "end": round(idx * FRAME_SECONDS, 6),
-                "rejected_by_energy_gate": _energy_gate_verdict(buffer, silence_frames),
+                "rejected_by_energy_gate": rejected_energy,
+                "rejected_by_min_utterance": rejected_min,
             }
         )
         in_speech = False
@@ -309,11 +343,13 @@ def reference_speech_regions(
     # is buffered. No fixture below ends mid-speech, so this exists for
     # faithfulness, not coverage.
     if in_speech:
+        rejected_energy, rejected_min = _gate_verdicts(buffer, silence_frames)
         regions.append(
             {
                 "start": round(speech_start_frame * FRAME_SECONDS, 6),
                 "end": round(len(frames) * FRAME_SECONDS, 6),
-                "rejected_by_energy_gate": _energy_gate_verdict(buffer, silence_frames),
+                "rejected_by_energy_gate": rejected_energy,
+                "rejected_by_min_utterance": rejected_min,
             }
         )
     return regions
@@ -357,9 +393,13 @@ def main() -> None:
     #    rejected by the energy gate.
     cases["noisy_room"] = _sinusoid_segment(4.0, NOISY_FLOOR_AMP, freq=60.0)
 
-    # 5. A loud 0.12s click, shorter than min_utterance. Segmentation
-    #    treats it identically everywhere; the length-gate outcome
-    #    afterwards diverges (documented, not pinned).
+    # 5. A loud 0.12s click. Segmentation treats it identically
+    #    everywhere, and the pinned gates record the honest outcome:
+    #    the trimmed buffer (0.12s speech + 0.2s padding = 0.32s) still
+    #    clears min_utterance 0.25 — the gate was meant to reject
+    #    exactly this, so the pin documents the miss rather than hiding
+    #    it. A fixture that a future tuning change makes gateable will
+    #    flip the pin loudly.
     cases["click_below_min"] = (
         _silence_segment(1.2)
         + _click(0.12, SPEECH_AMP)
@@ -397,12 +437,26 @@ def main() -> None:
         + _sinusoid_segment(0.84, NOISY_FLOOR_AMP, freq=60.0)
     )
 
+    # 9. A single-frame blip: loud enough that the energy gate passes it
+    #    under both padding policies, short enough that the length gate
+    #    rejects the trimmed 0.23s buffer. The one case where
+    #    rejected_by_min_utterance is true — case 5's 0.12s click is long
+    #    enough to survive, which is the miss it documents.
+    cases["blip_below_min_utterance"] = (
+        _silence_segment(1.2)
+        + _sinusoid_segment(FRAME_SECONDS, BLIP_AMP)
+        + _silence_segment(1.2)
+    )
+
     expected: dict[str, list[dict[str, object]]] = {}
     for name, samples in cases.items():
         wav_path = HERE / f"{name}.wav"
         _write_wav(wav_path, samples)
         expected[name] = reference_speech_regions(
-            samples, frame_energy=FRAME_ENERGY_DEFAULT, min_energy=MIN_ENERGY_DEFAULT
+            samples,
+            frame_energy=FRAME_ENERGY_DEFAULT,
+            min_energy=MIN_ENERGY_DEFAULT,
+            min_utterance=MIN_UTTERANCE_DEFAULT,
         )
 
     (HERE / "expected.json").write_text(

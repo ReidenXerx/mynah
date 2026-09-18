@@ -10,11 +10,26 @@
  *
  * Threading contract:
  *   - Events are delivered on engine threads. Callbacks must not block;
- *     front ends marshal to their own UI thread.
+ *     front ends marshal to their own UI thread. Two events can arrive at
+ *     once from different threads, so a callback that touches shared state
+ *     must say so itself; anything that marshals (Swift's MainActor, Qt's
+ *     queued connections) already does.
+ *   - A callback MAY call back into this API — mynah_stop() on a problem,
+ *     mynah_get_state() to refresh a menu. No engine lock is held while a
+ *     callback runs, so re-entering is safe rather than a deadlock.
+ *   - Pointers handed to a callback (mynah_event_text, _bands, _problem_*,
+ *     _model_name) belong to the event and are valid only until it
+ *     returns. Copy what outlives the call.
  *   - mynah_push_audio is the only call made from the real-time capture
- *     thread. It never blocks and never allocates.
+ *     thread. It takes no engine lock and allocates nothing: the samples
+ *     go into a lock-free ring, and what does not fit is dropped rather
+ *     than made to wait.
  *   - mynah_destroy must run before process exit: ggml aborts at exit if a
- *     Metal context is still alive (docs/SWIFT-APP.md, open issue 9).
+ *     Metal context is still alive (docs/SWIFT-APP.md, open issue 9). It
+ *     joins the engine's threads, so it BLOCKS for as long as the work in
+ *     flight takes — a cold model load is seconds, and the first ever one
+ *     compiles the Metal library (~7 s). Call it off your UI thread if a
+ *     frozen window during quit would be noticed.
  *   - Every other call may be made from any thread.
  *
  * Return codes: 0 on success, -1 on failure.

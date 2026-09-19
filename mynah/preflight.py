@@ -375,6 +375,23 @@ def _check_speech() -> CheckResult:
                 "  Or point at one you have:  mynah set model=/path/to/ggml-small.bin"
             ),
         )
+    # A model whose name we publish a hash for, but whose contents do not match
+    # it, is not the file we pinned — and whisper-cli parses it as a native
+    # binary format. Say so rather than transcribe with it. A model the user
+    # brought themselves has no published hash and is simply their business.
+    known = linux_stt.model_is_known(model)
+    if known is False:
+        return CheckResult(
+            ok=False,
+            title="Speech",
+            detail=f"{model.name} does not match its published checksum",
+            hint=(
+                "It is not the file Mynah pins, so it is not being used.\n"
+                f"  Remove it and fetch it again:\n"
+                f"  rm {model}\n"
+                f"  {linux_stt.download_command(model.stem.removeprefix('ggml-'))}"
+            ),
+        )
     return CheckResult(
         ok=True,
         title="Speech",

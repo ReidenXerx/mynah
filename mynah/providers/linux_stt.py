@@ -23,6 +23,7 @@ The audio never reaches the disk: the temporary WAV is written into the same
 from __future__ import annotations
 
 import logging
+import hashlib
 import os
 import shutil
 import subprocess
@@ -66,7 +67,31 @@ DEFAULT_MODEL = "small"
 # The download the setup check offers. Sizes are the published ggml sizes, used
 # only to tell the user what they are about to pull.
 MODEL_SIZES = {"tiny": "75 MB", "base": "142 MB", "small": "466 MB", "medium": "1.5 GB", "large-v3": "2.9 GB"}
-MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{name}.bin"
+# Pinned to one commit of the model repository, not to `main`.
+#
+# `resolve/main` is a moving target: whatever is behind it today is not
+# necessarily what was reviewed, and the file it returns is handed straight to
+# whisper-cli, which parses it as a native binary format. So the revision is
+# fixed here and the published SHA-256 of each file is checked after the
+# download. The hashes are the repository's own LFS object ids, which are the
+# SHA-256 of the file contents; ggml-small.bin was verified against a copy
+# downloaded before this pin.
+#
+# To move the pin: pick a commit from
+# https://huggingface.co/ggerganov/whisper.cpp/commits/main, then take the new
+# hashes from https://huggingface.co/api/models/ggerganov/whisper.cpp?blobs=true
+# (each sibling's `lfs.oid`). Both change together, deliberately, or not at all.
+MODEL_REVISION = "5359861c739e955e79d9a303bcbc70fb988958b1"
+MODEL_URL = ("https://huggingface.co/ggerganov/whisper.cpp/resolve/"
+             + MODEL_REVISION + "/ggml-{name}.bin")
+
+MODEL_SHA256 = {
+    "tiny": "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21",
+    "base": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+    "small": "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
+    "medium": "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208",
+    "large-v3": "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2",
+}
 
 
 def find_binary() -> str | None:
@@ -114,9 +139,45 @@ def find_model(name: str = "") -> Path | None:
 
 
 def download_command(name: str = DEFAULT_MODEL) -> str:
-    """The exact command that fetches a model, for a hint the user can paste."""
+    """The exact command that fetches a model, for a hint the user can paste.
+
+    It downloads from the pinned revision and then checks the file against its
+    published hash, deleting it if it does not match — a model that is not the
+    one we pinned must not be left sitting where whisper-cli will find it.
+    """
     target = Path(DEFAULT_MODEL_DIR).expanduser() / f"ggml-{name}.bin"
-    return f"curl -L --create-dirs -o {target} {MODEL_URL.format(name=name)}"
+    url = MODEL_URL.format(name=name)
+    digest = MODEL_SHA256.get(name)
+    if not digest:
+        return f"curl -L --create-dirs -o {target} {url}"
+    return (f"curl -L --create-dirs -o {target} {url} && "
+            f"echo '{digest}  {target}' | sha256sum -c - || rm -f {target}")
+
+
+def model_digest(path: Path) -> str:
+    """The SHA-256 of a model file, read in pieces rather than all at once."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def model_is_known(path: Path, name: str = "") -> bool | None:
+    """Whether this file is the model we pinned.
+
+    True if it matches, False if it does not, and None if there is no published
+    hash to compare against — somebody may legitimately point Mynah at a model
+    of their own, and that is their business, not a failure.
+    """
+    stem = name or path.stem.removeprefix("ggml-")
+    expected = MODEL_SHA256.get(stem)
+    if not expected:
+        return None
+    try:
+        return model_digest(path) == expected
+    except OSError:
+        return False
 
 
 def _scratch_dir() -> Path:

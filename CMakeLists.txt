@@ -51,4 +51,11 @@ if(APPLE)
 endif()
 add_subdirectory(third_party/whisper.cpp)
 
+# The Linux front end: only where it can build — its socket/injector layer
+# is POSIX and compiles on the dev Mac; PipeWire capture and the `mynah`
+# binary need libpipewire and stay Linux-only (see linux/CMakeLists.txt).
+if(UNIX)
+    add_subdirectory(linux)
+endif()
+
 add_subdirectory(core)

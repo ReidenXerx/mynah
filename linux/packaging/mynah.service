@@ -1,0 +1,34 @@
+# The login service (Phase 3 packaging; installed by the package at
+# /usr/lib/systemd/user/mynah.service). Same semantics as the Python era's
+# generated unit, plus the two details that are not decoration:
+#
+#   PartOf/WantedBy graphical-session.target ties the daemon to the
+#   graphical session rather than to login: mynah types through the
+#   Wayland compositor, so started before there is one it can only fail,
+#   and left running after the session ends it holds a microphone for
+#   nobody.
+#
+#   StartLimitBurst gives up after three failures in a minute. A service
+#   that cannot start is a service that needs a person, not a retry loop
+#   filling the journal with the same error forever (the macOS side
+#   learned this from a KeepAlive loop).
+#
+# `mynah service install` wraps `systemctl --user` around THIS unit.
+
+[Unit]
+Description=Mynah dictation
+Documentation=https://duduphudu.app/mynah/
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mynah
+Restart=on-failure
+RestartSec=5
+Slice=session.slice
+
+[Install]
+WantedBy=graphical-session.target

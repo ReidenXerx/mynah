@@ -66,4 +66,16 @@ inline void write_file(const std::filesystem::path& path, const std::string& tex
     out << text;
 }
 
+// Read one line (up to the newline, which is consumed) from a socket fd.
+// Empty result means EOF.
+inline std::string read_line(int fd) {
+    std::string line;
+    char c = 0;
+    while (::read(fd, &c, 1) == 1) {
+        if (c == '\n') return line;
+        line += c;
+    }
+    return line;
+}
+
 } // namespace mynah_test

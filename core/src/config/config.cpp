@@ -151,6 +151,7 @@ Config from_values(const flat_toml::Table& values) {
     c.show_indicator = bool_or(values, "show_indicator", c.show_indicator);
     c.idle_visible = bool_or(values, "idle_visible", c.idle_visible);
     c.injector = string_or(values, "injector", c.injector);
+    c.gpu = bool_or(values, "gpu", c.gpu);
     c.frame_energy = number_or(values, "frame_energy", c.frame_energy);
     c.min_energy = number_or(values, "min_energy", c.min_energy);
     c.min_utterance = number_or(values, "min_utterance", c.min_utterance);
@@ -169,6 +170,7 @@ void merge_into(flat_toml::Table& values, const Config& config) {
     values["show_indicator"] = flat_toml::boolean(config.show_indicator);
     values["idle_visible"] = flat_toml::boolean(config.idle_visible);
     values["injector"] = flat_toml::str(config.injector);
+    values["gpu"] = flat_toml::boolean(config.gpu);
     values["frame_energy"] = flat_toml::real(config.frame_energy);
     values["min_energy"] = flat_toml::real(config.min_energy);
     values["min_utterance"] = flat_toml::real(config.min_utterance);

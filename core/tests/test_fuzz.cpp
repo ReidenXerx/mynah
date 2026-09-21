@@ -158,10 +158,10 @@ TEST_CASE("json parser fuzz: mutations of expected.json throw cleanly or parse")
     std::string corpus = read_file(MYNAH_TUNING_TOML); // unrelated bytes: must not parse
     std::string golden = R"({"case": [{"start": 1.2, "end": 3.18,
         "rejected_by_energy_gate": false, "rejected_by_min_utterance": false}]})";
-    REQUIRE(mynah_test::json::parse(golden).is_object());
+    REQUIRE(mynah::json::parse(golden).is_object());
     bool throws_on_garbage = false;
     try {
-        (void)mynah_test::json::parse(corpus);
+        (void)mynah::json::parse(corpus);
     } catch (const std::exception&) {
         throws_on_garbage = true;
     }
@@ -180,7 +180,7 @@ TEST_CASE("json parser fuzz: mutations of expected.json throw cleanly or parse")
                 }
             }
             try {
-                (void)mynah_test::json::parse(text); // must parse or throw, never crash
+                (void)mynah::json::parse(text); // must parse or throw, never crash
             } catch (const std::exception&) {
             }
         }

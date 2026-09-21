@@ -1,16 +1,19 @@
-// A minimal JSON reader for the golden corpus's expected.json (and any
-// future fixture in the same shape). Python reads it with stdlib json and
-// Swift with JSONSerialization; the C++ suite reads it with this.
+// A minimal JSON reader/WRITER pair, shared by the golden-corpus tests and
+// the Linux control socket. Reads expected.json and the socket's incoming
+// commands; writes the socket's outgoing events and replies.
 //
 // Deliberately small: objects, arrays, strings, numbers, booleans, null.
 // No floats-vs-ints distinction (numbers are doubles), no escapes beyond
-// \" \\ \/ \b \f \n \r \t \uXXXX (which the corpus does not use, but a
+// " \\ \/ \b \f \n \r \t \uXXXX (which the corpus does not use, but a
 // regenerated file might).
+//
+// The namespace is mynah::json; the tests use it by the same spelling.
 
 #pragma once
 
 #include <charconv>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <stdexcept>
@@ -19,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-namespace mynah_test::json {
+namespace mynah::json {
 
 struct Value;
 using Array = std::vector<Value>;
@@ -236,4 +239,33 @@ inline Value parse(std::string_view text) {
     return value;
 }
 
-} // namespace mynah_test::json
+// --- writing -----------------------------------------------------------------
+
+// Escape one string for embedding in JSON output.
+inline std::string escape(std::string_view text) {
+    std::string out;
+    for (unsigned char c : text) {
+        switch (c) {
+        case '"': out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default:
+            if (c < 0x20) {
+                char buf[8];
+                std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                out += buf;
+            } else {
+                out += char(c);
+            }
+        }
+    }
+    return out;
+}
+
+inline std::string quoted(std::string_view text) { return "\"" + escape(text) + "\""; }
+
+} // namespace mynah::json

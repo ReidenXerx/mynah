@@ -86,7 +86,7 @@ inline std::map<std::string, std::vector<ExpectedRegion>> load_expected(
     std::ifstream in(path, std::ios::binary);
     REQUIRE_MESSAGE(in, ("cannot open " + path.string()).c_str());
     std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    json::Value root = json::parse(text);
+    mynah::json::Value root = mynah::json::parse(text);
     REQUIRE(root.is_object());
 
     std::map<std::string, std::vector<ExpectedRegion>> out;
@@ -94,11 +94,11 @@ inline std::map<std::string, std::vector<ExpectedRegion>> load_expected(
         REQUIRE_MESSAGE(regions_value.is_array(),
                         ("expected.json: '" + case_name + "' is not an array").c_str());
         std::vector<ExpectedRegion> regions;
-        for (const json::Value& region_value : regions_value.array) {
-            const json::Value* start = region_value.find("start");
-            const json::Value* end = region_value.find("end");
-            const json::Value* rejected_energy = region_value.find("rejected_by_energy_gate");
-            const json::Value* rejected_min = region_value.find("rejected_by_min_utterance");
+        for (const mynah::json::Value& region_value : regions_value.array) {
+            const mynah::json::Value* start = region_value.find("start");
+            const mynah::json::Value* end = region_value.find("end");
+            const mynah::json::Value* rejected_energy = region_value.find("rejected_by_energy_gate");
+            const mynah::json::Value* rejected_min = region_value.find("rejected_by_min_utterance");
             REQUIRE_MESSAGE(start != nullptr,
                             ("expected.json: bad 'start' in " + case_name).c_str());
             REQUIRE_MESSAGE(start->is_number(),

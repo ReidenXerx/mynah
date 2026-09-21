@@ -68,6 +68,10 @@ struct Config {
 
     // --- which implementation (Linux) ---
     std::string injector;
+    // Linux tiers (M5): a discrete GPU runs the `gpu` tier only when the
+    // user opted in — waking a dGPU per sentence spins fans for a
+    // two-word utterance. An integrated GPU is used automatically.
+    bool gpu = false;
 
     bool operator==(const Config&) const = default;
 };

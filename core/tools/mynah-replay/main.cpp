@@ -25,66 +25,19 @@
 // (no_model, model_load_failed) appear as JSON lines like every other
 // event and fail the run.
 
-#include <algorithm>
-#include <atomic>
 #include <chrono>
-#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "audio/wav.hpp"
 #include "mynah/mynah.h"
 
 namespace {
-
-struct Wav {
-    std::vector<float> samples; // 16 kHz mono
-    int sample_rate = 0;
-};
-
-Wav read_wav(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) throw std::runtime_error("cannot open " + path.string());
-    std::vector<unsigned char> data((std::istreambuf_iterator<char>(in)),
-                                    std::istreambuf_iterator<char>());
-    auto fail = [&](const std::string& why) {
-        throw std::runtime_error(path.filename().string() + ": " + why);
-    };
-    if (data.size() < 12 || std::memcmp(data.data(), "RIFF", 4) != 0 ||
-        std::memcmp(data.data() + 8, "WAVE", 4) != 0)
-        fail("not a RIFF/WAVE file");
-
-    Wav wav;
-    std::size_t offset = 12;
-    while (offset + 8 <= data.size()) {
-        std::string id(reinterpret_cast<const char*>(data.data()) + offset, 4);
-        std::size_t size = data[offset + 4] | (data[offset + 5] << 8) |
-                           (std::size_t(data[offset + 6]) << 16) |
-                           (std::size_t(data[offset + 7]) << 24);
-        std::size_t start = offset + 8;
-        if (id == "fmt " && size >= 16) {
-            wav.sample_rate = data[start + 4] | (data[start + 5] << 8) |
-                              (data[start + 6] << 16) | (data[start + 7] << 24);
-        } else if (id == "data") {
-            std::size_t end = std::min(start + size, data.size());
-            wav.samples.reserve((end - start) / 2);
-            for (std::size_t i = start; i + 1 < end; i += 2) {
-                std::uint16_t raw = data[i] | (data[i + 1] << 8);
-                wav.samples.push_back(float(std::int16_t(raw)) / 32768.0f);
-            }
-        }
-        offset = start + size + (size % 2); // chunks are word-aligned
-    }
-    if (wav.samples.empty()) fail("no PCM data");
-    if (wav.sample_rate != 16000)
-        fail("expected 16 kHz, got " + std::to_string(wav.sample_rate));
-    return wav;
-}
 
 std::string json_escape(const char* text) {
     if (!text) return "";
@@ -167,9 +120,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Wav wav;
+    std::vector<float> samples;
     try {
-        wav = read_wav(wav_path);
+        samples = mynah::audio::read_wav_mono_16k(wav_path);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "mynah-replay: %s\n", e.what());
         return 1;
@@ -258,12 +211,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    mynah_start(engine);
     // 1 s chunks with a breather: far faster than real time, slow enough
     // that the worker drains every chunk (dropped audio would be a lie).
     constexpr std::size_t kChunk = 16000;
-    for (std::size_t i = 0; i < wav.samples.size(); i += kChunk) {
-        std::size_t count = std::min(kChunk, wav.samples.size() - i);
-        mynah_push_audio(engine, wav.samples.data() + i, count);
+    for (std::size_t i = 0; i < samples.size(); i += kChunk) {
+        std::size_t count = std::min(kChunk, samples.size() - i);
+        mynah_push_audio(engine, samples.data() + i, count);
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
@@ -298,8 +252,9 @@ int main(int argc, char** argv) {
     // run that transcribed nothing is not by itself a failure — silence and
     // rejected noise are correct answers — but it is the thing a person
     // reading this output wants to know first.
-    std::fprintf(stderr, "mynah-replay: %.2f s of audio, %llu frames processed, %d text event(s)\n",
-                 wav.samples.size() / 16000.0,
+    std::fprintf(stderr,
+                 "mynah-replay: %.2f s of audio, %llu frames processed, %d text event(s)\n",
+                 samples.size() / 16000.0,
                  (unsigned long long)log.levels.load(std::memory_order_relaxed),
                  log.texts.load(std::memory_order_relaxed));
     return log.problems.load(std::memory_order_relaxed) > 0 ? 1 : 0;

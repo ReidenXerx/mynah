@@ -1,0 +1,80 @@
+# Maintainer: Mynah <https://github.com/ReidenXerx/mynah>
+# The AUR -git package — the first one published (docs/ENGINE-MIGRATION.md,
+# Phase 3: "PKGBUILD for mynah (AUR, -git first)"). Once a release is
+# tagged, the release PKGBUILD takes over and this stays for tracking main.
+
+pkgname=mynah-git
+pkgver=0.14.0
+pkgrel=1
+pkgdesc="Say it, and it types where you are — dictation on Wayland, on-device (git build)"
+arch=('x86_64')
+url="https://duduphudu.app/mynah/"
+license=('MIT')
+depends=(
+    'pipewire'
+    'wtype'
+    'wl-clipboard'
+    'curl'
+    'openssl'
+    'vulkan-icd-loader'
+    'gcc-libs'
+)
+makedepends=(
+    'cmake' 'git' 'pkgconf'
+    'vulkan-headers'     # the ggml Vulkan backend (-DGGML_VULKAN=ON) …
+    'shaderc'            # … compiles its shaders with glslc at build time
+)
+provides=('mynah')
+conflicts=('mynah')
+
+source=("git+https://github.com/ReidenXerx/mynah.git"
+        "git+https://github.com/ggml-org/whisper.cpp.git")
+sha256sums=('SKIP' 'SKIP')
+
+pkgver() {
+    cd "$srcdir/mynah"
+    # Tagged: 0.14.0.r3.gabc1234. Untagged (as the repo is today): a bare
+    # hash does not sort, so pacman could not tell a newer build from an
+    # older one — count commits instead.
+    # An explicit test, not `describe | sed || fallback`: a pipeline's status
+    # is sed's, so the fallback would never run and pkgver would be empty.
+    if git describe --long --tags >/dev/null 2>&1; then
+        git describe --long --tags | sed 's/^v//; s/\([^-]*-g\)/r\1/; s/-/./g'
+    else
+        printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+    fi
+}
+
+# third_party/whisper.cpp is a git submodule, and makepkg does not fetch
+# submodules: without this the configure step finds an empty directory.
+# The submodule is pointed at the clone makepkg already made (the second
+# source), and checked out at exactly the commit the repository pins (M6).
+prepare() {
+    cd "$srcdir/mynah"
+    git submodule init
+    git config submodule.third_party/whisper.cpp.url "$srcdir/whisper.cpp"
+    git -c protocol.file.allow=always submodule update
+}
+
+build() {
+    cmake -S "$srcdir/mynah" -B build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DGGML_NATIVE=OFF \
+        -DGGML_VULKAN=ON \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DWHISPER_BUILD_TESTS=OFF \
+        -DWHISPER_BUILD_EXAMPLES=OFF \
+        -DWHISPER_BUILD_SERVER=OFF \
+        -DMYNAH_BUILD_TESTS=OFF
+    cmake --build build -j"$(nproc)"
+}
+
+package() {
+    install -Dm755 build/linux/mynah "$pkgdir/usr/bin/mynah"
+    install -Dm644 "$srcdir/mynah/linux/packaging/mynah.service" \
+        "$pkgdir/usr/lib/systemd/user/mynah.service"
+    install -Dm644 "$srcdir/mynah/linux/packaging/benchmark.wav" \
+        "$pkgdir/usr/share/mynah/benchmark.wav"
+    install -Dm644 "$srcdir/mynah/LICENSE" "$pkgdir/usr/share/licenses/mynah-git/LICENSE"
+}

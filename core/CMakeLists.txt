@@ -12,6 +12,8 @@ add_library(mynah
     src/config/flat_toml.cpp
     src/filter/transcript_filter.cpp
     src/models/resolve.cpp
+    src/models/table.cpp
+    src/models/tiers.cpp
     src/segment/utterance_detector.cpp
     src/session/session.cpp
     src/stt/whisper_stt.cpp
@@ -19,10 +21,12 @@ add_library(mynah
 )
 add_library(mynah::mynah ALIAS mynah)
 
-# The only header front ends include.
+# The only header front ends include, by contract: include/mynah/mynah.h.
 target_include_directories(mynah PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-# Internal headers, included relative to src/.
-target_include_directories(mynah PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# Internal headers, relative to src/ — the Linux front end (linux/)
+# links libmynah and reaches for models/, config/ and stt/ directly; they
+# are not part of the C API and may change between releases.
+target_include_directories(mynah PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(mynah PUBLIC cxx_std_20)
 
 # MYNAH_VERSION is the project version from the root CMakeLists (P9) — the
@@ -52,7 +56,7 @@ if(MYNAH_BUILD_TESTS)
         tests/test_toml.cpp
     )
     target_link_libraries(mynah_tests PRIVATE mynah)
-    target_include_directories(mynah_tests PRIVATE src tests)
+    target_include_directories(mynah_tests PRIVATE src tests ${CMAKE_CURRENT_SOURCE_DIR}/../linux/common)
     target_compile_definitions(mynah_tests PRIVATE
         MYNAH_VERSION="${PROJECT_VERSION}"
         # The suites pin the core's constants against the shared contract the

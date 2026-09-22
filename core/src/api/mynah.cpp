@@ -272,6 +272,8 @@ static std::string config_to_json(const mynah::config::Config& config) {
     json << "\"frame_energy\":" << config.frame_energy << ',';
     json << "\"min_energy\":" << config.min_energy << ',';
     json << "\"min_utterance\":" << config.min_utterance;
+    json << "}"; // the closing brace: without it the JSON is truncated and
+                 // every front end's parse falls back to defaults
     return json.str();
 }
 

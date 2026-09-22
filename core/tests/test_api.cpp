@@ -9,12 +9,15 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "env.hpp"
+#include "json.hpp"
 #include "mynah/mynah.h"
 
 using mynah_test::EnvOverride;
@@ -141,6 +144,57 @@ TEST_CASE("the C API drives a real session and reports a bad model through the c
     mynah_stop(engine);
 
     mynah_destroy(engine);
+}
+
+TEST_CASE("mynah_config_set writes through, and mynah_config_json reads it back") {
+    // The settings UI's write path: one key at a time, JSON-encoded values,
+    // the engine validating and saving. This pins the C half of that path —
+    // the Swift side once sent the OLD value (and sent strings unquoted),
+    // and every setting snapped back; this test would have caught the
+    // engine half of any such break.
+    TmpDir dir;
+    EnvOverride override_dir("MYNAH_CONFIG_DIR", dir.path().string());
+    mynah_engine* engine = mynah_create(nullptr, nullptr, nullptr, nullptr);
+    REQUIRE(engine != nullptr);
+
+    // A string, two bools, a number, and the enum — the shapes the UI sends.
+    CHECK(mynah_config_set(engine, "language", "\"uk\"") == 0);
+    CHECK(mynah_config_set(engine, "vad", "false") == 0);
+    CHECK(mynah_config_set(engine, "idle_timeout", "0") == 0);
+    CHECK(mynah_config_set(engine, "transcription_mode", "\"on_stop\"") == 0);
+    // Refusals: an unknown key, an out-of-range enum value.
+    CHECK(mynah_config_set(engine, "nope", "\"x\"") == -1);
+    CHECK(mynah_config_set(engine, "trigger", "\"sometimes\"") == -1);
+
+    // The engine's view reflects every accepted write, and nothing else.
+    // PARSED, not substring-found: the first version of config_to_json
+    // never emitted the closing brace, the JSON was truncated, and every
+    // front end's parse fell back to defaults — substring checks passed.
+    char* json = mynah_config_json(engine);
+    REQUIRE(json != nullptr);
+    std::string text(json);
+    free(json);
+    mynah::json::Value parsed = mynah::json::parse(text); // throws if truncated
+    const mynah::json::Value* language = parsed.find("language");
+    REQUIRE(language != nullptr);
+    CHECK(language->text == "uk");
+    const mynah::json::Value* vad = parsed.find("vad");
+    REQUIRE(vad != nullptr);
+    CHECK(vad->boolean == false);
+    const mynah::json::Value* idle = parsed.find("idle_timeout");
+    REQUIRE(idle != nullptr);
+    CHECK(idle->number == 0.0);
+    const mynah::json::Value* mode = parsed.find("transcription_mode");
+    REQUIRE(mode != nullptr);
+    CHECK(mode->text == "on_stop");
+
+    // And the file on disk carries it for the next process.
+    mynah_destroy(engine);
+    std::ifstream in(dir.path() / "config.toml");
+    std::string on_disk((std::istreambuf_iterator<char>(in)),
+                        std::istreambuf_iterator<char>());
+    CHECK(on_disk.find("language = \"uk\"") != std::string::npos);
+    CHECK(on_disk.find("transcription_mode = \"on_stop\"") != std::string::npos);
 }
 
 TEST_CASE("reload_config picks up changes, and a broken file keeps the old config") {

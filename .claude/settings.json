@@ -1,0 +1,122 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-grep-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-read-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-edit-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-bash-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__gitnexus__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-mcp-guard.mjs"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-session.mjs"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-precompact.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-taskcore-nudge.mjs"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-minion-nudge.mjs"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-consult-nudge.mjs"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-microscope-nudge.mjs"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-northstar-anchor.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__gitnexus__impact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/bearing-impact-audit.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

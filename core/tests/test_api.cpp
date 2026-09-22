@@ -18,6 +18,7 @@
 
 #include "env.hpp"
 #include "json.hpp"
+#include "config/config.hpp"
 #include "mynah/mynah.h"
 
 using mynah_test::EnvOverride;
@@ -215,4 +216,60 @@ TEST_CASE("reload_config picks up changes, and a broken file keeps the old confi
     CHECK(mynah_get_state(engine) == MYNAH_IDLE);
 
     mynah_destroy(engine);
+}
+
+TEST_CASE("setting one key keeps what another writer changed meanwhile") {
+    // The config file has several writers: this engine, `mynah set` in a
+    // terminal, a hand edit. config_set used to start from the engine's
+    // in-memory copy and save every key it owns from there, so a value
+    // changed on disk since launch was quietly written back to what the
+    // engine still believed — flipping a toggle in the settings window
+    // reverted somebody else's `mynah set sensitivity=…`.
+    TmpDir dir;
+    EnvOverride override_dir("MYNAH_CONFIG_DIR", dir.path().string());
+    write_file(mynah::config::default_path(), "frame_energy = 0.010\nvad = true\n");
+
+    mynah_engine* engine = mynah_create(nullptr, nullptr, nullptr, nullptr);
+    REQUIRE(engine != nullptr);
+
+    // Another writer changes a DIFFERENT key, after the engine loaded.
+    write_file(mynah::config::default_path(),
+               "frame_energy = 0.005\nvad = true\nstt_provider = \"whisper-cpp\"\n");
+
+    REQUIRE(mynah_config_set(engine, "vad", "false") == 0);
+
+    mynah::config::ReadResult read = mynah::config::read_file(mynah::config::default_path());
+    REQUIRE(read.status == mynah::config::ReadStatus::ok);
+    CHECK(read.config.vad == false);           // ours applied
+    CHECK(read.config.frame_energy == 0.005);  // theirs survived
+    // And a key no writer here owns is still untouched.
+    std::ifstream in(mynah::config::default_path());
+    std::string on_disk((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    CHECK(on_disk.find("stt_provider = \"whisper-cpp\"") != std::string::npos);
+
+    // The engine runs on the merged result, not on its stale copy.
+    char* json = mynah_config_json(engine);
+    REQUIRE(json != nullptr);
+    mynah::json::Value parsed = mynah::json::parse(json);
+    free(json);
+    CHECK(parsed.find("frame_energy")->number == 0.005);
+    CHECK(parsed.find("vad")->boolean == false);
+
+    mynah_destroy(engine);
+}
+
+TEST_CASE("an engine created with an explicit config file writes back to THAT file") {
+    TmpDir dir;
+    EnvOverride override_dir("MYNAH_CONFIG_DIR", (dir.path() / "default").string());
+    std::filesystem::path explicit_file = dir.path() / "profile.toml";
+    write_file(explicit_file, "language = \"ru\"\n");
+
+    mynah_engine* engine = mynah_create(explicit_file.c_str(), nullptr, nullptr, nullptr);
+    REQUIRE(engine != nullptr);
+    REQUIRE(mynah_config_set(engine, "language", "\"uk\"") == 0);
+    mynah_destroy(engine);
+
+    CHECK(mynah::config::read_file(explicit_file).config.language == "uk");
+    // The default file is not created, let alone written.
+    CHECK(!std::filesystem::exists(dir.path() / "default" / "config.toml"));
 }

@@ -342,9 +342,20 @@ int mynah_config_set(mynah_engine* engine, const char* key, const char* json_val
     if (!engine || !key || !json_value) return -1;
     try {
         mynah::json::Value value = mynah::json::parse(json_value);
-        mynah::config::Config config = engine->session->config_snapshot();
+
+        // Start from the FILE, not from the engine's copy of it. Saving
+        // writes back every key this core owns, so starting from a snapshot
+        // taken at launch wrote stale values over whatever another writer
+        // had changed since — `mynah set sensitivity=…` in a terminal, or a
+        // hand edit, was reverted by the next toggle in the settings window.
+        // Re-reading first makes this what its name says: set ONE setting.
+        mynah::config::ReadResult read = mynah::config::read_file(engine->config_path);
+        if (read.status == mynah::config::ReadStatus::unreadable) return -1;
+        mynah::config::Config config = read.config;
+
         if (!apply_json_value(config, key, value)) return -1;
-        mynah::config::save(config); // read-modify-write: other writers keep their keys
+        // To the engine's own file — not always the default one.
+        mynah::config::save(config, engine->config_path);
         engine->session->set_config(std::move(config));
         return 0;
     } catch (...) {

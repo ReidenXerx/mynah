@@ -132,4 +132,10 @@ Config load();
 // written through to its target, and the file's permissions are kept.
 void save(const Config& config);
 
+// Save at `where` instead of default_path(), with the same semantics. A
+// front end created against an explicit config file writes back to THAT
+// file: saving its settings into ~/.config/mynah/config.toml instead would
+// change a file nobody asked about and lose the change on the next reload.
+void save(const Config& config, const std::filesystem::path& where);
+
 } // namespace mynah::config

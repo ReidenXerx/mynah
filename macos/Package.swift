@@ -15,6 +15,12 @@ import PackageDescription
 // directory, so "vendor/install/include" silently fails to find mynah.h.
 // Deriving an absolute path from the manifest's own location works from any
 // checkout and any invocation directory.
+let cltFrameworks = "/Library/Developer/CommandLineTools/Library/Developer/Frameworks"
+let testFrameworkFlags: [String] =
+    FileManager.default.fileExists(atPath: cltFrameworks + "/Testing.framework")
+        ? ["-F", cltFrameworks]
+        : []
+
 let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
 let vendorInclude = "\(packageDirectory)/vendor/install/include"
 let vendorLib = "\(packageDirectory)/vendor/install/lib"
@@ -84,6 +90,17 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("CoreML"),
             ]
+        ),
+        // The app's own logic: the settings adapter and the hotkey parser.
+        // The engine's tests live in the core's suite (`make core-test`);
+        // these cover what is on THIS side of the C API, which the core
+        // cannot see — and which shipped three settings bugs without one.
+        .testTarget(
+            name: "MynahAppTests",
+            dependencies: ["MynahApp"],
+            path: "Tests/MynahAppTests",
+            swiftSettings: [.unsafeFlags(testFrameworkFlags)],
+            linkerSettings: [.unsafeFlags(testFrameworkFlags)]
         ),
     ]
 )

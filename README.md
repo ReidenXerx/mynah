@@ -79,24 +79,32 @@ saying it is done. Linux below is fully locked.
 MYNAH=<the commit you are installing>   # a full 40-character SHA, never a branch name
 LOCKS=https://raw.githubusercontent.com/ReidenXerx/mynah/$MYNAH/requirements
 
-# 1. A throwaway builder whose only build backend is the hash-verified one.
-python3 -m venv /tmp/mynah-build
-/tmp/mynah-build/bin/pip install --require-hashes --only-binary :all: -r $LOCKS/build.lock
+# Build the engine in a private directory of its own, with a build backend that
+# is hash-verified before it runs. The subshell keeps the trap and the failure
+# exits to this block, so it is safe to paste into a shell you are still using.
+BUILD="$(mktemp -d)" && (
+  set -eu
+  trap 'rm -rf "$BUILD"' EXIT
+  # mktemp -d creates it 0700; refuse to build in it if it is anything else.
+  [ "$(stat -c %a "$BUILD")" = 700 ] || { echo "refusing: $BUILD is not private"; exit 1; }
 
-# 2. Build the engine with that backend and nothing else. --no-build-isolation is
-#    what stops pip fetching a build backend of its own choosing.
-/tmp/mynah-build/bin/pip wheel --no-build-isolation --no-deps -w /tmp/mynah-wheel \
-    "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
+  python3 -m venv "$BUILD/venv"
+  "$BUILD/venv/bin/pip" install --require-hashes --only-binary :all: -r "$LOCKS/build.lock"
 
-# 3. Install that wheel. A wheel runs no build backend at all.
-pipx install --pip-args="--no-deps" /tmp/mynah-wheel/mynah-0.1.0-py3-none-any.whl
+  # --no-build-isolation is what stops pip fetching a build backend of its own
+  # choosing; the only one present is the verified one installed above.
+  "$BUILD/venv/bin/pip" wheel --no-build-isolation --no-deps -w "$BUILD/wheel" \
+      "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
 
-# 4. What the engine imports, at pinned versions, every artifact checked against its hash.
-pipx runpip mynah install --require-hashes --only-binary :all: -r $LOCKS/build.lock
+  # A wheel runs no build backend at all.
+  pipx install --pip-args="--no-deps" "$BUILD"/wheel/mynah-*.whl
+)
+
+# What the engine imports, at pinned versions, every artifact checked against its hash.
+pipx runpip mynah install --require-hashes --only-binary :all: -r "$LOCKS/build.lock"
 pipx runpip mynah install --require-hashes --only-binary :all: \
-    --no-binary webrtcvad-wheels --no-build-isolation -r $LOCKS/linux.lock
+    --no-binary webrtcvad-wheels --no-build-isolation -r "$LOCKS/linux.lock"
 
-rm -rf /tmp/mynah-build /tmp/mynah-wheel
 sudo pacman -S whisper-cpp wtype wl-clipboard   # speech, typing, and pasting
 mynah setup                          # checks each of these and names what is missing
 ```
@@ -116,6 +124,12 @@ no ordering of `pipx --preinstall` gets in front of it, because pipx builds the 
 just to learn the package name. Steps 1 and 2 move that build somewhere the backend is already
 pinned and verified; step 3 then installs an artifact that needs no backend at all. The engine's
 provenance is unchanged — it is still the git commit you named, and nothing else.
+
+**Why the build directory is made with `mktemp -d`.** A fixed path under `/tmp` is a shared name:
+on a machine with more than one account, anybody can create it first, or swap the wheel between the
+build and the install, and what gets installed is then theirs rather than yours. `mktemp -d` makes a
+private directory nobody can guess, the block refuses to use it if it is not owner-only, the venv
+and the wheel both live inside it, and the trap removes it whatever happens.
 
 `mynah setup` is the honest path: it checks each requirement, says which one is missing and what to
 do about it — including the one `curl` that downloads a speech model — and only installs the login

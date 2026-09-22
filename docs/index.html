@@ -395,8 +395,9 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
   <div class="two">
     <div>
 <pre><span class="dim">Linux — the full commands are in the README, pinned and hash-checked</span>
-<span class="cmd">$ pip wheel --no-build-isolation …/mynah.git@&lt;commit&gt;</span>
-<span class="cmd">$ pipx install …/mynah-0.1.0-py3-none-any.whl</span>
+<span class="cmd">$ BUILD="$(mktemp -d)"   # private, cleaned up by a trap</span>
+<span class="cmd">$ "$BUILD/venv/bin/pip" wheel --no-build-isolation …@&lt;commit&gt;</span>
+<span class="cmd">$ pipx install "$BUILD"/wheel/mynah-*.whl</span>
 <span class="cmd">$ pipx runpip mynah install --require-hashes -r linux.lock</span>
 <span class="cmd">$ sudo pacman -S whisper-cpp wtype wl-clipboard</span>
 

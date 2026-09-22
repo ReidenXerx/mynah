@@ -462,6 +462,15 @@ int run_engine() {
     if (auto_benchmark(config))
         config = mynah::config::load(); // the benchmark stored a choice
 
+    // Vulkan starts here, not on the first toggle: it takes ~2 s, more when
+    // it wakes a dGPU from D3cold, and audio before a session is listening
+    // is dropped — it was the start of the first sentence. The dGPU goes
+    // back to sleep on its own ten seconds later.
+    if (std::optional<mynah::stt::GpuChoice> gpu = mynah::stt::pick_gpu(config.gpu))
+        std::fprintf(stderr, "mynah: speech runs on %s\n", gpu->name.c_str());
+    else
+        std::fprintf(stderr, "mynah: speech runs on the CPU\n");
+
     // Typing first: the engine's TEXT event drives the injector, so it
     // must exist before the engine's callback fires.
     mynah::inject::Tools tools = mynah::inject::Tools::discover();

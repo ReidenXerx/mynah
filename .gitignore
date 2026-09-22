@@ -13,3 +13,19 @@ macos/.build/
 .build/
 .DS_Store
 macos/vendor/
+
+# bearing — generated local state (safe to remove via bearing-uninstall)
+.bearing/.gitnexus-*
+.bearing/.bearing-*
+.bearing/.task-core.md
+.bearing/task-cores/
+*.bearing-backup
+.bearing/manifest.json
+.bearing/hooks.local.json
+.gitnexus/
+.tmp-agent/
+.bearing/gitnexus-api-profile.json
+docs/ARCHITECTURE.gitnexus.md
+.claude/skills/*
+!.claude/skills/gitnexus-area-*/
+# --- end bearing ---

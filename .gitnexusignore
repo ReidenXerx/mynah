@@ -1,0 +1,60 @@
+# --- begin bearing (managed — edits here are replaced on update) ---
+# GitNexus-only ignores (gitignore syntax). Complements .gitignore for index speed.
+# See: gitnexus analyze --help (reads .gitignore + .gitnexusignore)
+#
+# Add large generated/data directories here so the graph stays code-focused, e.g.:
+#   data/
+#   reports/
+#   fixtures/large/
+#   **/__snapshots__/
+
+# ── The agent layer is not code ───────────────────────────────────────────────
+# The graph exists to answer questions about THIS PROJECT'S SOURCE. Instructions
+# written for an agent are not source: indexing them adds File nodes and symbols
+# that describe the tooling rather than the product, and they turn up in query
+# results competing with real code.
+#
+# It got literal — AGENTS.md was indexed as a File node with its full text stored,
+# so the graph contained a description of the graph.
+#
+# `.claude/skills/gitnexus-area-*` matters most: those are generated FROM this
+# index and are committed so teammates get them, which would feed the index its
+# own output on the next run.
+.claude/
+.bearing/
+.cursor/
+.zed/
+.agents/
+.githooks/
+AGENTS.md
+CLAUDE.md
+docs/GITNEXUS-*
+docs/TEAM-BUNDLE.md
+docs/ARCHITECTURE.gitnexus.md
+
+# Build / dependency output (usually already in .gitignore — listed for clarity)
+dist/
+build/
+coverage/
+
+# Bundled build output. Minified single-line bundles are not code anyone reads, and indexing them
+# is actively harmful: on one real repo 446 of 1123 indexed files (40%) were Capacitor-copied
+# Next.js chunks, which produced 21 `Route` nodes describing a STALE MINIFIED COPY of the app —
+# so a route lookup pointed the reader at a webpack chunk instead of the handler. They also drive
+# the analyzer's `callable-value-flow: candidate set exceeded the cap` warnings.
+# `**/_next/` rather than a Capacitor-specific path, so a copy under android/ or ios/ is caught
+# without naming a layout that only one framework uses.
+.next/
+out/
+**/_next/
+*.min.js
+*.bundle.js
+# --- end bearing ---
+
+# Everything BELOW this line is yours and bearing never touches it.
+# Put repo-specific rules here — including re-includes, which must come AFTER the
+# exclusion they override because the last matching pattern wins. For example, when a
+# directory named `build` is real source rather than output:
+#
+#   !build/
+#   !src/ui/pages/build/

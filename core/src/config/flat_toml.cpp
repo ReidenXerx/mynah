@@ -239,7 +239,9 @@ bool parse_value(std::string_view raw, Value& out) {
 // (repr(45.0) == "45.0"). Apple's libc++ has no floating-point to_chars, so
 // this is the portable way: %g with increasing precision until it parses
 // back exactly.
-std::string format_double(double d) {
+std::string format_double(double d) { return number_to_string(d); }
+
+std::string format_double_impl(double d) {
     CLocaleScope c_locale;
     for (int precision = 1; precision <= 17; ++precision) {
         char buf[64];
@@ -309,6 +311,8 @@ std::string format_value(const Value& v) {
 }
 
 } // namespace
+
+std::string number_to_string(double value) { return format_double_impl(value); }
 
 Table parse(std::string_view text) {
     Table out;

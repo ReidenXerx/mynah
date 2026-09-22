@@ -49,6 +49,13 @@ inline Value boolean(bool b) { return Value(b); }
 inline Value strings(std::vector<std::string> v) { return Value(std::move(v)); }
 inline Value numbers(std::vector<double> v) { return Value(std::move(v)); }
 
+// A double as the shortest string that reads back as the same value, always
+// carrying a decimal point or exponent so it stays a float (45 -> "45.0").
+// Locale-proof: the C locale is used whatever the process runs under, so a
+// front end on a uk_UA or ru_RU desktop does not write "0,02". Shared with
+// the C API's config JSON so both spell numbers the same way.
+std::string number_to_string(double value);
+
 // Parse a flat TOML document. Never throws; unknown/broken lines are skipped.
 Table parse(std::string_view text);
 

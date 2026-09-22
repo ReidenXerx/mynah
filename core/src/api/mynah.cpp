@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <memory>
 #include <new>
+#include <cmath>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -19,6 +20,7 @@
 #include <whisper.h>
 
 #include "config/config.hpp"
+#include "config/flat_toml.hpp"
 #include "json.hpp"
 #include "models/resolve.hpp"
 #include "session/session.hpp"
@@ -252,6 +254,20 @@ int mynah_reload_config(mynah_engine* engine) {
 // keys, so the front end's adapter is a dictionary lookup with no mapping
 // table to drift. C++ linkage: the extern "C" boundary is below, and this
 // returns std::string.
+// A config number as JSON. Two things the stream's default formatting got
+// wrong: it printed six significant digits, so a hand-set frame_energy of
+// 0.0123456789 came back to the settings UI as 0.0123457 and was written
+// back rounded; and a non-finite value (a `nan` in the file, which TOML
+// permits and JSON does not) produced "nan", which made the WHOLE object
+// unparseable and every setting in the UI fall back to its default. null
+// keeps the rest of the object valid, and a front end treats it as
+// "absent" — the default for that one key. The shared formatter is the
+// TOML writer's, so both spell numbers the same way, in any locale.
+static std::string json_number(double value) {
+    if (!std::isfinite(value)) return "null";
+    return mynah::flat_toml::number_to_string(value);
+}
+
 static std::string config_to_json(const mynah::config::Config& config) {
     using mynah::json::quoted;
     std::ostringstream json;
@@ -267,11 +283,11 @@ static std::string config_to_json(const mynah::config::Config& config) {
     json << "\"gpu\":" << (config.gpu ? "true" : "false") << ',';
     json << "\"show_indicator\":" << (config.show_indicator ? "true" : "false") << ',';
     json << "\"idle_visible\":" << (config.idle_visible ? "true" : "false") << ',';
-    json << "\"idle_timeout\":" << config.idle_timeout << ',';
-    json << "\"auto_stop_silence\":" << config.auto_stop_silence << ',';
-    json << "\"frame_energy\":" << config.frame_energy << ',';
-    json << "\"min_energy\":" << config.min_energy << ',';
-    json << "\"min_utterance\":" << config.min_utterance;
+    json << "\"idle_timeout\":" << json_number(config.idle_timeout) << ',';
+    json << "\"auto_stop_silence\":" << json_number(config.auto_stop_silence) << ',';
+    json << "\"frame_energy\":" << json_number(config.frame_energy) << ',';
+    json << "\"min_energy\":" << json_number(config.min_energy) << ',';
+    json << "\"min_utterance\":" << json_number(config.min_utterance);
     json << "}"; // the closing brace: without it the JSON is truncated and
                  // every front end's parse falls back to defaults
     return json.str();

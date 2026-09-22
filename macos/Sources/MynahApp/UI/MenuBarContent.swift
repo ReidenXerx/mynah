@@ -43,6 +43,21 @@ struct MenuBarContent: View {
             }
         }
 
+        // Same honesty for the microphone (phase 5 bring-up): a session
+        // cannot hear without it, and .notDetermined / .denied here looked
+        // identical to a broken engine. When it is not granted, the button
+        // opens the right pane directly.
+        if controller.microphoneStatusText == "authorized" {
+            Text("Microphone: granted")
+        } else {
+            Button("Grant Microphone…") {
+                Permissions.openMicrophoneSettings()
+            }
+            Text("Microphone: \(controller.microphoneStatusText)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
         Toggle("Start at Login", isOn: $launchesAtLogin)
             .onChange(of: launchesAtLogin) { enabled in
                 do {
@@ -70,7 +85,7 @@ struct MenuBarContent: View {
 
         Divider()
 
-        Text("mynah \(MynahApp.version) · \(controller.config.hotkey)")
+        Text("mynah \(MynahApp.version)\(MynahApp.buildStamp.map { " · built \($0)" } ?? "") · \(controller.config.hotkey)")
 
         Button("Quit mynah") {
             NSApplication.shared.terminate(nil)

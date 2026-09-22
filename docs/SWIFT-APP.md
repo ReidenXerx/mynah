@@ -331,8 +331,34 @@ depending on which binary read it.
 ## Building
 
 ```sh
+make install-app                    # build (release), install at /Applications, launch
 make dev                            # build (debug), launch, stream the log; Ctrl+C quits
 ```
+
+**`make install-app` is how the app stays on this machine.** It installs to
+`/Applications/Mynah.app` (or `~/Applications` when `/Applications` is not
+writable), replacing the previous copy in place, and signs it so its
+Accessibility and Microphone grants survive every rebuild. Grant Accessibility
+once; after that, rebuild and reinstall as often as you like.
+
+Why that works: TCC keys a grant to the app's *designated requirement*. An
+ad-hoc signature's requirement is the build's cdhash, so every rebuild was a new
+app and the grant silently lapsed — dictation heard you and typed nothing.
+`scripts/create-signing-cert.sh` (run for you on first install) creates a
+`mynah-dev` signing identity in a keychain of its own,
+`~/Library/Keychains/mynah-dev.keychain-db`, and builds signed with it carry
+
+    identifier "com.reidenxerx.mynah" and certificate leaf = H"…"
+
+which every rebuild satisfies. The installer checks exactly that — does the new
+build satisfy the installed copy's requirement? — before replacing it, and says
+so; it refuses to install an ad-hoc build at all. No trust settings are changed:
+neither codesign nor TCC needs the certificate to be trusted. The fixed install
+path matters too: start-at-login registers the app where it runs, and
+`macos/build` is deleted on every build.
+
+To remove it: `make uninstall-app`, and for the identity
+`security delete-keychain ~/Library/Keychains/mynah-dev.keychain-db`.
 
 `make dev` (`scripts/dev.sh`) also checks out the whisper.cpp submodule when it is
 missing, sets `SDKROOT` when the default SDK cannot be linked by the active
@@ -348,7 +374,8 @@ open macos/build/Mynah.app
 The script prefers SwiftPM and falls back to invoking `swiftc` over the sources
 directly when SwiftPM is unavailable (see below). Either path produces the same
 binary; the fallback just cannot run the test suite. It then wraps the binary
-into `Mynah.app` with `Info.plist` and ad-hoc signs it.
+into `Mynah.app` with `Info.plist` and signs it (`scripts/signing.sh`): with the
+`mynah-dev` identity when it exists, ad-hoc with a warning when it does not.
 
 Run the bundle, not the raw binary — TCC keys permissions to the bundle
 identifier.
@@ -369,9 +396,9 @@ identifier.
 3. `open macos/build/Mynah.app` — a bird appears in the menu bar; there is no Dock
    icon or window (`LSUIElement`).
 4. Grant **Accessibility** (menu → "Grant Accessibility…") and allow the
-   microphone at the first prompt. Ad-hoc signatures change on every rebuild, so
-   macOS treats a rebuilt app as a new one — expect to remove and re-add it in
-   System Settings after rebuilding.
+   microphone at the first prompt. With the `mynah-dev` identity (above) this is
+   once: the installed app and dev builds share one requirement, so both keep
+   it. Only an ad-hoc build loses it on the next rebuild.
 5. Focus a text field, press the hotkey (default `⌘⇧.`), speak, press again.
 
 To restore the Python agent:

@@ -1,83 +1,75 @@
 #!/usr/bin/env bash
-# Create a stable self-signed code-signing identity for local development.
+# Create the stable code-signing identity local builds are signed with.
 #
-# Why: an ad-hoc signature (`codesign -s -`) has no stable identity, so its
-# cdhash changes with every rebuild and macOS treats each build as a different
-# app. TCC then drops the Accessibility grant, silently — dictation appears to
-# work while typing nothing, and the settings list fills with stale "mynah"
-# entries.
+# Why: an ad-hoc signature (`codesign -s -`) has no stable identity. Its
+# designated requirement is the build's cdhash, which changes with every
+# rebuild, so macOS treats each build as a different app — TCC drops the
+# Accessibility grant, silently: dictation appears to work while typing
+# nothing, and the settings list fills with stale "mynah" entries.
 #
-# A self-signed certificate gives a designated requirement that stays constant
-# across rebuilds, so the grant is made once. This is for local development
-# only; distribution needs a Developer ID certificate and notarization.
+# Signed with a certificate instead, the requirement becomes
+#     identifier "com.reidenxerx.mynah" and certificate leaf = H"…"
+# which every rebuild signed with the same certificate satisfies. The grant
+# is made once and survives rebuilds and reinstalls.
 #
-# This is a DEVELOPMENT-ONLY convenience and must never appear in distribution
-# instructions — shipping to anyone else needs a Developer ID certificate and
-# notarization, not this. Note that the trust step below marks the certificate
-# as a trusted root in your user domain, which means anything holding its
-# private key can sign code your Mac will accept locally.
+# How, and what it does NOT do:
+#   - The key and certificate live in a keychain of their own,
+#     ~/Library/Keychains/mynah-dev.keychain-db — not the login keychain, and
+#     not on the keychain search list. Nothing else on the machine sees it.
+#   - NO trust settings are changed. codesign does not need the certificate to
+#     be trusted to sign with it, and TCC does not evaluate trust — it checks
+#     that the signature satisfies the recorded requirement, which names the
+#     certificate's hash. (An earlier version marked the certificate as a
+#     trusted root in the login keychain, which would have let anything
+#     holding the key sign code the Mac accepts; that was never needed.)
+#   - The keychain's password is a fixed string in scripts/signing.sh. That
+#     is not a secret and is not meant to be one: anything running as you
+#     could already ask codesign to use an identity allowed for it. What
+#     protects this key is that it can sign exactly one thing — builds of
+#     this app, for this user's TCC grants.
 #
-# Run once:  macos/scripts/create-signing-cert.sh
+# This is for LOCAL builds only. Anything handed to another person needs a
+# Developer ID certificate and notarization (see scripts/package.sh).
 #
-# To undo, removing both the trust setting and the key:
-#   security remove-trusted-cert ~/Desktop/mynah-dev.cer   # if you exported it
-#   security delete-identity -c mynah-dev
+# Run once — `make install-app` runs it for you when the identity is missing:
+#   macos/scripts/create-signing-cert.sh
+#
+# To remove it (the next build falls back to ad-hoc signing):
+#   security delete-keychain ~/Library/Keychains/mynah-dev.keychain-db
 set -euo pipefail
 
-NAME="mynah-dev"
-KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=signing.sh
+source "$ROOT/scripts/signing.sh"
 
-# Is the identity actually usable? Test by signing something, not by reading
-# `security find-identity`: even with -v ("valid identities only") it still
-# *lists* broken ones, annotated like
-#     1) A470... "mynah-dev" (Invalid Key Usage for policy)
-# so grepping for the name matches a certificate codesign will refuse. A trial
-# signature is the only answer that means anything.
-identity_is_usable() {
-  local probe
-  probe="$(mktemp -d)/probe"
-  cp /bin/echo "$probe" 2>/dev/null || return 1
-  local ok=1
-  codesign --force --sign "$NAME" "$probe" >/dev/null 2>&1 && ok=0
-  rm -rf "$(dirname "$probe")"
-  return $ok
-}
-
-if identity_is_usable; then
-  echo "usable identity '$NAME' already exists — nothing to do"
-  echo "build with: macos/scripts/build-app.sh"
+if mynah_identity_usable; then
+  echo "signing identity '$MYNAH_IDENTITY_NAME' is ready in $MYNAH_KEYCHAIN — nothing to do"
   exit 0
 fi
 
-if security find-certificate -c "$NAME" >/dev/null 2>&1; then
-  echo "removing existing but unusable '$NAME' identity…"
-  # delete-identity removes the certificate *and* its private key; older systems
-  # only have delete-certificate, which orphans the key.
-  security delete-identity -c "$NAME" >/dev/null 2>&1 \
-    || while security delete-certificate -c "$NAME" >/dev/null 2>&1; do :; done
+if [ -e "$MYNAH_KEYCHAIN" ]; then
+  echo "the keychain at $MYNAH_KEYCHAIN exists but cannot sign — recreating it"
+  security delete-keychain "$MYNAH_KEYCHAIN" 2>/dev/null || rm -f "$MYNAH_KEYCHAIN"
 fi
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "creating self-signed code-signing certificate '$NAME'…"
+echo "creating the code-signing identity '$MYNAH_IDENTITY_NAME'…"
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout "$TMP/key.pem" -out "$TMP/cert.pem" \
-  -subj "/CN=$NAME" \
+  -subj "/CN=$MYNAH_IDENTITY_NAME" \
   -addext "basicConstraints=critical,CA:false" \
   -addext "keyUsage=critical,digitalSignature" \
   -addext "extendedKeyUsage=critical,codeSigning" \
   2>/dev/null
 
-# The password must be non-empty. `security import` rejects an empty-password
-# PKCS#12 with "MAC verification failed during PKCS12 import (wrong password?)",
-# which blames the password in a way that sounds like a mismatch rather than a
-# refusal to accept an empty one. The value is irrelevant — the bundle is
-# deleted seconds later — but it cannot be blank.
-#
-# -legacy is also passed where supported: OpenSSL 3.x defaults to AES-256-CBC +
-# SHA-256, which older Security framework builds cannot read. LibreSSL
-# (/usr/bin/openssl) has no such flag and already writes the legacy encoding.
+# The PKCS#12 bundle is only a carrier into the keychain and is deleted on
+# exit, but its password cannot be empty: `security import` rejects an
+# empty-password bundle with a "wrong password?" message that reads like a
+# mismatch rather than a refusal. -legacy where supported: OpenSSL 3 defaults
+# to AES-256 + SHA-256, which older Security framework builds cannot read.
+# LibreSSL (/usr/bin/openssl) has no such flag and writes the legacy form.
 P12_PASSWORD="mynah-dev-transient"
 PKCS12_COMPAT=""
 if openssl pkcs12 -help 2>&1 | grep -q -- "-legacy"; then
@@ -87,28 +79,34 @@ openssl pkcs12 -export -out "$TMP/cert.p12" \
   -inkey "$TMP/key.pem" -in "$TMP/cert.pem" -passout "pass:$P12_PASSWORD" \
   $PKCS12_COMPAT -macalg sha1
 
-# -T /usr/bin/codesign lets codesign use the key without prompting each time.
-security import "$TMP/cert.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" -T /usr/bin/codesign
+security create-keychain -p "$MYNAH_KEYCHAIN_PASSWORD" "$MYNAH_KEYCHAIN"
+# No auto-lock timeout: signing unlocks it anyway, but a build that runs past
+# the default five minutes should not find it locked halfway.
+security set-keychain-settings "$MYNAH_KEYCHAIN"
+security unlock-keychain -p "$MYNAH_KEYCHAIN_PASSWORD" "$MYNAH_KEYCHAIN"
+security import "$TMP/cert.p12" -k "$MYNAH_KEYCHAIN" -P "$P12_PASSWORD" -T /usr/bin/codesign >/dev/null
+# Let codesign use the key without a GUI "allow access?" prompt — which a
+# build run from a terminal or an agent could not answer.
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+  -k "$MYNAH_KEYCHAIN_PASSWORD" "$MYNAH_KEYCHAIN" >/dev/null
 
-# Trust it for code signing in the user domain. Without -d this does not need
-# sudo; codesign only requires the identity to be present and trusted enough to
-# build a chain locally.
-security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN" "$TMP/cert.pem" \
-  || echo "note: could not set trust automatically — open Keychain Access, find" \
-          "'$NAME', and set 'Code Signing' to 'Always Trust' if signing fails"
-
-# Confirm by signing, for the same reason as above.
-if identity_is_usable; then
-  echo "identity '$NAME' verified — it can sign"
+# Confirm by signing something, not by listing identities: a listing shows
+# identities codesign will still refuse.
+if mynah_identity_usable; then
+  echo "identity '$MYNAH_IDENTITY_NAME' created and verified — it can sign"
 else
-  echo "warning: '$NAME' imported but codesign will not use it:" >&2
-  security find-identity -p codesigning 2>&1 | grep "$NAME" >&2 || true
+  echo "error: the identity was created but codesign cannot use it" >&2
   exit 1
 fi
 
+if security find-certificate -c "$MYNAH_IDENTITY_NAME" "$HOME/Library/Keychains/login.keychain-db" \
+    >/dev/null 2>&1; then
+  echo
+  echo "note: an older '$MYNAH_IDENTITY_NAME' identity is in your login keychain, from the"
+  echo "      previous version of this script (which also marked it trusted). It is no"
+  echo "      longer used. To remove it:  security delete-identity -c $MYNAH_IDENTITY_NAME"
+fi
+
 echo
-echo "done. Build signed with it:"
-echo "  MYNAH_SIGN_IDENTITY=$NAME macos/scripts/build-app.sh"
-echo
-echo "Grant Accessibility once after the first signed build; it will survive"
-echo "subsequent rebuilds."
+echo "Builds are now signed with it. Grant Accessibility once to the installed app;"
+echo "every rebuild signed with this identity keeps the grant."

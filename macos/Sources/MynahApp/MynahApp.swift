@@ -31,6 +31,13 @@ struct MynahApp: App {
         .menuBarExtraStyle(.menu)
     }
 
+    /// The app's build stamp (CFBundleVersion, written by build-app.sh) —
+    /// proof of which build is actually running. nil under `swift build`,
+    /// which has no bundle.
+    static var buildStamp: String? {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+    }
+
     private static var menuBarIcon: NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: false) { rect in
@@ -71,7 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var permissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Log.ui.notice("launching mynah \(MynahApp.version, privacy: .public)")
+        let stamp = MynahApp.buildStamp.map { " (built \($0))" } ?? ""
+        Log.ui.notice("launching mynah \(MynahApp.version, privacy: .public)\(stamp, privacy: .public)")
 
         if controller.config.showIndicator {
             let indicator = IndicatorPanel(controller: controller)
@@ -92,7 +100,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // TCC offers no change notification, so poll. Cheap, and it means the
         // menu reflects a grant made in System Settings without a relaunch.
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
-            Task { @MainActor in self.controller.refreshPermissions() }
+            Task { @MainActor in
+                self.controller.refreshPermissions()
+                self.controller.refreshMicrophoneStatus()
+            }
+        }
+
+        // Ask for the microphone NOW, at launch — not on the first hotkey
+        // press. A menu bar app has no window of its own, and a session that
+        // pauses on an unanswered permission prompt looks exactly like a
+        // broken engine: pill listening, meter flat, nothing transcribed.
+        // Requested once here, the status is settled before any session, and
+        // startSession's own request returns instantly ever after.
+        if Permissions.microphoneStatus == .notDetermined {
+            Log.ui.notice("requesting microphone access (first launch)")
+            Task { await Permissions.requestMicrophone() }
         }
 
         registerHotkey(controller.config.hotkey, trigger: controller.config.trigger)
@@ -161,11 +183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 }
 
-#if DEBUG
 /// A hotkey + trigger pair that can travel through `removeDuplicates()`
-/// (Swift tuples do not conform).
+/// (Swift tuples do not conform). Not debug-only: the hotkey re-registration
+/// above runs in every build — under `#if DEBUG` it made release builds fail.
 struct ConfigTriggerChange: Equatable {
     var hotkey: String
     var trigger: String
 }
-#endif

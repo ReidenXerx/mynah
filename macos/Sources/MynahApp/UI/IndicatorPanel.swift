@@ -143,6 +143,9 @@ private struct VisualEffectBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
+// Previews use SessionController.preview, a DEBUG-only fixture, so they
+// are DEBUG-only too; otherwise a release build cannot compile them.
+#if DEBUG
 #Preview("Indicator — listening") {
     IndicatorView(controller: .preview(state: .listening, level: 0.7))
         .frame(width: 168, height: 44)
@@ -157,3 +160,4 @@ private struct VisualEffectBackground: NSViewRepresentable {
     IndicatorView(controller: .preview(state: .idle, level: 0.0))
         .frame(width: 168, height: 44)
 }
+#endif

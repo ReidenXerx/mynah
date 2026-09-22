@@ -35,6 +35,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/Users/sldkvdmzhaaa/.local/bin/uname"
       - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin/uname"
@@ -60,10 +61,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "message-v1"
@@ -108,6 +106,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/Users/sldkvdmzhaaa/.local/bin/gmake"
       - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin/gmake"
@@ -124,6 +123,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/gmake"
       - "/pkg/env/global/bin/gmake"
       - "/Library/Apple/usr/bin/gmake"
+      - "/Applications/Warp.app/Contents/Resources/bin/gmake"
       - "/Users/sldkvdmzhaaa/.local/bin/make"
       - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin/make"
       - "/opt/homebrew/bin/make"
@@ -148,10 +148,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -194,6 +191,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/Users/sldkvdmzhaaa/.local/bin/cc"
       - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin/cc"
@@ -219,10 +217,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -266,10 +261,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "message-v1"
@@ -369,6 +361,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     found: "/usr/bin/ar"
     search_context:
       ENV{PATH}:
@@ -387,10 +380,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -427,6 +417,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     found: "/usr/bin/ranlib"
     search_context:
       ENV{PATH}:
@@ -445,10 +436,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -485,6 +473,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     found: "/usr/bin/strip"
     search_context:
       ENV{PATH}:
@@ -503,10 +492,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -543,6 +529,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     found: "/usr/bin/ld"
     search_context:
       ENV{PATH}:
@@ -561,10 +548,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -601,6 +585,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     found: "/usr/bin/nm"
     search_context:
       ENV{PATH}:
@@ -619,10 +604,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -659,6 +641,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     found: "/usr/bin/objdump"
     search_context:
       ENV{PATH}:
@@ -677,10 +660,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -717,6 +697,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/usr/bin/objcopy"
       - "/Users/sldkvdmzhaaa/.local/bin/objcopy"
@@ -733,6 +714,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/objcopy"
       - "/pkg/env/global/bin/objcopy"
       - "/Library/Apple/usr/bin/objcopy"
+      - "/Applications/Warp.app/Contents/Resources/bin/objcopy"
     found: false
     search_context:
       ENV{PATH}:
@@ -751,10 +733,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -791,6 +770,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/usr/bin/readelf"
       - "/Users/sldkvdmzhaaa/.local/bin/readelf"
@@ -807,6 +787,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/readelf"
       - "/pkg/env/global/bin/readelf"
       - "/Library/Apple/usr/bin/readelf"
+      - "/Applications/Warp.app/Contents/Resources/bin/readelf"
     found: false
     search_context:
       ENV{PATH}:
@@ -825,10 +806,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -865,6 +843,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/usr/bin/dlltool"
       - "/Users/sldkvdmzhaaa/.local/bin/dlltool"
@@ -881,6 +860,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/dlltool"
       - "/pkg/env/global/bin/dlltool"
       - "/Library/Apple/usr/bin/dlltool"
+      - "/Applications/Warp.app/Contents/Resources/bin/dlltool"
     found: false
     search_context:
       ENV{PATH}:
@@ -899,10 +879,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -939,6 +916,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/usr/bin/addr2line"
       - "/Users/sldkvdmzhaaa/.local/bin/addr2line"
@@ -955,6 +933,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/addr2line"
       - "/pkg/env/global/bin/addr2line"
       - "/Library/Apple/usr/bin/addr2line"
+      - "/Applications/Warp.app/Contents/Resources/bin/addr2line"
     found: false
     search_context:
       ENV{PATH}:
@@ -973,10 +952,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -1013,6 +989,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/usr/bin/tapi"
       - "/Users/sldkvdmzhaaa/.local/bin/tapi"
@@ -1029,6 +1006,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/tapi"
       - "/pkg/env/global/bin/tapi"
       - "/Library/Apple/usr/bin/tapi"
+      - "/Applications/Warp.app/Contents/Resources/bin/tapi"
     found: false
     search_context:
       ENV{PATH}:
@@ -1047,10 +1025,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -1097,10 +1072,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "find-v1"
@@ -1144,10 +1116,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "message-v1"
@@ -1247,6 +1216,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
     searched_directories:
       - "/Users/sldkvdmzhaaa/.local/bin/install_name_tool"
       - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin/install_name_tool"
@@ -1272,10 +1242,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
   -
     kind: "try_compile-v1"
@@ -1286,8 +1253,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn"
     cmakeVariables:
       CMAKE_CXX_STDLIB_MODULES_JSON: ""
       CMAKE_C_FLAGS: ""
@@ -1300,18 +1267,18 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: false
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_fa93d/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_fa93d.dir/build.make CMakeFiles/cmTC_fa93d.dir/build
-        Building C object CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o
-        /usr/bin/cc   -arch arm64 -mmacosx-version-min=13.0   -v -Wl,-v -MD -MT CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_5f245/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_5f245.dir/build.make CMakeFiles/cmTC_5f245.dir/build
+        Building C object CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o
+        /usr/bin/cc   -arch arm64 -mmacosx-version-min=13.0   -v -Wl,-v -MD -MT CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
         Apple clang version 21.0.0 (clang-2100.3.34.2)
         Target: arm64-apple-darwin27.0.0
         Thread model: posix
         InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
         clang: warning: -Wl,-v: 'linker' input unused [-Wunused-command-line-argument]
-         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
+         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
         clang -cc1 version 21.0.0 (clang-2100.3.34.2) default target arm64-apple-darwin27.0.0
         ignoring nonexistent directory "/usr/local/include"
         ignoring nonexistent directory "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include"
@@ -1324,13 +1291,13 @@ events:
          /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks (framework directory)
          /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks (framework directory)
         End of search list.
-        Linking C executable cmTC_fa93d
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fa93d.dir/link.txt --verbose=1
+        Linking C executable cmTC_5f245
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5f245.dir/link.txt --verbose=1
         Apple clang version 21.0.0 (clang-2100.3.34.2)
         Target: arm64-apple-darwin27.0.0
         Thread model: posix
         InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
-         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_fa93d -L/usr/local/lib -v CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a
+         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_5f245 -L/usr/local/lib -v CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a
         @(#)PROGRAM:ld PROJECT:ld-27037.1
         BUILD 21:17:51 Aug 25 2026
         configured to support archs: armv6 armv7 armv7s arm64 arm64e arm64_32 i386 x86_64 x86_64h armv6m armv7k armv7m armv7em armv8m.main armv8.1m.main
@@ -1341,7 +1308,7 @@ events:
         	/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/swift
         Framework search paths:
         	/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks
-        /usr/bin/cc  -arch arm64 -mmacosx-version-min=13.0  -v -Wl,-v CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -o cmTC_fa93d
+        /usr/bin/cc  -arch arm64 -mmacosx-version-min=13.0  -v -Wl,-v CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -o cmTC_5f245
         
       exitCode: 0
   -
@@ -1383,18 +1350,18 @@ events:
       Parsed C implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
-        ignore line: [Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX']
+        ignore line: [Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn']
         ignore line: []
-        ignore line: [Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_fa93d/fast]
-        ignore line: [/Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_fa93d.dir/build.make CMakeFiles/cmTC_fa93d.dir/build]
-        ignore line: [Building C object CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o]
-        ignore line: [/usr/bin/cc   -arch arm64 -mmacosx-version-min=13.0   -v -Wl -v -MD -MT CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
+        ignore line: [Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_5f245/fast]
+        ignore line: [/Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_5f245.dir/build.make CMakeFiles/cmTC_5f245.dir/build]
+        ignore line: [Building C object CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o]
+        ignore line: [/usr/bin/cc   -arch arm64 -mmacosx-version-min=13.0   -v -Wl -v -MD -MT CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
         ignore line: [Apple clang version 21.0.0 (clang-2100.3.34.2)]
         ignore line: [Target: arm64-apple-darwin27.0.0]
         ignore line: [Thread model: posix]
         ignore line: [InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin]
         ignore line: [clang: warning: -Wl -v: 'linker' input unused [-Wunused-command-line-argument]]
-        ignore line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qOZFTX -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
+        ignore line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Dj2jpn -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
         ignore line: [clang -cc1 version 21.0.0 (clang-2100.3.34.2) default target arm64-apple-darwin27.0.0]
         ignore line: [ignoring nonexistent directory "/usr/local/include"]
         ignore line: [ignoring nonexistent directory "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include"]
@@ -1407,14 +1374,14 @@ events:
         ignore line: [ /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks (framework directory)]
         ignore line: [ /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks (framework directory)]
         ignore line: [End of search list.]
-        ignore line: [Linking C executable cmTC_fa93d]
-        ignore line: [/opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fa93d.dir/link.txt --verbose=1]
+        ignore line: [Linking C executable cmTC_5f245]
+        ignore line: [/opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5f245.dir/link.txt --verbose=1]
         ignore line: [Apple clang version 21.0.0 (clang-2100.3.34.2)]
         ignore line: [Target: arm64-apple-darwin27.0.0]
         ignore line: [Thread model: posix]
         ignore line: [InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin]
-        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_fa93d -L/usr/local/lib -v CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> linker [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld]
-        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_fa93d -L/usr/local/lib -v CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
+        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_5f245 -L/usr/local/lib -v CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> linker [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld]
+        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_5f245 -L/usr/local/lib -v CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
           arg [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld] ==> ignore
           arg [-demangle] ==> ignore
           arg [-lto_library] ==> ignore, skip following value
@@ -1431,10 +1398,10 @@ events:
           arg [-mllvm] ==> ignore
           arg [-enable-linkonceodr-outlining] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_fa93d] ==> ignore
+          arg [cmTC_5f245] ==> ignore
           arg [-L/usr/local/lib] ==> dir [/usr/local/lib]
           arg [-v] ==> ignore
-          arg [CMakeFiles/cmTC_fa93d.dir/CMakeCCompilerABI.c.o] ==> ignore
+          arg [CMakeFiles/cmTC_5f245.dir/CMakeCCompilerABI.c.o] ==> ignore
           arg [-lSystem] ==> lib [System]
           arg [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> lib [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
         linker tool for 'C': /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld 
@@ -1475,8 +1442,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -1490,19 +1457,19 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: false
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_c9e91/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_c9e91.dir/build.make CMakeFiles/cmTC_c9e91.dir/build
-        Building CXX object CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o
-        /usr/bin/c++   -arch arm64 -mmacosx-version-min=13.0   -v -Wl,-v -MD -MT CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -MF CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o.d -o CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -c /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_53818/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_53818.dir/build.make CMakeFiles/cmTC_53818.dir/build
+        Building CXX object CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o
+        /usr/bin/c++   -arch arm64 -mmacosx-version-min=13.0   -v -Wl,-v -MD -MT CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -MF CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o.d -o CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -c /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp
         Apple clang version 21.0.0 (clang-2100.3.34.2)
         Target: arm64-apple-darwin27.0.0
         Thread model: posix
         InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
         clang++: warning: -Wl,-v: 'linker' input unused [-Wunused-command-line-argument]
         ignoring nonexistent directory "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../include/c++/v1"
-         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCXXCompilerABI.cpp -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1 -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -fdeprecated-macro -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fcxx-exceptions -fexceptions -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -x c++ /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp
+         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCXXCompilerABI.cpp -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5 -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5 -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1 -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -fdeprecated-macro -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fcxx-exceptions -fexceptions -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -x c++ /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp
         clang -cc1 version 21.0.0 (clang-2100.3.34.2) default target arm64-apple-darwin27.0.0
         ignoring nonexistent directory "/usr/local/include"
         ignoring nonexistent directory "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include"
@@ -1516,13 +1483,13 @@ events:
          /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks (framework directory)
          /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks (framework directory)
         End of search list.
-        Linking CXX executable cmTC_c9e91
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c9e91.dir/link.txt --verbose=1
+        Linking CXX executable cmTC_53818
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_53818.dir/link.txt --verbose=1
         Apple clang version 21.0.0 (clang-2100.3.34.2)
         Target: arm64-apple-darwin27.0.0
         Thread model: posix
         InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
-         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_c9e91 -L/usr/local/lib -v CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -lc++ -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a
+         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_53818 -L/usr/local/lib -v CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -lc++ -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a
         @(#)PROGRAM:ld PROJECT:ld-27037.1
         BUILD 21:17:51 Aug 25 2026
         configured to support archs: armv6 armv7 armv7s arm64 arm64e arm64_32 i386 x86_64 x86_64h armv6m armv7k armv7m armv7em armv8m.main armv8.1m.main
@@ -1533,7 +1500,7 @@ events:
         	/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/swift
         Framework search paths:
         	/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks
-        /usr/bin/c++  -arch arm64 -mmacosx-version-min=13.0  -v -Wl,-v CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_c9e91
+        /usr/bin/c++  -arch arm64 -mmacosx-version-min=13.0  -v -Wl,-v CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_53818
         
       exitCode: 0
   -
@@ -1577,19 +1544,19 @@ events:
       Parsed CXX implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
-        ignore line: [Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j']
+        ignore line: [Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5']
         ignore line: []
-        ignore line: [Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_c9e91/fast]
-        ignore line: [/Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_c9e91.dir/build.make CMakeFiles/cmTC_c9e91.dir/build]
-        ignore line: [Building CXX object CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o]
-        ignore line: [/usr/bin/c++   -arch arm64 -mmacosx-version-min=13.0   -v -Wl -v -MD -MT CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -MF CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o.d -o CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -c /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_53818/fast]
+        ignore line: [/Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_53818.dir/build.make CMakeFiles/cmTC_53818.dir/build]
+        ignore line: [Building CXX object CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o]
+        ignore line: [/usr/bin/c++   -arch arm64 -mmacosx-version-min=13.0   -v -Wl -v -MD -MT CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -MF CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o.d -o CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -c /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
         ignore line: [Apple clang version 21.0.0 (clang-2100.3.34.2)]
         ignore line: [Target: arm64-apple-darwin27.0.0]
         ignore line: [Thread model: posix]
         ignore line: [InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin]
         ignore line: [clang++: warning: -Wl -v: 'linker' input unused [-Wunused-command-line-argument]]
         ignore line: [ignoring nonexistent directory "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../include/c++/v1"]
-        ignore line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCXXCompilerABI.cpp -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Xida2j -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1 -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -fdeprecated-macro -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fcxx-exceptions -fexceptions -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -x c++ /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -cc1 -triple arm64-apple-macosx13.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCXXCompilerABI.cpp -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=27.0 -fdepfile-entry=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5 -target-linker-version 1166.2 -v -fcoverage-compilation-dir=/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lolbf5 -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -sys-header-deps -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1 -internal-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -fdeprecated-macro -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fcxx-exceptions -fexceptions -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -x c++ /opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
         ignore line: [clang -cc1 version 21.0.0 (clang-2100.3.34.2) default target arm64-apple-darwin27.0.0]
         ignore line: [ignoring nonexistent directory "/usr/local/include"]
         ignore line: [ignoring nonexistent directory "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/local/include"]
@@ -1603,14 +1570,14 @@ events:
         ignore line: [ /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks (framework directory)]
         ignore line: [ /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/SubFrameworks (framework directory)]
         ignore line: [End of search list.]
-        ignore line: [Linking CXX executable cmTC_c9e91]
-        ignore line: [/opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c9e91.dir/link.txt --verbose=1]
+        ignore line: [Linking CXX executable cmTC_53818]
+        ignore line: [/opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_53818.dir/link.txt --verbose=1]
         ignore line: [Apple clang version 21.0.0 (clang-2100.3.34.2)]
         ignore line: [Target: arm64-apple-darwin27.0.0]
         ignore line: [Thread model: posix]
         ignore line: [InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin]
-        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_c9e91 -L/usr/local/lib -v CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -lc++ -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> linker [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld]
-        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_c9e91 -L/usr/local/lib -v CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o -lc++ -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
+        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_53818 -L/usr/local/lib -v CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -lc++ -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> linker [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld]
+        link line: [ "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld" -demangle -lto_library /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 13.0.0 27.0 -syslibroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_53818 -L/usr/local/lib -v CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o -lc++ -lSystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
           arg [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld] ==> ignore
           arg [-demangle] ==> ignore
           arg [-lto_library] ==> ignore, skip following value
@@ -1627,10 +1594,10 @@ events:
           arg [-mllvm] ==> ignore
           arg [-enable-linkonceodr-outlining] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_c9e91] ==> ignore
+          arg [cmTC_53818] ==> ignore
           arg [-L/usr/local/lib] ==> dir [/usr/local/lib]
           arg [-v] ==> ignore
-          arg [CMakeFiles/cmTC_c9e91.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+          arg [CMakeFiles/cmTC_53818.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
           arg [-lc++] ==> lib [c++]
           arg [-lSystem] ==> lib [System]
           arg [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> lib [/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
@@ -1698,6 +1665,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/sbin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
@@ -1754,10 +1722,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -1815,10 +1780,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -1895,6 +1857,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/sbin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
@@ -1951,10 +1914,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -1984,8 +1944,8 @@ events:
     checks:
       - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-l5ALZl"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-l5ALZl"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nA4Y3L"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nA4Y3L"
     cmakeVariables:
       CMAKE_CXX_STDLIB_MODULES_JSON: ""
       CMAKE_C_FLAGS: ""
@@ -1999,15 +1959,15 @@ events:
       variable: "CMAKE_HAVE_LIBC_PTHREAD"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-l5ALZl'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nA4Y3L'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_22af9/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_22af9.dir/build.make CMakeFiles/cmTC_22af9.dir/build
-        Building C object CMakeFiles/cmTC_22af9.dir/src.c.o
-        /usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD  -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_22af9.dir/src.c.o -MF CMakeFiles/cmTC_22af9.dir/src.c.o.d -o CMakeFiles/cmTC_22af9.dir/src.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-l5ALZl/src.c
-        Linking C executable cmTC_22af9
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_22af9.dir/link.txt --verbose=1
-        /usr/bin/cc  -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_22af9.dir/src.c.o -o cmTC_22af9
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_0d83d/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_0d83d.dir/build.make CMakeFiles/cmTC_0d83d.dir/build
+        Building C object CMakeFiles/cmTC_0d83d.dir/src.c.o
+        /usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD  -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_0d83d.dir/src.c.o -MF CMakeFiles/cmTC_0d83d.dir/src.c.o.d -o CMakeFiles/cmTC_0d83d.dir/src.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nA4Y3L/src.c
+        Linking C executable cmTC_0d83d
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0d83d.dir/link.txt --verbose=1
+        /usr/bin/cc  -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_0d83d.dir/src.c.o -o cmTC_0d83d
         
       exitCode: 0
   -
@@ -2043,6 +2003,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/sbin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
@@ -2094,6 +2055,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/ccache"
       - "/pkg/env/global/bin/ccache"
       - "/Library/Apple/usr/bin/ccache"
+      - "/Applications/Warp.app/Contents/Resources/bin/ccache"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/bin/ccache"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/sbin/ccache"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/ccache"
@@ -2147,10 +2109,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -2202,6 +2161,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
       - "/pkg/env/global/bin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/sbin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
@@ -2253,6 +2213,7 @@ events:
       - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/sccache"
       - "/pkg/env/global/bin/sccache"
       - "/Library/Apple/usr/bin/sccache"
+      - "/Applications/Warp.app/Contents/Resources/bin/sccache"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/bin/sccache"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/sbin/sccache"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/sccache"
@@ -2306,10 +2267,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -2336,8 +2294,8 @@ events:
       - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
     description: "Detecting C OpenMP compiler info"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-jUwdC1"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-jUwdC1"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-TD1SdQ"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-TD1SdQ"
     cmakeVariables:
       CMAKE_CXX_STDLIB_MODULES_JSON: ""
       CMAKE_C_FLAGS: ""
@@ -2351,18 +2309,18 @@ events:
       variable: "OpenMP_COMPILE_RESULT_C_Xclang fopenmp"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-jUwdC1'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-TD1SdQ'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_c6374/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_c6374.dir/build.make CMakeFiles/cmTC_c6374.dir/build
-        Building C object CMakeFiles/cmTC_c6374.dir/OpenMPTryFlag.c.o
-        /usr/bin/cc   -Xclang -fopenmp -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_c6374.dir/OpenMPTryFlag.c.o -MF CMakeFiles/cmTC_c6374.dir/OpenMPTryFlag.c.o.d -o CMakeFiles/cmTC_c6374.dir/OpenMPTryFlag.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-jUwdC1/OpenMPTryFlag.c
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-jUwdC1/OpenMPTryFlag.c:2:10: fatal error: 'omp.h' file not found
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_67d17/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_67d17.dir/build.make CMakeFiles/cmTC_67d17.dir/build
+        Building C object CMakeFiles/cmTC_67d17.dir/OpenMPTryFlag.c.o
+        /usr/bin/cc   -Xclang -fopenmp -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_67d17.dir/OpenMPTryFlag.c.o -MF CMakeFiles/cmTC_67d17.dir/OpenMPTryFlag.c.o.d -o CMakeFiles/cmTC_67d17.dir/OpenMPTryFlag.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-TD1SdQ/OpenMPTryFlag.c
+        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-TD1SdQ/OpenMPTryFlag.c:2:10: fatal error: 'omp.h' file not found
             2 | #include <omp.h>
               |          ^~~~~~~
         1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_c6374.dir/OpenMPTryFlag.c.o] Error 1
-        make: *** [cmTC_c6374/fast] Error 2
+        make[2]: *** [CMakeFiles/cmTC_67d17.dir/OpenMPTryFlag.c.o] Error 1
+        make[1]: *** [cmTC_67d17/fast] Error 2
         
       exitCode: 2
   -
@@ -2399,6 +2357,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -2406,8 +2365,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -2427,6 +2384,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -2434,8 +2392,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -2454,6 +2410,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -2461,8 +2418,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -2481,6 +2436,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -2488,8 +2444,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -2514,10 +2468,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -2552,8 +2503,8 @@ events:
       - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
     description: "Detecting CXX OpenMP compiler info"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Mkcpaw"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Mkcpaw"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QaN0Ws"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QaN0Ws"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2567,18 +2518,18 @@ events:
       variable: "OpenMP_COMPILE_RESULT_CXX_Xclang fopenmp"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Mkcpaw'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QaN0Ws'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_aa1a5/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_aa1a5.dir/build.make CMakeFiles/cmTC_aa1a5.dir/build
-        Building CXX object CMakeFiles/cmTC_aa1a5.dir/OpenMPTryFlag.cpp.o
-        /usr/bin/c++   -Xclang -fopenmp -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_aa1a5.dir/OpenMPTryFlag.cpp.o -MF CMakeFiles/cmTC_aa1a5.dir/OpenMPTryFlag.cpp.o.d -o CMakeFiles/cmTC_aa1a5.dir/OpenMPTryFlag.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Mkcpaw/OpenMPTryFlag.cpp
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Mkcpaw/OpenMPTryFlag.cpp:2:10: fatal error: 'omp.h' file not found
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_b7f04/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_b7f04.dir/build.make CMakeFiles/cmTC_b7f04.dir/build
+        Building CXX object CMakeFiles/cmTC_b7f04.dir/OpenMPTryFlag.cpp.o
+        /usr/bin/c++   -Xclang -fopenmp -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_b7f04.dir/OpenMPTryFlag.cpp.o -MF CMakeFiles/cmTC_b7f04.dir/OpenMPTryFlag.cpp.o.d -o CMakeFiles/cmTC_b7f04.dir/OpenMPTryFlag.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QaN0Ws/OpenMPTryFlag.cpp
+        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QaN0Ws/OpenMPTryFlag.cpp:2:10: fatal error: 'omp.h' file not found
             2 | #include <omp.h>
               |          ^~~~~~~
         1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_aa1a5.dir/OpenMPTryFlag.cpp.o] Error 1
-        make: *** [cmTC_aa1a5/fast] Error 2
+        make[2]: *** [CMakeFiles/cmTC_b7f04.dir/OpenMPTryFlag.cpp.o] Error 1
+        make[1]: *** [cmTC_b7f04/fast] Error 2
         
       exitCode: 2
   -
@@ -2610,6 +2561,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -2617,8 +2569,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -2643,10 +2593,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -2684,8 +2631,8 @@ events:
     checks:
       - "Performing Test GGML_COMPILER_SUPPORTS_FP16_FORMAT_I3E"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ALtgbC"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ALtgbC"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-WRJROz"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-WRJROz"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2699,15 +2646,15 @@ events:
       variable: "GGML_COMPILER_SUPPORTS_FP16_FORMAT_I3E"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ALtgbC'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-WRJROz'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_438b2/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_438b2.dir/build.make CMakeFiles/cmTC_438b2.dir/build
-        Building CXX object CMakeFiles/cmTC_438b2.dir/src.cxx.o
-        /usr/bin/c++ -DGGML_COMPILER_SUPPORTS_FP16_FORMAT_I3E  -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0   -mfp16-format=ieee -MD -MT CMakeFiles/cmTC_438b2.dir/src.cxx.o -MF CMakeFiles/cmTC_438b2.dir/src.cxx.o.d -o CMakeFiles/cmTC_438b2.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ALtgbC/src.cxx
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_0f2f9/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_0f2f9.dir/build.make CMakeFiles/cmTC_0f2f9.dir/build
+        Building CXX object CMakeFiles/cmTC_0f2f9.dir/src.cxx.o
+        /usr/bin/c++ -DGGML_COMPILER_SUPPORTS_FP16_FORMAT_I3E  -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0   -mfp16-format=ieee -MD -MT CMakeFiles/cmTC_0f2f9.dir/src.cxx.o -MF CMakeFiles/cmTC_0f2f9.dir/src.cxx.o.d -o CMakeFiles/cmTC_0f2f9.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-WRJROz/src.cxx
         clang++: error: unknown argument: '-mfp16-format=ieee'
-        make[1]: *** [CMakeFiles/cmTC_438b2.dir/src.cxx.o] Error 1
-        make: *** [cmTC_438b2/fast] Error 2
+        make[2]: *** [CMakeFiles/cmTC_0f2f9.dir/src.cxx.o] Error 1
+        make[1]: *** [cmTC_0f2f9/fast] Error 2
         
       exitCode: 2
   -
@@ -2720,8 +2667,8 @@ events:
     checks:
       - "Performing Test HAVE_DOTPROD"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Ib9I9z"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Ib9I9z"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nvjzEz"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nvjzEz"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2735,15 +2682,15 @@ events:
       variable: "HAVE_DOTPROD"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Ib9I9z'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nvjzEz'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_f2585/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_f2585.dir/build.make CMakeFiles/cmTC_f2585.dir/build
-        Building CXX object CMakeFiles/cmTC_f2585.dir/src.cxx.o
-        /usr/bin/c++ -DHAVE_DOTPROD  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_f2585.dir/src.cxx.o -MF CMakeFiles/cmTC_f2585.dir/src.cxx.o.d -o CMakeFiles/cmTC_f2585.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-Ib9I9z/src.cxx
-        Linking CXX executable cmTC_f2585
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f2585.dir/link.txt --verbose=1
-        /usr/bin/c++  -march=armv8.2-a+dotprod+fp16 -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_f2585.dir/src.cxx.o -o cmTC_f2585
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_3e244/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_3e244.dir/build.make CMakeFiles/cmTC_3e244.dir/build
+        Building CXX object CMakeFiles/cmTC_3e244.dir/src.cxx.o
+        /usr/bin/c++ -DHAVE_DOTPROD  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_3e244.dir/src.cxx.o -MF CMakeFiles/cmTC_3e244.dir/src.cxx.o.d -o CMakeFiles/cmTC_3e244.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-nvjzEz/src.cxx
+        Linking CXX executable cmTC_3e244
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3e244.dir/link.txt --verbose=1
+        /usr/bin/c++  -march=armv8.2-a+dotprod+fp16 -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_3e244.dir/src.cxx.o -o cmTC_3e244
         
       exitCode: 0
   -
@@ -2756,8 +2703,8 @@ events:
     checks:
       - "Performing Test HAVE_SVE"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qBObcR"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qBObcR"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eE4zt5"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eE4zt5"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2771,18 +2718,18 @@ events:
       variable: "HAVE_SVE"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qBObcR'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eE4zt5'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_34f77/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_34f77.dir/build.make CMakeFiles/cmTC_34f77.dir/build
-        Building CXX object CMakeFiles/cmTC_34f77.dir/src.cxx.o
-        /usr/bin/c++ -DHAVE_SVE  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_34f77.dir/src.cxx.o -MF CMakeFiles/cmTC_34f77.dir/src.cxx.o.d -o CMakeFiles/cmTC_34f77.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qBObcR/src.cxx
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-qBObcR/src.cxx:3:24: error: "Feature SVE is not defined"
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_357ab/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_357ab.dir/build.make CMakeFiles/cmTC_357ab.dir/build
+        Building CXX object CMakeFiles/cmTC_357ab.dir/src.cxx.o
+        /usr/bin/c++ -DHAVE_SVE  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_357ab.dir/src.cxx.o -MF CMakeFiles/cmTC_357ab.dir/src.cxx.o.d -o CMakeFiles/cmTC_357ab.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eE4zt5/src.cxx
+        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eE4zt5/src.cxx:3:24: error: "Feature SVE is not defined"
             3 |                     #  error "Feature SVE is not defined"
               |                        ^
         1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_34f77.dir/src.cxx.o] Error 1
-        make: *** [cmTC_34f77/fast] Error 2
+        make[2]: *** [CMakeFiles/cmTC_357ab.dir/src.cxx.o] Error 1
+        make[1]: *** [cmTC_357ab/fast] Error 2
         
       exitCode: 2
   -
@@ -2795,8 +2742,8 @@ events:
     checks:
       - "Performing Test HAVE_MATMUL_INT8"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-0oB5qq"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-0oB5qq"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-3t0dlr"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-3t0dlr"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2810,18 +2757,18 @@ events:
       variable: "HAVE_MATMUL_INT8"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-0oB5qq'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-3t0dlr'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_d6299/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_d6299.dir/build.make CMakeFiles/cmTC_d6299.dir/build
-        Building CXX object CMakeFiles/cmTC_d6299.dir/src.cxx.o
-        /usr/bin/c++ -DHAVE_MATMUL_INT8  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_d6299.dir/src.cxx.o -MF CMakeFiles/cmTC_d6299.dir/src.cxx.o.d -o CMakeFiles/cmTC_d6299.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-0oB5qq/src.cxx
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-0oB5qq/src.cxx:3:24: error: "Feature MATMUL_INT8 is not defined"
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_c0d9d/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_c0d9d.dir/build.make CMakeFiles/cmTC_c0d9d.dir/build
+        Building CXX object CMakeFiles/cmTC_c0d9d.dir/src.cxx.o
+        /usr/bin/c++ -DHAVE_MATMUL_INT8  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_c0d9d.dir/src.cxx.o -MF CMakeFiles/cmTC_c0d9d.dir/src.cxx.o.d -o CMakeFiles/cmTC_c0d9d.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-3t0dlr/src.cxx
+        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-3t0dlr/src.cxx:3:24: error: "Feature MATMUL_INT8 is not defined"
             3 |                     #  error "Feature MATMUL_INT8 is not defined"
               |                        ^
         1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_d6299.dir/src.cxx.o] Error 1
-        make: *** [cmTC_d6299/fast] Error 2
+        make[2]: *** [CMakeFiles/cmTC_c0d9d.dir/src.cxx.o] Error 1
+        make[1]: *** [cmTC_c0d9d/fast] Error 2
         
       exitCode: 2
   -
@@ -2834,8 +2781,8 @@ events:
     checks:
       - "Performing Test HAVE_FMA"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5EEr6B"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5EEr6B"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eQfXMd"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eQfXMd"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2849,15 +2796,15 @@ events:
       variable: "HAVE_FMA"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5EEr6B'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eQfXMd'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_6d6ec/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_6d6ec.dir/build.make CMakeFiles/cmTC_6d6ec.dir/build
-        Building CXX object CMakeFiles/cmTC_6d6ec.dir/src.cxx.o
-        /usr/bin/c++ -DHAVE_FMA  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_6d6ec.dir/src.cxx.o -MF CMakeFiles/cmTC_6d6ec.dir/src.cxx.o.d -o CMakeFiles/cmTC_6d6ec.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5EEr6B/src.cxx
-        Linking CXX executable cmTC_6d6ec
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_6d6ec.dir/link.txt --verbose=1
-        /usr/bin/c++  -march=armv8.2-a+dotprod+fp16 -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_6d6ec.dir/src.cxx.o -o cmTC_6d6ec
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_4ff0c/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_4ff0c.dir/build.make CMakeFiles/cmTC_4ff0c.dir/build
+        Building CXX object CMakeFiles/cmTC_4ff0c.dir/src.cxx.o
+        /usr/bin/c++ -DHAVE_FMA  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_4ff0c.dir/src.cxx.o -MF CMakeFiles/cmTC_4ff0c.dir/src.cxx.o.d -o CMakeFiles/cmTC_4ff0c.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-eQfXMd/src.cxx
+        Linking CXX executable cmTC_4ff0c
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_4ff0c.dir/link.txt --verbose=1
+        /usr/bin/c++  -march=armv8.2-a+dotprod+fp16 -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_4ff0c.dir/src.cxx.o -o cmTC_4ff0c
         
       exitCode: 0
   -
@@ -2870,8 +2817,8 @@ events:
     checks:
       - "Performing Test HAVE_FP16_VECTOR_ARITHMETIC"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-zJ1Q2l"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-zJ1Q2l"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QeWazN"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QeWazN"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2885,15 +2832,15 @@ events:
       variable: "HAVE_FP16_VECTOR_ARITHMETIC"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-zJ1Q2l'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QeWazN'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_f002b/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_f002b.dir/build.make CMakeFiles/cmTC_f002b.dir/build
-        Building CXX object CMakeFiles/cmTC_f002b.dir/src.cxx.o
-        /usr/bin/c++ -DHAVE_FP16_VECTOR_ARITHMETIC  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_f002b.dir/src.cxx.o -MF CMakeFiles/cmTC_f002b.dir/src.cxx.o.d -o CMakeFiles/cmTC_f002b.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-zJ1Q2l/src.cxx
-        Linking CXX executable cmTC_f002b
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f002b.dir/link.txt --verbose=1
-        /usr/bin/c++  -march=armv8.2-a+dotprod+fp16 -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_f002b.dir/src.cxx.o -o cmTC_f002b
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_319a1/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_319a1.dir/build.make CMakeFiles/cmTC_319a1.dir/build
+        Building CXX object CMakeFiles/cmTC_319a1.dir/src.cxx.o
+        /usr/bin/c++ -DHAVE_FP16_VECTOR_ARITHMETIC  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_319a1.dir/src.cxx.o -MF CMakeFiles/cmTC_319a1.dir/src.cxx.o.d -o CMakeFiles/cmTC_319a1.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-QeWazN/src.cxx
+        Linking CXX executable cmTC_319a1
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_319a1.dir/link.txt --verbose=1
+        /usr/bin/c++  -march=armv8.2-a+dotprod+fp16 -arch arm64 -mmacosx-version-min=13.0 CMakeFiles/cmTC_319a1.dir/src.cxx.o -o cmTC_319a1
         
       exitCode: 0
   -
@@ -2906,8 +2853,8 @@ events:
     checks:
       - "Performing Test HAVE_SME"
     directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-2YorpY"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-2YorpY"
+      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5BIwBq"
+      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5BIwBq"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -2921,18 +2868,18 @@ events:
       variable: "HAVE_SME"
       cached: true
       stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-2YorpY'
+        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5BIwBq'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_df9a0/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_df9a0.dir/build.make CMakeFiles/cmTC_df9a0.dir/build
-        Building CXX object CMakeFiles/cmTC_df9a0.dir/src.cxx.o
-        /usr/bin/c++ -DHAVE_SME  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_df9a0.dir/src.cxx.o -MF CMakeFiles/cmTC_df9a0.dir/src.cxx.o.d -o CMakeFiles/cmTC_df9a0.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-2YorpY/src.cxx
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-2YorpY/src.cxx:3:24: error: "Feature SME is not defined"
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_b6c29/fast
+        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_b6c29.dir/build.make CMakeFiles/cmTC_b6c29.dir/build
+        Building CXX object CMakeFiles/cmTC_b6c29.dir/src.cxx.o
+        /usr/bin/c++ -DHAVE_SME  -march=armv8.2-a+dotprod+fp16 -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_b6c29.dir/src.cxx.o -MF CMakeFiles/cmTC_b6c29.dir/src.cxx.o.d -o CMakeFiles/cmTC_b6c29.dir/src.cxx.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5BIwBq/src.cxx
+        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-5BIwBq/src.cxx:3:24: error: "Feature SME is not defined"
             3 |                     #  error "Feature SME is not defined"
               |                        ^
         1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_df9a0.dir/src.cxx.o] Error 1
-        make: *** [cmTC_df9a0/fast] Error 2
+        make[2]: *** [CMakeFiles/cmTC_b6c29.dir/src.cxx.o] Error 1
+        make[1]: *** [cmTC_b6c29/fast] Error 2
         
       exitCode: 2
   -
@@ -2963,6 +2910,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -2970,8 +2918,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -2996,10 +2942,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -3054,6 +2997,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -3061,8 +3005,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -3087,10 +3029,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -3145,6 +3084,7 @@ events:
       - "/usr/sbin/"
       - "/sbin/"
       - "/Library/Apple/usr/bin/"
+      - "/Applications/Warp.app/Contents/Resources/bin/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/"
       - "/opt/homebrew/lib/"
@@ -3152,8 +3092,6 @@ events:
       - "/usr/local/"
       - "/usr/lib/"
       - "/usr/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/lib/"
-      - "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install/"
       - "/opt/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/"
       - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/"
@@ -3178,10 +3116,7 @@ events:
         - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
         - "/pkg/env/global/bin"
         - "/Library/Apple/usr/bin"
-        - "/Users/sldkvdmzhaaa/.local/bin"
-        - "/Users/sldkvdmzhaaa/.nvm/versions/node/v24.17.0/bin"
-        - "/opt/homebrew/bin"
-        - "/opt/homebrew/sbin"
+        - "/Applications/Warp.app/Contents/Resources/bin"
       CMAKE_INSTALL_PREFIX: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/install"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr"
@@ -3208,394 +3143,4 @@ events:
         - "/Library/Frameworks"
         - "/Network/Library/Frameworks"
         - "/System/Library/Frameworks"
-...
-
----
-events:
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting C OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ym20fB"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ym20fB"
-    cmakeVariables:
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_C_FLAGS: ""
-      CMAKE_C_FLAGS_DEBUG: "-g"
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_C_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ym20fB'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_3efc1/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_3efc1.dir/build.make CMakeFiles/cmTC_3efc1.dir/build
-        Building C object CMakeFiles/cmTC_3efc1.dir/OpenMPTryFlag.c.o
-        /usr/bin/cc   -Xclang -fopenmp -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_3efc1.dir/OpenMPTryFlag.c.o -MF CMakeFiles/cmTC_3efc1.dir/OpenMPTryFlag.c.o.d -o CMakeFiles/cmTC_3efc1.dir/OpenMPTryFlag.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ym20fB/OpenMPTryFlag.c
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-ym20fB/OpenMPTryFlag.c:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_3efc1.dir/OpenMPTryFlag.c.o] Error 1
-        make: *** [cmTC_3efc1/fast] Error 2
-        
-      exitCode: 2
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting CXX OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lzelyx"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lzelyx"
-    cmakeVariables:
-      CMAKE_CXX_FLAGS: ""
-      CMAKE_CXX_FLAGS_DEBUG: "-g"
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_CXX_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lzelyx'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_57b08/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_57b08.dir/build.make CMakeFiles/cmTC_57b08.dir/build
-        Building CXX object CMakeFiles/cmTC_57b08.dir/OpenMPTryFlag.cpp.o
-        /usr/bin/c++   -Xclang -fopenmp -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_57b08.dir/OpenMPTryFlag.cpp.o -MF CMakeFiles/cmTC_57b08.dir/OpenMPTryFlag.cpp.o.d -o CMakeFiles/cmTC_57b08.dir/OpenMPTryFlag.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lzelyx/OpenMPTryFlag.cpp
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-lzelyx/OpenMPTryFlag.cpp:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_57b08.dir/OpenMPTryFlag.cpp.o] Error 1
-        make: *** [cmTC_57b08/fast] Error 2
-        
-      exitCode: 2
-...
-
----
-events:
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting C OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-e6NZis"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-e6NZis"
-    cmakeVariables:
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_C_FLAGS: ""
-      CMAKE_C_FLAGS_DEBUG: "-g"
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_C_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-e6NZis'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_69ec7/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_69ec7.dir/build.make CMakeFiles/cmTC_69ec7.dir/build
-        Building C object CMakeFiles/cmTC_69ec7.dir/OpenMPTryFlag.c.o
-        /usr/bin/cc   -Xclang -fopenmp -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_69ec7.dir/OpenMPTryFlag.c.o -MF CMakeFiles/cmTC_69ec7.dir/OpenMPTryFlag.c.o.d -o CMakeFiles/cmTC_69ec7.dir/OpenMPTryFlag.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-e6NZis/OpenMPTryFlag.c
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-e6NZis/OpenMPTryFlag.c:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_69ec7.dir/OpenMPTryFlag.c.o] Error 1
-        make: *** [cmTC_69ec7/fast] Error 2
-        
-      exitCode: 2
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting CXX OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-U4dj43"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-U4dj43"
-    cmakeVariables:
-      CMAKE_CXX_FLAGS: ""
-      CMAKE_CXX_FLAGS_DEBUG: "-g"
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_CXX_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-U4dj43'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_91c05/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_91c05.dir/build.make CMakeFiles/cmTC_91c05.dir/build
-        Building CXX object CMakeFiles/cmTC_91c05.dir/OpenMPTryFlag.cpp.o
-        /usr/bin/c++   -Xclang -fopenmp -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_91c05.dir/OpenMPTryFlag.cpp.o -MF CMakeFiles/cmTC_91c05.dir/OpenMPTryFlag.cpp.o.d -o CMakeFiles/cmTC_91c05.dir/OpenMPTryFlag.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-U4dj43/OpenMPTryFlag.cpp
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-U4dj43/OpenMPTryFlag.cpp:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_91c05.dir/OpenMPTryFlag.cpp.o] Error 1
-        make: *** [cmTC_91c05/fast] Error 2
-        
-      exitCode: 2
-...
-
----
-events:
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting C OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-INWPgs"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-INWPgs"
-    cmakeVariables:
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_C_FLAGS: ""
-      CMAKE_C_FLAGS_DEBUG: "-g"
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_C_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-INWPgs'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_2b7c3/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_2b7c3.dir/build.make CMakeFiles/cmTC_2b7c3.dir/build
-        Building C object CMakeFiles/cmTC_2b7c3.dir/OpenMPTryFlag.c.o
-        /usr/bin/cc   -Xclang -fopenmp -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_2b7c3.dir/OpenMPTryFlag.c.o -MF CMakeFiles/cmTC_2b7c3.dir/OpenMPTryFlag.c.o.d -o CMakeFiles/cmTC_2b7c3.dir/OpenMPTryFlag.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-INWPgs/OpenMPTryFlag.c
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-INWPgs/OpenMPTryFlag.c:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_2b7c3.dir/OpenMPTryFlag.c.o] Error 1
-        make: *** [cmTC_2b7c3/fast] Error 2
-        
-      exitCode: 2
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting CXX OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-7K59Fv"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-7K59Fv"
-    cmakeVariables:
-      CMAKE_CXX_FLAGS: ""
-      CMAKE_CXX_FLAGS_DEBUG: "-g"
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_CXX_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-7K59Fv'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_7e7b3/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_7e7b3.dir/build.make CMakeFiles/cmTC_7e7b3.dir/build
-        Building CXX object CMakeFiles/cmTC_7e7b3.dir/OpenMPTryFlag.cpp.o
-        /usr/bin/c++   -Xclang -fopenmp -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_7e7b3.dir/OpenMPTryFlag.cpp.o -MF CMakeFiles/cmTC_7e7b3.dir/OpenMPTryFlag.cpp.o.d -o CMakeFiles/cmTC_7e7b3.dir/OpenMPTryFlag.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-7K59Fv/OpenMPTryFlag.cpp
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-7K59Fv/OpenMPTryFlag.cpp:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_7e7b3.dir/OpenMPTryFlag.cpp.o] Error 1
-        make: *** [cmTC_7e7b3/fast] Error 2
-        
-      exitCode: 2
-...
-
----
-events:
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting C OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-1WJ852"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-1WJ852"
-    cmakeVariables:
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_C_FLAGS: ""
-      CMAKE_C_FLAGS_DEBUG: "-g"
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_C_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-1WJ852'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_d393d/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_d393d.dir/build.make CMakeFiles/cmTC_d393d.dir/build
-        Building C object CMakeFiles/cmTC_d393d.dir/OpenMPTryFlag.c.o
-        /usr/bin/cc   -Xclang -fopenmp -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_d393d.dir/OpenMPTryFlag.c.o -MF CMakeFiles/cmTC_d393d.dir/OpenMPTryFlag.c.o.d -o CMakeFiles/cmTC_d393d.dir/OpenMPTryFlag.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-1WJ852/OpenMPTryFlag.c
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-1WJ852/OpenMPTryFlag.c:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_d393d.dir/OpenMPTryFlag.c.o] Error 1
-        make: *** [cmTC_d393d/fast] Error 2
-        
-      exitCode: 2
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting CXX OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-hGTF4w"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-hGTF4w"
-    cmakeVariables:
-      CMAKE_CXX_FLAGS: ""
-      CMAKE_CXX_FLAGS_DEBUG: "-g"
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_CXX_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-hGTF4w'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_8f530/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_8f530.dir/build.make CMakeFiles/cmTC_8f530.dir/build
-        Building CXX object CMakeFiles/cmTC_8f530.dir/OpenMPTryFlag.cpp.o
-        /usr/bin/c++   -Xclang -fopenmp -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_8f530.dir/OpenMPTryFlag.cpp.o -MF CMakeFiles/cmTC_8f530.dir/OpenMPTryFlag.cpp.o.d -o CMakeFiles/cmTC_8f530.dir/OpenMPTryFlag.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-hGTF4w/OpenMPTryFlag.cpp
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-hGTF4w/OpenMPTryFlag.cpp:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_8f530.dir/OpenMPTryFlag.cpp.o] Error 1
-        make: *** [cmTC_8f530/fast] Error 2
-        
-      exitCode: 2
-...
-
----
-events:
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting C OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-15U8ve"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-15U8ve"
-    cmakeVariables:
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_C_FLAGS: ""
-      CMAKE_C_FLAGS_DEBUG: "-g"
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_C_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-15U8ve'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_865ac/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_865ac.dir/build.make CMakeFiles/cmTC_865ac.dir/build
-        Building C object CMakeFiles/cmTC_865ac.dir/OpenMPTryFlag.c.o
-        /usr/bin/cc   -Xclang -fopenmp -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_865ac.dir/OpenMPTryFlag.c.o -MF CMakeFiles/cmTC_865ac.dir/OpenMPTryFlag.c.o.d -o CMakeFiles/cmTC_865ac.dir/OpenMPTryFlag.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-15U8ve/OpenMPTryFlag.c
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-15U8ve/OpenMPTryFlag.c:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_865ac.dir/OpenMPTryFlag.c.o] Error 1
-        make: *** [cmTC_865ac/fast] Error 2
-        
-      exitCode: 2
-  -
-    kind: "try_compile-v1"
-    backtrace:
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:334 (try_compile)"
-      - "/opt/homebrew/share/cmake/Modules/FindOpenMP.cmake:642 (_OPENMP_GET_FLAGS)"
-      - "third_party/whisper.cpp/ggml/src/CMakeLists.txt:226 (find_package)"
-    description: "Detecting CXX OpenMP compiler info"
-    directories:
-      source: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-CXmVrJ"
-      binary: "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-CXmVrJ"
-    cmakeVariables:
-      CMAKE_CXX_FLAGS: ""
-      CMAKE_CXX_FLAGS_DEBUG: "-g"
-      CMAKE_CXX_STDLIB_MODULES_JSON: ""
-      CMAKE_EXE_LINKER_FLAGS: ""
-      CMAKE_MODULE_PATH: "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/cmake/;/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/cmake/"
-      CMAKE_OSX_ARCHITECTURES: ""
-      CMAKE_OSX_DEPLOYMENT_TARGET: "13.0"
-      CMAKE_OSX_SYSROOT: ""
-    buildResult:
-      variable: "OpenMP_COMPILE_RESULT_CXX_Xclang fopenmp"
-      cached: true
-      stdout: |
-        Change Dir: '/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-CXmVrJ'
-        
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_947b7/fast
-        /Applications/Xcode.app/Contents/Developer/usr/bin/make  -f CMakeFiles/cmTC_947b7.dir/build.make CMakeFiles/cmTC_947b7.dir/build
-        Building CXX object CMakeFiles/cmTC_947b7.dir/OpenMPTryFlag.cpp.o
-        /usr/bin/c++   -Xclang -fopenmp -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -MD -MT CMakeFiles/cmTC_947b7.dir/OpenMPTryFlag.cpp.o -MF CMakeFiles/cmTC_947b7.dir/OpenMPTryFlag.cpp.o.d -o CMakeFiles/cmTC_947b7.dir/OpenMPTryFlag.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-CXmVrJ/OpenMPTryFlag.cpp
-        /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/CMakeFiles/CMakeScratch/TryCompile-CXmVrJ/OpenMPTryFlag.cpp:2:10: fatal error: 'omp.h' file not found
-            2 | #include <omp.h>
-              |          ^~~~~~~
-        1 error generated.
-        make[1]: *** [CMakeFiles/cmTC_947b7.dir/OpenMPTryFlag.cpp.o] Error 1
-        make: *** [cmTC_947b7/fast] Error 2
-        
-      exitCode: 2
 ...

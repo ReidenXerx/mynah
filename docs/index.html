@@ -248,11 +248,8 @@
     <h1>Say it. It types <em>where you are</em>.</h1>
     <p class="lede">Press a key and talk. Your words land in whatever window has focus — a commit message, a chat, a form — <b>as you pause, not when you stop.</b> The speech never leaves the machine you are sitting at.</p>
     <div class="cta">
-      <button class="button primary" type="button" data-copy='pipx install "git+https://github.com/ReidenXerx/mynah.git"' >
-        <span>pipx install …/mynah.git</span><span class="copied" aria-hidden="true">copied</span>
-      </button>
+      <a class="button primary" href="#install">Install it</a>
       <a class="button" href="https://github.com/ReidenXerx/mynah">Read the source</a>
-      <a class="button" href="#install">Install</a>
     </div>
     <ul class="facts">
       <li>no account · no API key</li>
@@ -394,15 +391,13 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
 
 <section id="install">
   <p class="label">Install</p>
-  <h2>One command, then a guided first run</h2>
+  <h2>Pinned to a commit, then a guided first run</h2>
   <div class="two">
     <div>
-<pre><span class="dim">macOS</span>
-<span class="cmd">$ pipx install "git+https://github.com/ReidenXerx/mynah.git"</span>
-<span class="cmd">$ pipx inject mynah "mynah[macos] @ git+https://github.com/ReidenXerx/mynah.git"</span>
-
-<span class="dim">Linux</span>
-<span class="cmd">$ pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"</span>
+<pre><span class="dim">Linux — the full commands are in the README, pinned and hash-checked</span>
+<span class="cmd">$ pip wheel --no-build-isolation …/mynah.git@&lt;commit&gt;</span>
+<span class="cmd">$ pipx install …/mynah-0.1.0-py3-none-any.whl</span>
+<span class="cmd">$ pipx runpip mynah install --require-hashes -r linux.lock</span>
 <span class="cmd">$ sudo pacman -S whisper-cpp wtype wl-clipboard</span>
 
 <span class="cmd">$ mynah setup</span>

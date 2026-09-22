@@ -14,10 +14,7 @@ Everything runs on the machine you are sitting at.
 [![macOS](https://img.shields.io/badge/macOS-shipping-3FBF9A)](#where-it-runs)
 [![Linux · Wayland](https://img.shields.io/badge/Linux%20%C2%B7%20Wayland-shipping-3FBF9A)](docs/LINUX-APP.md)
 
-```bash
-pipx install "git+https://github.com/ReidenXerx/mynah.git"
-mynah setup
-```
+**[Install](#install)** — a few commands, pinned to a commit and hash-checked, then `mynah setup`
 
 **[duduphudu.app/mynah](https://duduphudu.app/mynah/)** — what it does, and what it refuses to do
 
@@ -64,27 +61,42 @@ unloads and Mynah costs nothing at all.
 **macOS**
 
 ```bash
-pipx install "git+https://github.com/ReidenXerx/mynah.git"
-pipx inject mynah "mynah[macos] @ git+https://github.com/ReidenXerx/mynah.git"
+MYNAH=<the commit you are installing>   # a full 40-character SHA, never a branch name
+pipx install "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
+pipx inject mynah "mynah[macos] @ git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
 mynah setup                          # dependencies, permissions, hotkey, login service
 ```
+
+**The macOS extra is not locked yet**, and this path says so rather than implying otherwise: the
+commit is pinned, but `mlx-whisper`, `pynput`, the pyobjc frameworks and `rumps` are still resolved
+from PyPI at install time, and pip's build isolation may fetch an unchecked build backend. Locking
+it means generating and testing the set on an Apple Silicon machine, which is the honest gate on
+saying it is done. Linux below is fully locked.
 
 **Linux (Wayland)**
 
 ```bash
 MYNAH=<the commit you are installing>   # a full 40-character SHA, never a branch name
+LOCKS=https://raw.githubusercontent.com/ReidenXerx/mynah/$MYNAH/requirements
 
-# The engine at that exact commit, with nothing resolved from PyPI yet.
-pipx install --pip-args="--no-deps" "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
+# 1. A throwaway builder whose only build backend is the hash-verified one.
+python3 -m venv /tmp/mynah-build
+/tmp/mynah-build/bin/pip install --require-hashes --only-binary :all: -r $LOCKS/build.lock
 
-# What it imports, at pinned versions, every artifact checked against its hash.
+# 2. Build the engine with that backend and nothing else. --no-build-isolation is
+#    what stops pip fetching a build backend of its own choosing.
+/tmp/mynah-build/bin/pip wheel --no-build-isolation --no-deps -w /tmp/mynah-wheel \
+    "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
+
+# 3. Install that wheel. A wheel runs no build backend at all.
+pipx install --pip-args="--no-deps" /tmp/mynah-wheel/mynah-0.1.0-py3-none-any.whl
+
+# 4. What the engine imports, at pinned versions, every artifact checked against its hash.
+pipx runpip mynah install --require-hashes --only-binary :all: -r $LOCKS/build.lock
 pipx runpip mynah install --require-hashes --only-binary :all: \
-    --no-binary webrtcvad-wheels --no-build-isolation \
-    -r https://raw.githubusercontent.com/ReidenXerx/mynah/$MYNAH/requirements/build.lock
-pipx runpip mynah install --require-hashes --only-binary :all: \
-    --no-binary webrtcvad-wheels --no-build-isolation \
-    -r https://raw.githubusercontent.com/ReidenXerx/mynah/$MYNAH/requirements/linux.lock
+    --no-binary webrtcvad-wheels --no-build-isolation -r $LOCKS/linux.lock
 
+rm -rf /tmp/mynah-build /tmp/mynah-wheel
 sudo pacman -S whisper-cpp wtype wl-clipboard   # speech, typing, and pasting
 mynah setup                          # checks each of these and names what is missing
 ```
@@ -96,6 +108,14 @@ whether it is still current. One package is built from source rather than instal
 webrtcvad-wheels publishes no wheel for CPython 3.14, which is what Arch ships. Its source archive
 is hash-checked like everything else and builds against the pinned setuptools, with pip's build
 isolation off so no unchecked build backend can be fetched in its place.
+
+**Why the engine is built separately rather than installed straight from git.** `pipx install
+git+…` builds the source distribution, and pip's build isolation fetches a build backend for that
+build from PyPI without checking it against anything — `--no-deps` does not turn isolation off, and
+no ordering of `pipx --preinstall` gets in front of it, because pipx builds the source once more
+just to learn the package name. Steps 1 and 2 move that build somewhere the backend is already
+pinned and verified; step 3 then installs an artifact that needs no backend at all. The engine's
+provenance is unchanged — it is still the git commit you named, and nothing else.
 
 `mynah setup` is the honest path: it checks each requirement, says which one is missing and what to
 do about it — including the one `curl` that downloads a speech model — and only installs the login

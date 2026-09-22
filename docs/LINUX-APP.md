@@ -20,16 +20,19 @@ So the Linux side is a set of providers plus one socket:
 | Segmentation | unchanged | the golden corpus pins one implementation for both platforms |
 | Service | `systemd --user`, tied to `graphical-session.target` | the Linux equivalent of the LaunchAgent |
 
-Install:
+Install: **[the Linux section of the README](../README.md#install)**, which is the
+only install path kept current. It pins the engine to a commit, builds it with a
+hash-verified backend and installs what it imports from
+`requirements/linux.lock` with `--require-hashes`, then:
 
 ```bash
-pipx install "git+https://github.com/ReidenXerx/mynah.git"
-# The extra comes from this repository: the bare name `mynah` on PyPI is an
-# unrelated package, and pip would happily fetch that instead.
-pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"
 sudo pacman -S whisper-cpp wtype wl-clipboard
 mynah setup
 ```
+
+The engine's dependencies are never requested by the bare name `mynah` from
+PyPI — that name belongs to an unrelated package, and pip would happily fetch
+that instead.
 
 `mynah setup` checks each of those, names what is missing, and prints the exact
 command that fixes it — including the `curl` that downloads a model.

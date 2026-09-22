@@ -1,0 +1,73 @@
+# Every artifact the Linux extra may install, pinned by version and verified by hash.
+# Written by tools/lock.py -- edit that, not this.
+#
+#   pip install --require-hashes --only-binary :all: \
+#               --no-binary webrtcvad-wheels --no-build-isolation \
+#               -r requirements/linux.lock
+#
+# Covers CPython 3.11 to 3.14 on x86_64 and aarch64 Linux, glibc and musl alike. Every hash a
+# package may legitimately match is listed, so pip picks the artifact for the running interpreter
+# and still verifies it; an interpreter or machine outside that set matches nothing here and pip
+# stops rather than installing something unverified.
+#
+# One exception, deliberate and narrow: webrtcvad-wheels 2.0.14 publishes wheels only up to
+# cp313 and Arch ships CPython 3.14, so its source archive is permitted -- by name, not in
+# general. It is hash-checked exactly like every wheel here, it is the only package built
+# locally, and it builds against the setuptools pinned in build.lock.
+
+sounddevice==0.5.6 \
+    --hash=sha256:de099612311ad81e55d31ccbd83f43ea6bf4d87b48f9b6ea55a1fbcde0eee4e0
+webrtcvad-wheels==2.0.14 \
+    --hash=sha256:04e47b87bf673098f25e2c2e07e486b58a339a93231ee0021a86a92b3b759b89 \
+    --hash=sha256:32409315eaaec46ea58fb7e729193c66573d95124208efd03f332bc2fc4c6c7b \
+    --hash=sha256:34b315326dd6c8529221492ebf28fc649d96b1a49ce49bf649eca60aabc70a2d \
+    --hash=sha256:42310d3bb6cdb46a79a219d14fe97ae272b8af629d84321e5cfa0764556109a6 \
+    --hash=sha256:42cbef958b145573fb425482dbbd74fc080540a510c3871e1cebd59afa83c87f \
+    --hash=sha256:5f59c8e291c6ef102d9f39532982fbf26a52ce2de6328382e2654b0960fea397 \
+    --hash=sha256:6056a2559d83836bf4b6af4993448202bfd080efd5e799d2153118e4a91d3fd1 \
+    --hash=sha256:63fdad42c0ca6248b9a5c8ca34ff17a5c43bb63ffd8997a5902ad7237a05ca68 \
+    --hash=sha256:792ce66f32b6d3ffa7569ef467b4ec1a5a45eb95cc466d204c04c120f4169015 \
+    --hash=sha256:7de1df623d148052a61bd151545344dfafcf85dfb7075ea0e855009c080eb0ec \
+    --hash=sha256:9c67055236f1ffcf160825bb87dbe2c1d3846ad51b54602906b1c7ea37a0b4ac \
+    --hash=sha256:b4003139f180b8e4930b862d662dc574602e4547c8fb497bc48579b7cacc4110 \
+    --hash=sha256:fe2ced612732a41aefa14ea2ea52f84de5afd43665ebed092e1d6df93641e239
+numpy==2.5.3 \
+    --hash=sha256:1302b90c0e52281681b2975adfe8a860cb7b12216a27b4b0b4207c44bf7bccf0 \
+    --hash=sha256:1fb6f8fb9ff0b3a69f52c66ce397b0246583e9f28616231b0e32ca49259a5fa6 \
+    --hash=sha256:4f8929ee6c96bfbd7b4ed2032e0c03af86fe1826740ab61ddabf9072d06e57ff \
+    --hash=sha256:536f963710a4e63934d80ac0dc4f478804a83e9a84b6828018f25d09953ada33 \
+    --hash=sha256:76c2c1e6bfa5c84adc6434dfbf013aa92096a7985221762c8f11fedfd20fff58 \
+    --hash=sha256:93e1f5447e2b1e479d7bd74701e84746b86450cff1fc368b132d195e2b8f8211 \
+    --hash=sha256:9deb49575e5b0b94ed72c8a64ec4d033381adc27e9060ae842971f697ba96104 \
+    --hash=sha256:a5fa86b80fd24bcd1aff83ad23be44ea323de3f787be8f8b15d4a65621e25321 \
+    --hash=sha256:b00eefbcf0f292945c4b4dec2ae845389ef5bcdcd596e6e4328051db5b5ba694 \
+    --hash=sha256:b0521d0f4aebb6e06189451025fa17a913287b13c03d5fe05c017333b654ea5b \
+    --hash=sha256:b5d93cf48f687479941d12b69c873ad2cc76bbd487f0091c2200636497f34034 \
+    --hash=sha256:b7e18c623bb5c95acb3b3328861272816ba199fb531921c5d6d0b675f1fde9e3 \
+    --hash=sha256:bd4cb9ad3c7889b9b3fe0a9a9fb5d2ed26f9879bff2608d9f01aed147a20d231 \
+    --hash=sha256:be5a8381859b6da607c84f4f7d6847725f1cf1853ef8a2c9e115b7d58bef47dc \
+    --hash=sha256:c00abe94c1a69d75d827dcf1c025b25c8a45d230b3bcd77a9020883a1b047653 \
+    --hash=sha256:c76d5dde9f445058f83d0c02af00557a4db91de9a9a57c0df87d1535001d654b
+cffi==2.1.1 \
+    --hash=sha256:208f941bb9d18e768138677f0a6d2ce01f590df56043dda1df1535ac57c88517 \
+    --hash=sha256:210019b6c7cf07f081b4c54635c8cf744377001350e29cc0f81c4377b4797735 \
+    --hash=sha256:25792eac27877609e7bb06d42ff88278a6624fff2ba9bbb523c09616b117e80f \
+    --hash=sha256:3311ed60d36f83378794e1009ac6258bafbf81f7888b4caa7b35a521e3f95813 \
+    --hash=sha256:34e261f78cb6ceaaa36f42f2613f4380d94d9c759a9c73c769ee6e0247364632 \
+    --hash=sha256:49cbc70e6542d4ccccb936558d1064a8012541e78f821f955cff24e357776c94 \
+    --hash=sha256:51b31d1c98274844cfd7838ce00bfc27c7423a4dc00fc0772fc3331c2cc90676 \
+    --hash=sha256:58acb8ab8e295e6c5ea12f888cbb13cf21511ef2a3303a23f4325c29d17fe5c1 \
+    --hash=sha256:5c58fe613dc5e5336357eff555824a314d8e43282600435c8d1cb6a7a2fedd13 \
+    --hash=sha256:5e7cecbaadb83884793e05828cee59b210b24583b9c7425d0ba6a754fe22eb4e \
+    --hash=sha256:64faea20f4e2613363a1a9b9c7dd73058f3ecd00133a511e72ad7c511658f527 \
+    --hash=sha256:68e62fe11f30d5ca8289242866f0a5291402d8529ca2178ab8afc5c9694ae890 \
+    --hash=sha256:7225e4514edb64eb6740324353e0da0711954fd8d7da4576755b1c6e09b697cd \
+    --hash=sha256:a2d7755bef5a12ed488f4ef1f1b69ee9191d7396083b755a5d2295f6edb4768b \
+    --hash=sha256:a931079504ecc49efed7744c476a5c343a92fabf66dec2db95edb1b2fdc770e2 \
+    --hash=sha256:b0431303acaea1089ad4b3e9ce4e6518193def1118d4073ca848635ee4ea2e96 \
+    --hash=sha256:c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf \
+    --hash=sha256:e0bcb7e0f677f543555d2adff3bf19c05f66cdb4796e5ff602442ab2fe3c4ef7 \
+    --hash=sha256:f16c709686a78c727bbbf059f92b0bf41c6fc60deec706d2dc19f529175a6125 \
+    --hash=sha256:f5cfbc5fe74540d335175b656c725d74d90e3730c626d92575eea35029d9afaa
+pycparser==3.0 \
+    --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992

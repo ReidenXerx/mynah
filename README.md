@@ -72,11 +72,30 @@ mynah setup                          # dependencies, permissions, hotkey, login 
 **Linux (Wayland)**
 
 ```bash
-pipx install "git+https://github.com/ReidenXerx/mynah.git"
-pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"
+MYNAH=<the commit you are installing>   # a full 40-character SHA, never a branch name
+
+# The engine at that exact commit, with nothing resolved from PyPI yet.
+pipx install --pip-args="--no-deps" "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
+
+# What it imports, at pinned versions, every artifact checked against its hash.
+pipx runpip mynah install --require-hashes --only-binary :all: \
+    --no-binary webrtcvad-wheels --no-build-isolation \
+    -r https://raw.githubusercontent.com/ReidenXerx/mynah/$MYNAH/requirements/build.lock
+pipx runpip mynah install --require-hashes --only-binary :all: \
+    --no-binary webrtcvad-wheels --no-build-isolation \
+    -r https://raw.githubusercontent.com/ReidenXerx/mynah/$MYNAH/requirements/linux.lock
+
 sudo pacman -S whisper-cpp wtype wl-clipboard   # speech, typing, and pasting
 mynah setup                          # checks each of these and names what is missing
 ```
+
+`--require-hashes` makes pip refuse anything not named in the lock, so nothing that runs here is
+decided by PyPI after you read this. `requirements/linux.lock` covers CPython 3.11 to 3.14 on
+x86_64 and aarch64, glibc and musl; `tools/lock.py` writes it, and `tools/lock.py --check` says
+whether it is still current. One package is built from source rather than installed as a wheel:
+webrtcvad-wheels publishes no wheel for CPython 3.14, which is what Arch ships. Its source archive
+is hash-checked like everything else and builds against the pinned setuptools, with pip's build
+isolation off so no unchecked build backend can be fetched in its place.
 
 `mynah setup` is the honest path: it checks each requirement, says which one is missing and what to
 do about it — including the one `curl` that downloads a speech model — and only installs the login

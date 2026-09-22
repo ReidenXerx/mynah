@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=68"]
+# Pinned, not ranged: requirements/build.lock installs this exact setuptools with its hash
+# before anything is built, and --no-build-isolation then leaves it the only one that can run.
+# Raising it means raising it in tools/lock.py too, and reading the diff.
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]

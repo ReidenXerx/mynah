@@ -118,3 +118,27 @@ TEST_CASE("a cancelled download leaves nothing behind") {
     CHECK(!std::filesystem::exists(dir.path() / "models" / "ggml-fake.bin"));
     CHECK(!std::filesystem::exists(dir.path() / "models" / "ggml-fake.bin.part"));
 }
+
+TEST_CASE("Content-Length is read in any case, and a redirect's does not stick") {
+    using mynah::download::detail::header_total;
+    std::uint64_t total = 0;
+    header_total("Content-Length: 1234\r\n", total);
+    CHECK(total == 1234);
+    // HTTP/2 spells header names in lowercase — HuggingFace and its CDN do.
+    header_total("HTTP/2 200\r\n", total);
+    CHECK(total == 0);
+    header_total("content-length: 487601967\r\n", total);
+    CHECK(total == 487601967);
+    // Following a redirect: the 302's own length is dropped at the next
+    // status line, and only the file's counts.
+    header_total("HTTP/2 302\r\n", total);
+    header_total("content-length: 1170\r\n", total);
+    header_total("HTTP/2 200\r\n", total);
+    CHECK(total == 0);
+    header_total("content-length: 885098\r\n", total);
+    CHECK(total == 885098);
+    // Not the header, or not a number: unchanged.
+    header_total("content-type: application/octet-stream\r\n", total);
+    header_total("Content-Length: lots\r\n", total);
+    CHECK(total == 885098);
+}

@@ -1,9 +1,12 @@
 #include "setup.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <optional>
+#include <string>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -13,6 +16,7 @@
 #include "injector.hpp"
 #include "json.hpp"
 #include "models/resolve.hpp"
+#include "stt/stt.hpp"
 
 namespace mynah::setup {
 
@@ -39,7 +43,8 @@ Check check_typing() {
 Check check_speech() {
     // whisper.cpp is compiled in; the question is whether a model is.
     config::Config config = config::load();
-    std::filesystem::path model = models::resolve(config.model, models::search_directories());
+    std::filesystem::path model = models::resolve(config.model, models::search_directories(),
+                                                  stt::pick_gpu(config.gpu).has_value());
     if (!model.empty())
         return {true, "Speech", "whisper.cpp with " + model.filename().string(), ""};
     std::string wanted = config.model.empty() ? std::string("small") : config.model;
@@ -49,6 +54,32 @@ Check check_speech() {
                 wanted +
                 "\n"
                 "  Or point at one you have:  mynah set model=/path/to/ggml-small.bin"};
+}
+
+// Where speech will run. Informational unless `gpu` is on and the session
+// hides the NVIDIA Vulkan driver (VK_LOADER_DRIVERS_DISABLE — an "iGPU by
+// default, dGPU per app" setup): then mynah falls back without a word, and
+// this is where the word is.
+Check check_gpu() {
+    config::Config config = config::load();
+    std::optional<stt::GpuChoice> gpu = stt::pick_gpu(config.gpu);
+    const char* disabled = std::getenv("VK_LOADER_DRIVERS_DISABLE");
+    std::string hidden = disabled ? disabled : "";
+    for (char& c : hidden) c = char(std::tolower(static_cast<unsigned char>(c)));
+    const bool nvidia_hidden = hidden.find("nvidia") != std::string::npos;
+    if (config.gpu && nvidia_hidden && (!gpu || gpu->kind != stt::GpuKind::Discrete))
+        return {false, "GPU",
+                gpu ? "the integrated GPU (" + gpu->name + "): the NVIDIA driver is hidden"
+                    : std::string("the CPU: the NVIDIA driver is hidden"),
+                "VK_LOADER_DRIVERS_DISABLE=" + std::string(disabled) +
+                    " hides the discrete GPU from mynah.\n"
+                    "  Let mynah see it (the dGPU still sleeps between sentences):\n"
+                    "  env -u VK_LOADER_DRIVERS_DISABLE mynah\n"
+                    "  Or keep the integrated GPU:  mynah set gpu=off"};
+    if (!gpu) return {true, "GPU", "none — speech runs on the CPU", ""};
+    return {true, "GPU",
+            gpu->name + (gpu->kind == stt::GpuKind::Discrete ? " (discrete)" : " (integrated)"),
+            ""};
 }
 
 Check check_microphone() {
@@ -127,7 +158,7 @@ Check check_hotkey() {
 } // namespace
 
 std::vector<Check> run_checks() {
-    return {check_typing(), check_speech(), check_microphone(), check_hotkey()};
+    return {check_typing(), check_speech(), check_gpu(), check_microphone(), check_hotkey()};
 }
 
 int report(const std::vector<Check>& checks) {
@@ -136,13 +167,18 @@ int report(const std::vector<Check>& checks) {
         const char* mark = check.ok ? "ok" : "!!";
         std::fprintf(stderr, "  [%s] %s: %s\n", mark, check.title.c_str(),
                      check.detail.c_str());
-        if (!check.ok) {
-            if (!check.hint.empty())
-                std::fprintf(stderr, "        %s\n", check.hint.c_str());
-            ++failures;
-        } else if (!check.hint.empty()) {
-            std::fprintf(stderr, "        %s\n", check.hint.c_str());
+        // Every line of the hint under the title, not just the first: the
+        // hints continue on "\n  " lines, which printed at column 2.
+        std::size_t begin = 0;
+        while (begin < check.hint.size()) {
+            std::size_t end = check.hint.find('\n', begin);
+            if (end == std::string::npos) end = check.hint.size();
+            std::string line = check.hint.substr(begin, end - begin);
+            line.erase(0, std::min<std::size_t>(line.find_first_not_of(' '), 2));
+            std::fprintf(stderr, "        %s\n", line.c_str());
+            begin = end + 1;
         }
+        if (!check.ok) ++failures;
     }
     return failures == 0 ? 0 : 1;
 }

@@ -107,11 +107,14 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # build; its shaders are compiled at build time with glslc.
     option(MYNAH_VULKAN "Build ggml's Vulkan backend (the gpu tier)" ON)
     if(MYNAH_VULKAN)
+        # What ggml-vulkan's own CMakeLists requires, checked here first so
+        # a missing one names its package instead of a config-file search.
         find_package(Vulkan COMPONENTS glslc QUIET)
-        if(NOT Vulkan_FOUND)
+        find_package(SPIRV-Headers CONFIG QUIET)
+        if(NOT Vulkan_FOUND OR NOT SPIRV-Headers_FOUND)
             message(FATAL_ERROR
-                "MYNAH_VULKAN needs the Vulkan headers and glslc.\n"
-                "  Arch:  sudo pacman -S vulkan-headers shaderc\n"
+                "MYNAH_VULKAN needs the Vulkan headers, the SPIR-V headers and glslc.\n"
+                "  Arch:  sudo pacman -S vulkan-headers spirv-headers shaderc\n"
                 "Or build CPU-only with -DMYNAH_VULKAN=OFF.")
         endif()
     endif()

@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <csignal>
@@ -44,6 +45,7 @@
 #include "stt/stt.hpp"
 #include "systemd.hpp"
 #include "tuning/constants.hpp"
+#include "typing_queue.hpp"
 
 namespace {
 
@@ -103,7 +105,12 @@ int models_list() {
 }
 
 int models_download(const std::string& name) {
+    // The names this command advertises: the table's aliases and filenames
+    // (find), plus "turbo" — a short alias find() deliberately leaves to
+    // resolve() — the tier names, and "vad".
     const mynah::models::ModelInfo* info = mynah::models::find(name);
+    if (info == nullptr && name == "turbo") info = &mynah::models::kTurbo;
+    if (info == nullptr) info = mynah::models::model_for_tier(name); // gpu, small, base
     if (info == nullptr && name == "vad") info = &mynah::models::kSileroVad;
     if (info == nullptr)
         return fail("no model named '" + name +
@@ -124,41 +131,55 @@ int models_download(const std::string& name) {
 
 int models_benchmark(const std::string& clip, const std::string& language,
                      const mynah::config::Config& config) {
-    // Candidates that are actually here; the benchmark is honest about a
-    // model that did not load.
+    // Turbo is only a candidate where it could win: the gpu tier needs a
+    // GPU (choose_tier), and timing it on a CPU costs the first start
+    // tens of seconds to learn nothing.
+    std::optional<mynah::stt::GpuChoice> gpu = mynah::stt::pick_gpu(config.gpu);
     std::vector<const mynah::models::ModelInfo*> candidates;
     for (const mynah::models::ModelInfo* info : {&mynah::models::kTurbo,
                                                  &mynah::models::kSmall,
                                                  &mynah::models::kBase}) {
-        if (std::filesystem::exists(model_path(info))) candidates.push_back(info);
+        if (!std::filesystem::exists(model_path(info))) continue;
+        if (info == &mynah::models::kTurbo && !gpu) {
+            std::fprintf(stderr, "skipping %s: no GPU to run it on%s\n",
+                         std::string(info->filename).c_str(),
+                         config.gpu ? "" : " (a discrete one needs: mynah set gpu=on)");
+            continue;
+        }
+        candidates.push_back(info);
     }
     if (candidates.empty())
         return fail("no tier model on disk — download one first: mynah models download small");
+    if (gpu) std::fprintf(stderr, "GPU: %s\n", gpu->name.c_str());
 
-    bool gpu_ready = false;
+    // The benchmark is honest about a model that did not load.
     std::optional<double> turbo_seconds;
     std::optional<double> small_seconds;
     auto stt = mynah::stt::make_whisper();
     for (const mynah::models::ModelInfo* info : candidates) {
         std::fprintf(stderr, "benchmarking %s … ", std::string(info->filename).c_str());
-        auto result = mynah::models::benchmark(*stt, model_path(info), clip, language);
+        auto result =
+            mynah::models::benchmark(*stt, model_path(info), clip, language, config.gpu);
+        stt->unload(); // each candidate loads its own model
         if (!result) {
             std::fprintf(stderr, "could not run\n");
             continue;
         }
         std::fprintf(stderr, "%.2f s per clip\n", result->seconds);
-        if (info->filename == mynah::models::kTurbo.filename) {
-            turbo_seconds = result->seconds;
-            gpu_ready = mynah::models::gpu_available(config.gpu);
-        }
-        if (info->filename == mynah::models::kSmall.filename)
-            small_seconds = result->seconds;
+        if (info == &mynah::models::kTurbo) turbo_seconds = result->seconds;
+        if (info == &mynah::models::kSmall) small_seconds = result->seconds;
     }
-    stt->unload();
 
-    std::string tier = mynah::models::choose_tier(gpu_ready, turbo_seconds, small_seconds);
+    std::string tier = mynah::models::choose_tier(gpu.has_value(), turbo_seconds, small_seconds);
     const mynah::models::ModelInfo* chosen = mynah::models::model_for_tier(tier);
-    std::fprintf(stderr, "chosen tier: %s (%s)\n", tier.c_str(), std::string(chosen->filename).c_str());
+    std::fprintf(stderr, "chosen tier: %s (%s)\n", tier.c_str(),
+                 std::string(chosen->filename).c_str());
+    // The tier can be one whose model is not here — `base`, the floor, when
+    // only a too-slow model was measured. Storing a path to nothing would
+    // turn "slow" into "no model"; say what to fetch instead.
+    if (!std::filesystem::exists(model_path(chosen)))
+        return fail("the " + tier + " tier's model is not downloaded: mynah models download " +
+                    tier + ", then mynah models benchmark");
 
     // Store the result: a set `model` always overrides, so writing it here
     // is what "stores the result" means — the next start skips the
@@ -171,11 +192,10 @@ int models_benchmark(const std::string& clip, const std::string& language,
 
 // The first start with no model configured: benchmark what is on disk and
 // pick a tier (docs/ENGINE-MIGRATION.md, "Linux model tiers"). A set
-// `model` always overrides; no candidates or no clip means no benchmark.
+// `model` always overrides; no clip or no candidate means no benchmark, and
+// the engine falls back to kUntieredPreference.
 bool auto_benchmark(const mynah::config::Config& config) {
     if (!config.model.empty()) return false;
-    if (!mynah::models::resolve(config.model, mynah::models::search_directories()).empty())
-        return false; // something resolves already
     std::string clip = benchmark_clip();
     if (clip.empty()) return false;
     bool any_candidate = false;
@@ -205,7 +225,7 @@ const SettingInfo kSettings[] = {
     {"idle_timeout", "Seconds before the model unloads (0 = never)"},
     {"auto_stop_silence", "Seconds of silence that end a session (0 = off)"},
     {"vad", "Reject non-voice audio per utterance (Silero)"},
-    {"gpu", "Run the gpu tier on a discrete GPU (off = integrated/CPU only)"},
+    {"gpu", "Prefer a discrete GPU; it sleeps between sentences (off = integrated/CPU only)"},
     {"show_indicator", "The floating mic indicator (the desktop shell's pill)"},
     {"idle_visible", "Keep the indicator dimmed-visible between sessions"},
     {"injector", "smart, wtype or clipboard (empty = chosen for you)"},
@@ -233,9 +253,8 @@ const std::pair<const char*, const char*> kFriendly[] = {
 };
 
 std::string show_bool(bool value) { return value ? "on" : "off"; }
-std::string show_number(double value) {
-    return mynah::flat_toml::emit({{"x", mynah::flat_toml::real(value)}}).substr(4);
-}
+// As config.toml spells it.
+std::string show_number(double value) { return mynah::flat_toml::number_to_string(value); }
 
 int config_command() {
     mynah::config::ReadResult read =
@@ -247,10 +266,14 @@ int config_command() {
     // Key, then the value as the engine sees it. One row per setting, driven
     // off the same table `set` validates against — the listing cannot drift
     // when a setting is added.
+    // Columns as wide as the longest key ("transcription_mode").
+    int key_width = 0;
+    for (const SettingInfo& setting : kSettings)
+        key_width = std::max(key_width, int(std::strlen(setting.key)));
     auto row = [&](const char* key, const std::string& value) {
         for (const SettingInfo& setting : kSettings)
             if (std::string(setting.key) == key) {
-                std::fprintf(stderr, "  %-16s %-12s %s\n", key, value.c_str(),
+                std::fprintf(stderr, "  %-*s  %-12s %s\n", key_width, key, value.c_str(),
                              setting.description);
                 return;
             }
@@ -271,12 +294,6 @@ int config_command() {
     row("frame_energy", show_number(config.frame_energy));
     row("min_energy", show_number(config.min_energy));
     row("min_utterance", show_number(config.min_utterance));
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "frame_energy",
-                 show_number(config.frame_energy).c_str(), kSettings[12].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "min_energy",
-                 show_number(config.min_energy).c_str(), kSettings[13].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "min_utterance",
-                 show_number(config.min_utterance).c_str(), kSettings[14].description);
     std::fprintf(stderr,
                  "\nChange one with:  mynah set <key>=<value>     e.g.  mynah set "
                  "language=uk\n");
@@ -454,13 +471,13 @@ int run_engine() {
         injector = mynah::inject::make_clipboard(tools);
     else injector = mynah::inject::make_smart(tools);
 
+    // Both pointers are set before the socket accepts its first command —
+    // the only thing that can start a session, and so the first event.
     struct EngineContext {
-        mynah_engine* engine = nullptr;
         mynah::control::Server* server = nullptr;
-        mynah::inject::Injector* injector = nullptr;
+        mynah::inject::TypingQueue* typing = nullptr;
     };
     EngineContext context;
-    context.injector = injector.get();
 
     mynah_event_fn on_event = [](const mynah_event* event, void* user) {
         auto* ctx = static_cast<EngineContext*>(user);
@@ -475,13 +492,9 @@ int run_engine() {
                                        bands_json(mynah_event_bands(event)));
             break;
         case MYNAH_EVENT_TEXT: {
-            // Publishing here means the event fires exactly when the text
-            // really landed: a failed wtype publishes nothing, same as the
-            // Python engine.
-            const char* text = mynah_event_text(event);
-            if (text != nullptr && ctx->injector->type_text(text))
-                ctx->server->publish("{\"event\":\"text\",\"text\":" +
-                                      mynah::json::quoted(text) + "}");
+            // Typing blocks and this callback must not (mynah.h): queued,
+            // typed on the queue's thread, published there once it landed.
+            if (const char* text = mynah_event_text(event)) ctx->typing->push(text);
             break;
         }
         case MYNAH_EVENT_PROBLEM: {
@@ -514,10 +527,9 @@ int run_engine() {
         std::free(error);
         return 1;
     }
-    context.engine = engine;
 
-    // The engine exists and nothing has started a session yet — no event
-    // can fire — so the socket can be wired now.
+    // The engine exists and nothing has started a session yet, so no event
+    // can fire until the socket below accepts a command.
     std::atomic<bool> quit_requested{false};
     mynah::control::Server::Handlers wired;
     wired.toggle = [engine] { mynah_toggle(engine); };
@@ -526,20 +538,29 @@ int run_engine() {
     wired.quit = [&quit_requested] { quit_requested.store(true); };
     wired.state = [engine] { return std::string(state_word(mynah_get_state(engine))); };
     mynah::control::Server server(std::move(wired), mynah::control::socket_path(), kVersion);
+    // The `text` event means the text really landed: a failed injection
+    // publishes nothing, same as the Python engine.
+    auto typing = std::make_unique<mynah::inject::TypingQueue>(
+        [&injector](const std::string& text) { return injector->type_text(text); },
+        [&server](const std::string& text) {
+            server.publish("{\"event\":\"text\",\"text\":" + mynah::json::quoted(text) + "}");
+        });
+    context.server = &server;
+    context.typing = typing.get();
     try {
         server.start();
     } catch (const std::exception& e) {
         mynah_destroy(engine);
         return fail(e.what());
     }
-    context.server = &server;
 
     // Capture: PipeWire straight into the engine's ring.
     mynah::capture::PipeWireCapture capture(engine);
     if (!capture.start()) {
         std::fprintf(stderr, "mynah: microphone: %s\n", capture.error().c_str());
-        server.stop();
         mynah_destroy(engine);
+        typing.reset();
+        server.stop();
         return 1;
     }
 
@@ -550,10 +571,14 @@ int run_engine() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
+    // Engine first, so no event arrives after this; then what is still
+    // queued is typed while the socket can still tell subscribers; then the
+    // socket.
     capture.stop();
     mynah_stop(engine);
-    server.stop();
     mynah_destroy(engine);
+    typing.reset();
+    server.stop();
     return 0;
 }
 
@@ -588,7 +613,12 @@ int main(int argc, char** argv) {
     if (command == "setup" || command == "doctor")
         return mynah::setup::report(mynah::setup::run_checks());
     if (command == "config" || command == "cfg") return config_command();
-    if (command == "set" && args.size() > 1) return set_command(args[1]);
+    if (command == "set") {
+        if (args.size() != 2)
+            return fail("set takes one KEY=VALUE, e.g. mynah set language=uk — "
+                        "mynah config lists the keys");
+        return set_command(args[1]);
+    }
     if (command == "service") {
         std::string action = args.size() > 1 ? args[1] : "status";
         if (action == "install") return mynah::systemd::install();
@@ -602,8 +632,19 @@ int main(int argc, char** argv) {
     if (command == "status") return control_command("status");
     if (command == "watch") {
         double timeout = 2.0;
-        for (std::size_t i = 1; i + 1 < args.size(); ++i)
-            if (args[i] == "--timeout") timeout = std::stod(args[i + 1]);
+        for (std::size_t i = 1; i < args.size(); ++i) {
+            if (args[i] != "--timeout") continue;
+            if (i + 1 == args.size()) return fail("--timeout needs a number of seconds");
+            std::size_t used = 0;
+            try {
+                timeout = std::stod(args[i + 1], &used);
+            } catch (const std::exception&) {
+                used = 0;
+            }
+            if (used != args[i + 1].size() || !(timeout > 0.0))
+                return fail("--timeout is a number of seconds above 0, got '" + args[i + 1] + "'");
+            ++i;
+        }
         return watch_command(timeout);
     }
     if (command == "models") {

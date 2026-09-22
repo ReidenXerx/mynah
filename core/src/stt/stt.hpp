@@ -18,6 +18,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace mynah::stt {
 
@@ -27,8 +28,14 @@ public:
 
     // Load the model file. Seconds on a cold start; runs on the session's
     // loader thread, off every other thread. Returns false on failure.
-    virtual bool load(const std::filesystem::path& model) = 0;
+    // `discrete_gpu` is config `gpu`: whether a discrete GPU may run it
+    // (see choose_gpu); ignored on macOS, where it is always Metal (M4).
+    virtual bool load(const std::filesystem::path& model, bool discrete_gpu) = 0;
     virtual bool is_loaded() const = 0;
+
+    // Whether load() with the same `discrete_gpu` would run on a GPU — what
+    // an empty `model` resolves to depends on it (models::resolve).
+    virtual bool gpu_available(bool discrete_gpu) const = 0;
 
     // Free the model — the "zero RAM at idle" behaviour. The session calls
     // this after idle_timeout and the engine on destroy.
@@ -47,5 +54,23 @@ public:
 // whisper.cpp on the compute backend the platform gives it (Metal on
 // Apple Silicon).
 std::unique_ptr<SpeechToText> make_whisper();
+
+// The GPU policy on Linux (docs/ENGINE-MIGRATION.md, "Linux model tiers"):
+// an integrated GPU is used automatically; a discrete one only when the
+// user opted in (config `gpu`), and then in preference to the integrated
+// one. `gpus` lists the GPU-type devices in ggml's registry order; the
+// result indexes into it — which is how whisper_context_params::gpu_device
+// counts — or is empty for the CPU.
+enum class GpuKind { Discrete, Integrated };
+std::optional<int> choose_gpu(const std::vector<GpuKind>& gpus, bool discrete_allowed);
+
+// choose_gpu over the devices this process can see, with their names;
+// empty for the CPU. Registers ggml's backends first if nothing has.
+struct GpuChoice {
+    int index = 0;      // for whisper_context_params::gpu_device
+    std::string name;   // ggml's device description, for logs and setup
+    GpuKind kind = GpuKind::Integrated;
+};
+std::optional<GpuChoice> pick_gpu(bool discrete_allowed);
 
 } // namespace mynah::stt

@@ -5,6 +5,7 @@
 #include <curl/curl.h>
 
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <cstdio>
 #include <filesystem>
@@ -30,21 +31,34 @@ struct FetchContext {
     bool write_failed = false; // disk full, or the file went away
 };
 
+} // namespace
+
+namespace detail {
+
+// Content-Length, matched case-insensitively: HTTP/2 — which HuggingFace
+// and its CDN speak — sends header names in lowercase, and the old exact
+// match never saw one, so the size check and the progress were silently
+// off. A status line starts a new response: following HuggingFace's redirect
+// to its CDN, the redirect's own length must not stand for the file's.
 void header_total(const char* header, std::uint64_t& total) {
-    constexpr std::string_view prefix = "Content-Length:";
     std::string_view line(header);
-    if (line.rfind(prefix, 0) == 0) {
-        line.remove_prefix(prefix.size());
-        while (!line.empty() && (line.front() == ' ' || line.front() == '\t'))
-            line.remove_prefix(1);
-        std::uint64_t value = 0;
-        if (std::from_chars(line.data(), line.data() + line.size(), value).ec ==
-            std::errc{})
-            total = value;
+    if (line.rfind("HTTP/", 0) == 0) {
+        total = 0;
+        return;
     }
+    constexpr std::string_view name = "content-length:";
+    if (line.size() < name.size()) return;
+    for (std::size_t i = 0; i < name.size(); ++i)
+        if (std::tolower(static_cast<unsigned char>(line[i])) != name[i]) return;
+    line.remove_prefix(name.size());
+    while (!line.empty() && (line.front() == ' ' || line.front() == '\t'))
+        line.remove_prefix(1);
+    std::uint64_t value = 0;
+    if (std::from_chars(line.data(), line.data() + line.size(), value).ec == std::errc{})
+        total = value;
 }
 
-} // namespace
+} // namespace detail
 
 std::string file_sha256(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
@@ -80,7 +94,7 @@ namespace {
 
 size_t on_header(char* data, size_t size, size_t count, void* user) {
     auto* context = static_cast<FetchContext*>(user);
-    header_total(data, context->total); // Content-Length, when present
+    detail::header_total(data, context->total); // Content-Length, when present
     return size * count;
 }
 

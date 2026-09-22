@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 struct mynah_engine;
@@ -28,8 +29,10 @@ public:
 
     // Connect the stream. Returns false with `error()` set when PipeWire
     // is not reachable — the daemon not running is the normal reason on a
-    // bare ssh session, and the remedy names it.
+    // bare ssh session, and the remedy names it. A failed start leaves
+    // nothing behind, and start() may be called again.
     bool start();
+    // Idempotent; the destructor calls it.
     void stop();
 
     const std::string& error() const { return error_; }
@@ -40,7 +43,7 @@ public:
     struct Impl;
 
 private:
-    Impl* impl_ = nullptr;
+    std::unique_ptr<Impl> impl_;
     std::string error_;
 };
 

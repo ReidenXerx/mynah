@@ -35,12 +35,14 @@ public:
     std::vector<std::size_t> call_sample_counts; // mirror of calls
     std::function<std::string()> result = [] { return "привет мир"; };
 
-    bool load(const std::filesystem::path&) override {
+    bool load(const std::filesystem::path&, bool) override {
         if (on_load) on_load();
         loaded.store(true);
         return load_result;
     }
     bool is_loaded() const override { return loaded.load(); }
+    // No GPU: the tests never touch Vulkan (nor wake a dGPU).
+    bool gpu_available(bool) const override { return false; }
     void unload() override { loaded.store(false); }
     std::optional<std::string> transcribe(const float*, std::size_t count,
                                           const std::string& language,

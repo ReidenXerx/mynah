@@ -46,6 +46,11 @@ TEST_CASE("every model in the table is honest about its source") {
         CHECK(info->filename.size() > 4);
         CHECK(std::string_view(info->filename).substr(info->filename.size() - 4) ==
               ".bin");
+        // A fixed revision, never `main`, and the hash to check it by.
+        CHECK(info->url.find("/resolve/main/") == std::string_view::npos);
+        CHECK(info->url.substr(info->url.size() - info->filename.size()) == info->filename);
+        CHECK(info->sha256.size() == 64);
+        CHECK(info->sha256.find_first_not_of("0123456789abcdef") == std::string_view::npos);
     }
 }
 

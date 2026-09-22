@@ -8,12 +8,16 @@
 #include "vendor/doctest.h"
 
 #include <filesystem>
+#include <iterator>
+#include <optional>
+#include <set>
 #include <fstream>
 #include <string>
 #include <vector>
 
 #include "env.hpp"
 #include "models/resolve.hpp"
+#include "stt/stt.hpp"
 
 using mynah::models::alias_from_filename;
 using mynah::models::resolve;
@@ -42,7 +46,7 @@ std::string filename_of(const std::filesystem::path& path) {
 
 TEST_CASE("resolves a full alias like large-v3-turbo-q5_0") {
     auto [dir, dirs] = make_disk({"ggml-large-v3-turbo-q5_0.bin"});
-    CHECK(filename_of(resolve("large-v3-turbo-q5_0", dirs)) ==
+    CHECK(filename_of(resolve("large-v3-turbo-q5_0", dirs, false)) ==
           "ggml-large-v3-turbo-q5_0.bin");
 }
 
@@ -50,40 +54,40 @@ TEST_CASE("resolves a filename written in config as if it were an alias") {
     // The settings UI shows filenames (ggml-medium.bin); a user copying
     // that into the config must not get "no model found".
     auto [dir, dirs] = make_disk({"ggml-medium.bin"});
-    CHECK(filename_of(resolve("ggml-medium.bin", dirs)) == "ggml-medium.bin");
+    CHECK(filename_of(resolve("ggml-medium.bin", dirs, false)) == "ggml-medium.bin");
 }
 
 TEST_CASE("short alias 'turbo' resolves when exactly one turbo variant exists") {
     auto [dir, dirs] = make_disk({"ggml-large-v3-turbo-q5_0.bin"});
-    CHECK(filename_of(resolve("turbo", dirs)) == "ggml-large-v3-turbo-q5_0.bin");
+    CHECK(filename_of(resolve("turbo", dirs, false)) == "ggml-large-v3-turbo-q5_0.bin");
 }
 
 TEST_CASE("short alias 'turbo' is ambiguous with two variants — resolves to nothing") {
     auto [dir, dirs] =
         make_disk({"ggml-large-v3-turbo.bin", "ggml-large-v3-turbo-q5_0.bin"});
-    CHECK(resolve("turbo", dirs).empty());
+    CHECK(resolve("turbo", dirs, false).empty());
 }
 
 TEST_CASE("prefix 'large-v3' picks the best on-disk variant by preference order") {
     auto [dir, dirs] = make_disk({"ggml-large-v3.bin", "ggml-large-v3-q5_0.bin"});
-    CHECK(filename_of(resolve("large-v3", dirs)) == "ggml-large-v3.bin");
+    CHECK(filename_of(resolve("large-v3", dirs, false)) == "ggml-large-v3.bin");
 }
 
 TEST_CASE("prefix 'large-v3' resolves a quantized-only disk") {
     auto [dir, dirs] = make_disk({"ggml-large-v3-q5_0.bin"});
-    CHECK(filename_of(resolve("large-v3", dirs)) == "ggml-large-v3-q5_0.bin");
+    CHECK(filename_of(resolve("large-v3", dirs, false)) == "ggml-large-v3-q5_0.bin");
 }
 
 TEST_CASE("prefix never rewrites an explicit quantized request") {
     auto [dir, dirs] =
         make_disk({"ggml-large-v3-turbo.bin", "ggml-large-v3-turbo-q5_0.bin"});
-    CHECK(filename_of(resolve("large-v3-turbo-q5_0", dirs)) ==
+    CHECK(filename_of(resolve("large-v3-turbo-q5_0", dirs, false)) ==
           "ggml-large-v3-turbo-q5_0.bin");
 }
 
 TEST_CASE("an unknown name resolves to nothing, not to a fallback") {
     auto [dir, dirs] = make_disk({"ggml-large-v3.bin"});
-    CHECK(resolve("nonexistent-model", dirs).empty());
+    CHECK(resolve("nonexistent-model", dirs, false).empty());
 }
 
 TEST_CASE("auto-pick (empty configured) walks the full five-class preference") {
@@ -103,7 +107,28 @@ TEST_CASE("auto-pick (empty configured) walks the full five-class preference") {
               alias_from_filename(mynah::models::kPreference[i]));
 
     auto [dir, dirs] = make_disk({"ggml-small.bin"});
-    CHECK(filename_of(resolve("", dirs)) == "ggml-small.bin");
+    CHECK(filename_of(resolve("", dirs, false)) == "ggml-small.bin");
+}
+
+TEST_CASE("an empty model is turbo on a GPU, the CPU-safe small without one") {
+    auto [dir, dirs] = make_disk({"ggml-large-v3-turbo.bin", "ggml-small.bin", "ggml-base.bin"});
+    CHECK(filename_of(resolve("", dirs, true)) == "ggml-large-v3-turbo.bin");
+#if defined(__APPLE__)
+    // Metal, always (M4): no CPU order to fall to.
+    CHECK(filename_of(resolve("", dirs, false)) == "ggml-large-v3-turbo.bin");
+#else
+    CHECK(filename_of(resolve("", dirs, false)) == "ggml-small.bin");
+    // The same eleven models, only reordered: nothing auto-picks on one
+    // platform and not the other.
+    std::set<std::string> untiered(std::begin(mynah::models::kUntieredPreference),
+                                   std::end(mynah::models::kUntieredPreference));
+    std::set<std::string> preferred(std::begin(mynah::models::kPreference),
+                                    std::end(mynah::models::kPreference));
+    CHECK(untiered == preferred);
+    // Turbo alone still resolves on a CPU: slow, but working.
+    auto [turbo_dir, turbo_dirs] = make_disk({"ggml-large-v3-turbo.bin"});
+    CHECK(filename_of(resolve("", turbo_dirs, false)) == "ggml-large-v3-turbo.bin");
+#endif
 }
 
 TEST_CASE("alias_from_filename mirrors _alias_from_name") {
@@ -115,9 +140,9 @@ TEST_CASE("alias_from_filename mirrors _alias_from_name") {
 
 TEST_CASE("non-ggml and non-bin files are not discovered as aliases") {
     auto [dir, dirs] = make_disk({"ggml-medium.bin", "random.bin", "not-a-model.txt"});
-    CHECK(filename_of(resolve("medium", dirs)) == "ggml-medium.bin");
-    CHECK(resolve("random", dirs).empty());
-    CHECK(resolve("not-a-model", dirs).empty());
+    CHECK(filename_of(resolve("medium", dirs, false)) == "ggml-medium.bin");
+    CHECK(resolve("random", dirs, false).empty());
+    CHECK(resolve("not-a-model", dirs, false).empty());
 }
 
 TEST_CASE("an explicit path wins over the search directories") {
@@ -127,7 +152,7 @@ TEST_CASE("an explicit path wins over the search directories") {
         std::ofstream out(explicit_file, std::ios::binary);
         out << "x";
     }
-    CHECK(resolve(explicit_file.string(), dirs) == explicit_file);
+    CHECK(resolve(explicit_file.string(), dirs, false) == explicit_file);
 }
 TEST_CASE("MYNAH_MODEL_DIR is searched first, as it is in the Python engine") {
     auto [dir, _] = make_disk({"ggml-small.bin"});
@@ -137,7 +162,7 @@ TEST_CASE("MYNAH_MODEL_DIR is searched first, as it is in the Python engine") {
     REQUIRE(!dirs.empty());
     CHECK(dirs.front() == dir.path());
     // And it resolves through the real search path, not just a passed-in list.
-    CHECK(filename_of(mynah::models::resolve("small", dirs)) == "ggml-small.bin");
+    CHECK(filename_of(mynah::models::resolve("small", dirs, false)) == "ggml-small.bin");
 }
 
 TEST_CASE("the search path carries this platform's conventional directories") {
@@ -158,4 +183,20 @@ TEST_CASE("the search path carries this platform's conventional directories") {
     CHECK(has(".local/share/mynah/models"));
     CHECK(has("/usr/share/whisper.cpp"));
 #endif
+}
+
+TEST_CASE("the GPU policy: integrated by default, discrete only when opted in") {
+    using mynah::stt::GpuKind;
+    using mynah::stt::choose_gpu;
+    const std::vector<GpuKind> laptop{GpuKind::Discrete, GpuKind::Integrated};
+    // This machine's shape: ggml can list the dGPU first. With `gpu` off it
+    // must not be the one that runs.
+    CHECK(choose_gpu(laptop, false) == std::optional<int>(1));
+    CHECK(choose_gpu(laptop, true) == std::optional<int>(0));
+    // Only a discrete GPU: the CPU unless opted in.
+    CHECK(choose_gpu({GpuKind::Discrete}, false) == std::nullopt);
+    CHECK(choose_gpu({GpuKind::Discrete}, true) == std::optional<int>(0));
+    // Opted in with no discrete GPU: the integrated one, not the CPU.
+    CHECK(choose_gpu({GpuKind::Integrated}, true) == std::optional<int>(0));
+    CHECK(choose_gpu({}, true) == std::nullopt);
 }

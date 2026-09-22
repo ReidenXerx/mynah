@@ -9,6 +9,8 @@
 #include "vendor/doctest.h"
 
 #include <clocale>
+#include <cstdlib>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -172,6 +174,26 @@ TEST_CASE("skips comments, blank lines and table headers") {
     CHECK(values.size() == 1);
     REQUIRE(get(values, "language"));
     CHECK(*get(values, "language") == S("uk"));
+}
+
+TEST_CASE("numbers are written the way Python's repr writes them") {
+    // Shortest round-trip digits, positional for exponents -4..15. %g went
+    // scientific at the digit count: 10.0 was "1e+01" in config.toml.
+    const std::pair<double, const char*> cases[] = {
+        {10.0, "10.0"},           {100.0, "100.0"},       {45.0, "45.0"},
+        {0.0, "0.0"},             {-0.0, "-0.0"},         {0.02, "0.02"},
+        {0.1, "0.1"},             {0.25, "0.25"},         {-3.5, "-3.5"},
+        {0.0001, "0.0001"},       {0.00001, "1e-05"},     {1.5e-05, "1.5e-05"},
+        {1e15, "1000000000000000.0"}, {1e16, "1e+16"},    {1e22, "1e+22"},
+        {1.0 / 3.0, "0.3333333333333333"},                {123456.789, "123456.789"},
+    };
+    for (const auto& [value, expected] : cases) {
+        CAPTURE(value);
+        CHECK(mynah::flat_toml::number_to_string(value) == std::string(expected));
+        CHECK(std::strtod(expected, nullptr) == value); // and it round-trips
+    }
+    CHECK(mynah::flat_toml::emit(Table{{"auto_stop_silence", D(10.0)}}) ==
+          "auto_stop_silence = 10.0\n");
 }
 
 TEST_CASE("round-trips through emit unchanged") {

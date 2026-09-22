@@ -62,4 +62,16 @@ enum Permissions {
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
         NSWorkspace.shared.open(url)
     }
+
+    /// The raw status, for diagnostics: .notDetermined means a prompt is (or
+    /// was) pending, .denied means the user (or a stale TCC entry) refused.
+    static var microphoneStatusText: String {
+        switch microphoneStatus {
+        case .notDetermined: return "notDetermined"
+        case .authorized: return "authorized"
+        case .denied: return "denied"
+        case .restricted: return "restricted"
+        @unknown default: return "unknown"
+        }
+    }
 }

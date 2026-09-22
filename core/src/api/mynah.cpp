@@ -248,12 +248,11 @@ int mynah_reload_config(mynah_engine* engine) {
 
 // --- config (the settings surface for the front ends) ----------------------
 
-namespace {
-
 // The config as a flat JSON object. Keys are snake_case, exactly the TOML
 // keys, so the front end's adapter is a dictionary lookup with no mapping
-// table to drift.
-std::string config_to_json(const mynah::config::Config& config) {
+// table to drift. C++ linkage: the extern "C" boundary is below, and this
+// returns std::string.
+static std::string config_to_json(const mynah::config::Config& config) {
     using mynah::json::quoted;
     std::ostringstream json;
     json << "{";
@@ -319,8 +318,6 @@ bool apply_json_value(mynah::config::Config& config, const std::string& key,
     else if (key == "min_utterance") { if (auto v = as_number()) { config.min_utterance = *v; return true; } }
     return false;
 }
-
-} // namespace
 
 char* mynah_config_json(const mynah_engine* engine) {
     if (!engine) return nullptr;

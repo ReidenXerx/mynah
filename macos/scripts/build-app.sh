@@ -69,6 +69,7 @@ build_with_swiftc() {
     -target "arm64-apple-macosx$DEPLOYMENT_TARGET" \
     -swift-version 6 -parse-as-library $opt \
     -Xcc "-I$VENDOR/include" \
+    -I "$ROOT/Sources/CMynah" \
     "${MYNAH_LIBS[@]}" \
     -lc++ \
     -framework Metal -framework MetalKit -framework Accelerate \
@@ -94,26 +95,37 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/MynahApp" "$APP/Contents/MacOS/MynahApp"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
-# Signing. An ad-hoc signature changes on every rebuild, so macOS sees a
-# different app each time and silently drops the Accessibility grant. Set
-# MYNAH_SIGN_IDENTITY to a stable self-signed identity to avoid that — create one
-# with scripts/create-signing-cert.sh. Distribution needs a Developer ID
-# certificate plus notarization, and every bundled dylib signed individually
-# once the Python runtime is embedded.
-IDENTITY="${MYNAH_SIGN_IDENTITY:-}"
-if [ -z "$IDENTITY" ] && security find-certificate -c mynah-dev >/dev/null 2>&1; then
-  IDENTITY="mynah-dev"   # use it automatically once it exists
+# The app icon, rendered from the repo's mark. A bundle without CFBundleIconFile
+# shows the generic placeholder tile in Finder and System Settings — which is how
+# a build gets mistaken for somebody else's.
+ICON_SRC="$ROOT/docs/assets/mynah-mark.svg"
+if [ -f "$ICON_SRC" ]; then
+  if swift "$ROOT/scripts/make-icon.swift" "$ICON_SRC" "$APP/Contents/Resources/mynah.icns"; then
+    /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string mynah" "$APP/Contents/Info.plist" 2>/dev/null \
+      || /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile mynah" "$APP/Contents/Info.plist"
+  else
+    echo "warning: icon rendering failed — the bundle will use the placeholder tile" >&2
+  fi
 fi
 
-if [ -n "$IDENTITY" ]; then
-  codesign --force --sign "$IDENTITY" "$APP" \
-    && echo "signed with '$IDENTITY' (stable across rebuilds)" \
-    || echo "warning: signing with '$IDENTITY' failed"
-else
-  codesign --force --sign - "$APP" 2>/dev/null \
-    || echo "warning: ad-hoc codesign failed; permissions may not stick"
-  echo "note: ad-hoc signed — Accessibility must be re-granted after each rebuild."
-  echo "      run scripts/create-signing-cert.sh once to stop that."
+# The build stamp: CFBundleVersion carries the build time, so the running app
+# is identifiable in the menu and in the log — the question "is this the build
+# I just made?" should never need a filesystem check to answer.
+BUILD_STAMP="$(date '+%Y.%m.%d %H:%M')"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_STAMP" "$APP/Contents/Info.plist" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_STAMP" "$APP/Contents/Info.plist"
+echo "build stamp: $BUILD_STAMP"
+
+# Signing (scripts/signing.sh): a stable identity when there is one, so the
+# Accessibility grant survives this rebuild; ad-hoc with a warning when there
+# is not. MYNAH_REQUIRE_STABLE_SIGNATURE=1 (install-app.sh sets it) makes an
+# ad-hoc signature a failure instead — a build that loses the grant on the
+# next rebuild must never be installed.
+# shellcheck source=signing.sh
+source "$ROOT/scripts/signing.sh"
+if ! mynah_sign "$APP" "$([ "${MYNAH_REQUIRE_STABLE_SIGNATURE:-0}" = 1 ] && echo stable || echo any)"; then
+  echo "error: signing failed — $APP is not usable" >&2
+  exit 1
 fi
 
 echo "built $APP"

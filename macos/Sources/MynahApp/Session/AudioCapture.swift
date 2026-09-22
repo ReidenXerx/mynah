@@ -36,6 +36,9 @@ final class AudioCapture: @unchecked Sendable {
     /// matching this class's existing `@unchecked Sendable` threading pattern.
     private var consecutiveConversionFailures = 0
 
+    /// Diagnostic counter for the phase 5 bring-up tap log (see installTap).
+    private var debugFrameCounter = 0
+
     deinit {
         if let configurationObserver {
             NotificationCenter.default.removeObserver(configurationObserver)
@@ -118,12 +121,31 @@ final class AudioCapture: @unchecked Sendable {
         // than reusing the instance.
         converter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
+        // Diagnostic (phase 5 bring-up): the input format the hardware gave
+        // us, logged once per session — a 0 Hz / 0-channel format here means
+        // the engine started against a dead input.
+        let channels = Int(inputFormat.channelCount)
+        let rate = Int(inputFormat.sampleRate)
+        Log.audio.notice(
+            "tap installed: input \(rate, privacy: .public) Hz, \(channels, privacy: .public) ch")
+
         input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self] buffer, _ in
             guard let self, let converted = self.convert(buffer, to: targetFormat) else {
                 self?.noteConversionFailure()
                 return
             }
             self.consecutiveConversionFailures = 0
+            // Diagnostic (phase 5 bring-up): once a second, what the tap is
+            // actually delivering — peak amplitude over the window. A flat
+            // 0.000 while speaking means the hardware is delivering silence
+            // and this is a device/permission problem, not an engine one.
+            if let peak = converted.map({ abs($0) }).max() {
+                debugFrameCounter += 1
+                if debugFrameCounter == 1 || debugFrameCounter % 34 == 0 {
+                    Log.audio.debug(
+                        "tap → \(converted.count, privacy: .public) samples, peak \(peak, format: .fixed(precision: 4), privacy: .public)")
+                }
+            }
             self.onFrame?(converted)
         }
     }

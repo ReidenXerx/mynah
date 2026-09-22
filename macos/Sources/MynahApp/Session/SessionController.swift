@@ -49,6 +49,13 @@ final class SessionController: ObservableObject {
     /// (M5). The engine reports the degradation as a `vad_degraded` problem.
     @Published private(set) var isVADDegraded = false
 
+    /// The microphone permission as AVFoundation sees it, polled alongside
+    /// Accessibility. Surfaced in the menu: a session that cannot hear is
+    /// indistinguishable from a broken engine unless THIS is visible (phase
+    /// 5 bring-up: an unanswered .notDetermined parked every session with a
+    /// live pill and a dead mic).
+    @Published private(set) var microphoneStatusText: String = Permissions.microphoneStatusText
+
     private let capture = AudioCapture()
 
     /// The engine pointer lives in a Sendable box so the nonisolated deinit
@@ -90,9 +97,23 @@ final class SessionController: ObservableObject {
     // MARK: - Trigger
 
     func toggleSession() {
-        guard let engine else { return }
-        mynah_toggle(engine)
+        // The app owns capture: the tap is armed in startSession, so the
+        // toggle MUST route through it. Calling mynah_toggle directly runs
+        // the engine with nobody pushing samples — a listening pill with a
+        // dead microphone (the exact bug this fixed).
+        isEngaged ? endSession() : startSession()
     }
+
+    /// True from `startSession` until `endSession` — what the microphone
+    /// task waits on. The engine's LOADING→LISTENING state events travel
+    /// through the sink and hop to the main actor, so `isEngaged` can still
+    /// read idle for a few runloop ticks after a start; gating the capture
+    /// on it raced and silently skipped arming the mic (the pill showed a
+    /// live session with a dead microphone), so the intent is tracked
+    /// explicitly instead of observed through the event stream.
+    private var sessionWanted = false
+    /// Diagnostic counter (phase 5 bring-up), see handle(.level).
+    private var levelEventCount = 0
 
     /// Starts a session. The model load happens inside the engine — the
     /// LOADING state arrives as an event, and a second press of the hotkey
@@ -102,15 +123,24 @@ final class SessionController: ObservableObject {
     /// for that whole session.
     func startSession() {
         guard let engine, !isEngaged else { return }
+        sessionWanted = true
         lastError = nil
+        // Diagnostic (phase 5 bring-up): what AVFoundation believes about the
+        // mic before anything else happens — .notDetermined here means the
+        // permission prompt below was never answered and the tap will not arm
+        // until it is.
+        Log.session.notice("session start: mic status \(Permissions.microphoneStatusText, privacy: .public)")
         mynah_start(engine)
 
         Task { [weak self] in
-            guard let self else { return }
+            guard let self, sessionWanted else { return }
             let granted = await Permissions.requestMicrophone()
-            guard isEngaged else { return } // cancelled during the prompt or the load
+            guard sessionWanted else { return } // ended while prompting or loading
             if granted {
                 do {
+                    // Arms even while the engine is still LOADING: samples
+                    // pushed before it finishes are dropped by the ring, so
+                    // nothing is lost and nothing is late.
                     try startCapture()
                 } catch {
                     Log.audio.error(
@@ -131,6 +161,7 @@ final class SessionController: ObservableObject {
         guard let engine else { return }
         // Returns at once; remaining utterances arrive as events and the
         // state falls back to idle as they complete.
+        sessionWanted = false
         mynah_stop(engine)
         isSessionActive = false
         level = 0
@@ -223,6 +254,7 @@ final class SessionController: ObservableObject {
         } onConfigurationChange: { [weak self] in
             Task { @MainActor in self?.handleCaptureConfigurationChange() }
         }
+        Log.audio.notice("capture armed — tap running, pushing into the engine")
     }
 
     private func handleCaptureConfigurationChange() {
@@ -250,6 +282,14 @@ final class SessionController: ObservableObject {
         // Clear the stale complaint as soon as the grant lands, so the menu does
         // not keep accusing the user of something they have already done.
         if trusted, lastError?.contains("Accessibility") == true { lastError = nil }
+    }
+
+    /// Re-read the microphone permission; called on the same timer.
+    func refreshMicrophoneStatus() {
+        let text = Permissions.microphoneStatusText
+        guard text != microphoneStatusText else { return }
+        Log.ui.notice("microphone status changed: \(text, privacy: .public)")
+        microphoneStatusText = text
     }
 
     /// Surface a failure raised outside the controller (e.g. hotkey registration).
@@ -286,9 +326,24 @@ final class SessionController: ObservableObject {
         case .state:
             state = event.state
             isSessionActive = event.state != .idle
-            if event.state == .idle { level = 0 }
+            if event.state == .idle {
+                level = 0
+                // The session ended by itself (auto-stop, capture error):
+                // sync the intent flag, or a later microphone task would arm
+                // a tap for a session nobody asked for.
+                sessionWanted = false
+                capture.stop()
+            }
         case .level:
             level = event.level
+            // Diagnostic (phase 5 bring-up): the first level events prove the
+            // engine is processing frames and publishing; their values say
+            // whether the audio is silence or voice.
+            levelEventCount += 1
+            if levelEventCount == 1 || levelEventCount % 300 == 0 {
+                Log.session.notice(
+                    "level event #\(self.levelEventCount, privacy: .public): \(event.level, format: .fixed(precision: 3), privacy: .public)")
+            }
         case .text:
             // The last line of defence (the hallucination filter) already ran
             // in the core; this is where the text reaches the keyboard.

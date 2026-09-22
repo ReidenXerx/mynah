@@ -169,6 +169,10 @@ struct SettingsView: View {
     }
 }
 
+// Previews use SessionController.preview, a DEBUG-only fixture, so they
+// are DEBUG-only too; otherwise a release build cannot compile them.
+#if DEBUG
 #Preview("Settings") {
     SettingsView(controller: .preview(state: .idle))
 }
+#endif

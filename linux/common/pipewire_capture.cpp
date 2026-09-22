@@ -5,6 +5,7 @@
 #include <spa/param/audio/raw.h>
 #include <spa/utils/result.h>
 
+#include <cstdint>
 #include <cstring>
 
 #include "mynah/mynah.h"

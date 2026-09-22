@@ -16,8 +16,33 @@ project(mynah
 option(MYNAH_BUILD_TESTS "Build the libmynah test suite" ON)
 option(MYNAH_BUILD_LINUX "Build the Linux front end (auto on Linux; off for an app-only build)" ON)
 
+# Sanitized builds for the tests (docs/LINUX-KDE-PLAN.md, Stage 1): the
+# engine is threaded, and ASan/TSan are how that stays honest. Applied to
+# everything, whisper.cpp included, so TSan sees every access.
+set(MYNAH_SANITIZE "" CACHE STRING "Build under a sanitizer: address (with UB), thread, or empty")
+set_property(CACHE MYNAH_SANITIZE PROPERTY STRINGS "" address thread)
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    # Unset means -O0 for the core and whisper.cpp alike — a dev build that
+    # transcribes at a fraction of real speed. The PKGBUILD passes Release.
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE)
+endif()
+
 if(MYNAH_BUILD_TESTS)
     enable_testing()
+endif()
+
+if(MYNAH_SANITIZE STREQUAL "address")
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+elseif(MYNAH_SANITIZE STREQUAL "thread")
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=thread)
+    # libgomp is not instrumented: under OpenMP every ggml worker handoff
+    # reads as a race. ggml's own thread pool is plain atomics TSan can see.
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+elseif(NOT MYNAH_SANITIZE STREQUAL "")
+    message(FATAL_ERROR "MYNAH_SANITIZE is '${MYNAH_SANITIZE}': use address, thread, or leave it empty")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -49,6 +74,48 @@ if(APPLE)
     if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "" FORCE)
     endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The CPU level the CPU backend is compiled for. The binary is static
+    # (no GGML_BACKEND_DL, so no runtime pick between CPU variants), so this
+    # is fixed at build time. x86-64-v3 — AVX2, FMA, F16C, BMI2: every Intel
+    # Core since Haswell (2013), every AMD since Excavator (2015) — is what
+    # the package ships; GGML_NATIVE=OFF alone would mean baseline x86-64,
+    # no AVX at all, and the CPU tiers several times slower. `native` is for
+    # a build that only ever runs on the machine that built it.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+        set(MYNAH_CPU "x86-64-v3" CACHE STRING "CPU level for the CPU backend: x86-64-v3 (the package) or native (this machine)")
+    else()
+        set(MYNAH_CPU "native" CACHE STRING "CPU level for the CPU backend: native (x86-64-v3 is x86 only)")
+    endif()
+    set_property(CACHE MYNAH_CPU PROPERTY STRINGS x86-64-v3 native)
+    if(MYNAH_CPU STREQUAL "native")
+        set(GGML_NATIVE ON CACHE BOOL "" FORCE)
+    elseif(MYNAH_CPU STREQUAL "x86-64-v3")
+        set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+        foreach(feature GGML_SSE42 GGML_AVX GGML_AVX2 GGML_FMA GGML_F16C GGML_BMI2)
+            set(${feature} ON CACHE BOOL "" FORCE)
+        endforeach()
+        # AVX-VNNI is not part of v3: Haswell through Zen 4 lack it. Whether
+        # it is worth a second level is measured in Stage 5, not assumed.
+        set(GGML_AVX_VNNI OFF CACHE BOOL "" FORCE)
+    else()
+        message(FATAL_ERROR "MYNAH_CPU is '${MYNAH_CPU}': use x86-64-v3 or native")
+    endif()
+
+    # The gpu tier (docs/ENGINE-MIGRATION.md, "Linux model tiers") runs on
+    # ggml's Vulkan backend. On by default so a local build is the package
+    # build; its shaders are compiled at build time with glslc.
+    option(MYNAH_VULKAN "Build ggml's Vulkan backend (the gpu tier)" ON)
+    if(MYNAH_VULKAN)
+        find_package(Vulkan COMPONENTS glslc QUIET)
+        if(NOT Vulkan_FOUND)
+            message(FATAL_ERROR
+                "MYNAH_VULKAN needs the Vulkan headers and glslc.\n"
+                "  Arch:  sudo pacman -S vulkan-headers shaderc\n"
+                "Or build CPU-only with -DMYNAH_VULKAN=OFF.")
+        endif()
+    endif()
+    set(GGML_VULKAN ${MYNAH_VULKAN} CACHE BOOL "" FORCE)
 endif()
 add_subdirectory(third_party/whisper.cpp)
 

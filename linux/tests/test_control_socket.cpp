@@ -172,6 +172,8 @@ TEST_CASE("a bare word is a command too") {
     auto replies = fixture.talk({"stop"});
     REQUIRE(replies.size() == 1);
     CHECK(replies[0].find("ok")->boolean == true);
+    // Acknowledged first, run afterwards — wait for it, as above.
+    REQUIRE(fixture.engine.await_calls(1));
     CHECK(fixture.engine.take_calls() == std::vector<std::string>{"stop"});
 }
 
@@ -281,6 +283,9 @@ TEST_CASE("a slow handler does not hold the reply") {
                    "s for the handler")
                       .c_str());
     ::close(fd);
+    // Acknowledged first, run afterwards: the handler may not have begun yet.
+    for (int i = 0; i < 200 && !started.load(); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     CHECK(started.load());
     release.store(true);
     server.stop();

@@ -54,6 +54,25 @@ TEST_CASE("falls back to defaults for missing and mistyped keys") {
     CHECK(config.language == "ru");
 }
 
+TEST_CASE("transcription_mode normalises: on_stop is kept, anything else is live") {
+    Config on_stop = mynah::config::from_values(
+        mynah::flat_toml::parse("transcription_mode = \"on_stop\""));
+    CHECK(on_stop.transcription_mode == "on_stop");
+
+    Config live = mynah::config::from_values(
+        mynah::flat_toml::parse("transcription_mode = \"live\""));
+    CHECK(live.transcription_mode == "live");
+
+    // A hand-edited bogus value must not silently change behaviour: it
+    // reads as the default.
+    Config bogus = mynah::config::from_values(
+        mynah::flat_toml::parse("transcription_mode = \"whenever\""));
+    CHECK(bogus.transcription_mode == "live");
+
+    Config absent; // the default
+    CHECK(absent.transcription_mode == "live");
+}
+
 TEST_CASE("default_path honours MYNAH_CONFIG_DIR, or ignores it when empty") {
     // The baseline with the variable absent — captured first, restored after.
     std::filesystem::path baseline;

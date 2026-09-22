@@ -19,6 +19,10 @@ struct AppConfig: Equatable {
     var prompt = ""
     var hotkey = "<cmd>+<shift>+."
     var trigger = "toggle"
+    /// "live" transcribes each utterance as you pause (default);
+    /// "on_stop" buffers the whole session and transcribes once at the end
+    /// — one coherent decode, text arrives after the session closes.
+    var transcriptionMode = "live"
     var injector = ""
     var vad = true
     var gpu = false
@@ -46,6 +50,7 @@ struct AppConfig: Equatable {
         if let v = values["prompt"] as? String { prompt = v }
         if let v = values["hotkey"] as? String { hotkey = v }
         if let v = values["trigger"] as? String { trigger = v }
+        if let v = values["transcription_mode"] as? String { transcriptionMode = v }
         if let v = values["injector"] as? String { injector = v }
         if let v = values["vad"] as? Bool { vad = v }
         if let v = values["gpu"] as? Bool { gpu = v }
@@ -89,6 +94,7 @@ extension AppConfig {
         add("prompt", prompt, other.prompt)
         add("hotkey", hotkey, other.hotkey)
         add("trigger", trigger, other.trigger)
+        add("transcription_mode", transcriptionMode, other.transcriptionMode)
         add("injector", injector, other.injector)
         add("vad", vad, other.vad)
         add("gpu", gpu, other.gpu)

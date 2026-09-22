@@ -495,6 +495,59 @@ TEST_CASE("a hallucination is dropped, never typed") {
     REQUIRE(harness.tape->await("state:idle"));
 }
 
+TEST_CASE("on_stop mode transcribes once, at session end") {
+    // Dudu's second mode: the session's audio is buffered whole and decoded
+    // once, when the session ends — no text, no transcription while the
+    // session is open, however many pauses it contains (live mode would
+    // have produced one transcription per pause).
+    mynah::config::Config config = test_config();
+    config.transcription_mode = "on_stop";
+    Harness harness(config);
+    harness.engine->start();
+    REQUIRE(harness.tape->await("state:listening"));
+
+    // Two clips separated by a long-enough gap to close two utterances in
+    // live mode; in on_stop mode neither may transcribe while the session
+    // is open.
+    std::vector<float> first = utterance_clip();
+    std::size_t first_samples = first.size();
+    harness.engine->push_audio(first.data(), first.size());
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    CHECK(harness.stt->calls.empty()); // nothing decoded mid-session
+    CHECK(!harness.tape->contains("text:"));
+
+    harness.engine->push_audio(first.data(), first.size());
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    CHECK(harness.stt->calls.empty()); // still buffered
+
+    // The stop is what starts the transcription: one decode of the whole
+    // session, then the text.
+    harness.engine->stop();
+    REQUIRE(harness.tape->await("text:привет мир", 20000));
+    REQUIRE(harness.stt->calls.size() == 1);
+    // The batch is the WHOLE session's frames — live mode would carry only
+    // the trimmed last utterance.
+    CHECK(harness.stt->call_sample_counts[0] > first_samples);
+
+    REQUIRE(harness.tape->await("state:idle"));
+}
+
+TEST_CASE("live mode (the default) transcribes while the session is open") {
+    // The mode key's absence means live — the batch branch must not have
+    // changed the default.
+    Harness harness(test_config());
+    harness.engine->start();
+    REQUIRE(harness.tape->await("state:listening"));
+
+    std::vector<float> clip = utterance_clip();
+    harness.engine->push_audio(clip.data(), clip.size());
+    REQUIRE(harness.tape->await("text:привет мир", 20000)); // mid-session
+    CHECK(harness.engine->is_capturing());
+    harness.engine->stop();
+    REQUIRE(harness.tape->await("state:idle"));
+    CHECK(harness.stt->calls.size() == 1);
+}
+
 TEST_CASE("queued utterances merge into one transcription") {
     Harness harness(test_config());
     // A latch, not a sleep: the first transcription holds open until the

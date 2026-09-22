@@ -1,2 +1,0 @@
-/usr/bin/ar qc libparakeet.a CMakeFiles/parakeet.dir/parakeet.cpp.o
-/usr/bin/ranlib libparakeet.a

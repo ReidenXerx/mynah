@@ -8,5 +8,8 @@ build*/
 *.egg-info/
 macos/build/
 macos/.build/
+# SwiftPM's build tree at the repo root (a trailing comment on a
+# pattern line is NOT a comment — it becomes part of the pattern).
+.build/
 .DS_Store
 macos/vendor/

@@ -293,8 +293,10 @@ void write_all(int fd, const std::string& text) {
 
 } // namespace
 
-void save(const Config& config) {
-    std::filesystem::path path = default_path();
+void save(const Config& config) { save(config, default_path()); }
+
+void save(const Config& config, const std::filesystem::path& where) {
+    std::filesystem::path path = where;
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec); // first save makes ~/.config/mynah
 

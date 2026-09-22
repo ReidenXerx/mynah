@@ -97,6 +97,18 @@ struct SettingsView: View {
                 AppliesNote(.nextSession)
             }
 
+            Section {
+                Picker("Transcribe", selection: binding(\.transcriptionMode)) {
+                    Text("While speaking").tag("live")
+                    Text("On session end").tag("on_stop")
+                }
+                AppliesNote(.nextSession,
+                            detail: "While speaking: text lands each time you pause. "
+                                  + "On session end: the whole recording is transcribed "
+                                  + "in one pass when you stop — text arrives later, but "
+                                  + "each passage is decoded with full context.")
+            }
+
             ModelSectionView(controller: controller)
 
             Section {

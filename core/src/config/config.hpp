@@ -40,6 +40,13 @@ struct Config {
     std::string hotkey = "<cmd>+<shift>+.";
     // "toggle" (press to start, press again to stop) or "ptt" (hold to talk).
     std::string trigger = "toggle";
+    // Transcription timing (Dudu's request): "live" transcribes each
+    // utterance as you pause (the default, unchanged behaviour); "on_stop"
+    // buffers the whole session and transcribes once, when the session ends
+    // — one coherent decode with full context, at the cost of waiting for
+    // the text until afterwards. The Python engine's vad=false mode was
+    // exactly this.
+    std::string transcription_mode = "live";
     // VAD for utterance segmentation (P3: Silero per utterance).
     bool vad = true;
     // Seconds of continuous silence before a session stops itself (0 = off).

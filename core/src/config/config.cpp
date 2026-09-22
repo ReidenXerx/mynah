@@ -146,6 +146,10 @@ Config from_values(const flat_toml::Table& values) {
     c.idle_timeout = number_or(values, "idle_timeout", c.idle_timeout);
     c.hotkey = string_or(values, "hotkey", c.hotkey);
     c.trigger = string_or(values, "trigger", c.trigger);
+    // Tolerant normalisation: anything but the two known modes reads as the
+    // default, so a hand-edited value cannot silently change behaviour.
+    c.transcription_mode = string_or(values, "transcription_mode", c.transcription_mode);
+    if (c.transcription_mode != "on_stop") c.transcription_mode = "live";
     c.vad = bool_or(values, "vad", c.vad);
     c.auto_stop_silence = number_or(values, "auto_stop_silence", c.auto_stop_silence);
     c.show_indicator = bool_or(values, "show_indicator", c.show_indicator);
@@ -165,6 +169,7 @@ void merge_into(flat_toml::Table& values, const Config& config) {
     values["idle_timeout"] = flat_toml::real(config.idle_timeout);
     values["hotkey"] = flat_toml::str(config.hotkey);
     values["trigger"] = flat_toml::str(config.trigger);
+    values["transcription_mode"] = flat_toml::str(config.transcription_mode);
     values["vad"] = flat_toml::boolean(config.vad);
     values["auto_stop_silence"] = flat_toml::real(config.auto_stop_silence);
     values["show_indicator"] = flat_toml::boolean(config.show_indicator);

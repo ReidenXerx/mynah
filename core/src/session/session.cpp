@@ -428,10 +428,23 @@ void Engine::audio_worker(std::shared_ptr<Session> session, config::Config cfg, 
     std::vector<float> scratch(audio::kFrameSamples);
     float bands[constants::spectrum_bands];
 
+    // transcription_mode = "on_stop" (Dudu's request): the whole session
+    // lands in one buffer and is transcribed once, when the session ends —
+    // one coherent decode with full context. The Python engine's vad=false
+    // mode was exactly this. The detector still runs per frame: it drives
+    // the level meter's gates and auto-stop; only its utterance output is
+    // discarded, and every frame lands in the batch instead.
+    const bool batch_mode = cfg.transcription_mode == "on_stop";
+    std::vector<float> batch;
+
     auto accept = [&](segment::Utterance& utterance) {
         // The enqueue gates (Swift's placement): min_utterance on the
         // TRIMMED duration (P2), and the whole-buffer RMS against the
-        // CALIBRATED gate — never the static floor alone.
+        // CALIBRATED gate — never the static floor alone. In batch mode the
+        // "utterance" is the whole session, which is the Python engine's
+        // no-VAD behaviour verbatim; note the trade it inherits: silence
+        // dilutes the batch RMS, so a long session with little talking can
+        // fall under the gate.
         if (utterance.duration < cfg.min_utterance) return;
         if (audio::rms(utterance.samples.data(), utterance.samples.size()) <
             detector.current_energy_threshold())
@@ -446,7 +459,15 @@ void Engine::audio_worker(std::shared_ptr<Session> session, config::Config cfg, 
         // callbacks, and holding it across a front end's code is what made
         // a callback that touched the engine deadlock.
         if (events_.level) events_.level(audio::level(frame_rms), bands);
-        if (auto utterance = detector.process(samples, count)) accept(*utterance);
+        if (batch_mode) {
+            // The detector's per-frame state keeps the level gates and
+            // auto-stop honest; its utterance output is discarded — the
+            // batch buffer is what gets transcribed.
+            batch.insert(batch.end(), samples, samples + count);
+            (void)detector.process(samples, count);
+        } else if (auto utterance = detector.process(samples, count)) {
+            accept(*utterance);
+        }
 
         // Auto-stop after prolonged silence with no utterance open. Safe
         // from this thread: stop() never joins, it only flips flags.
@@ -474,8 +495,22 @@ void Engine::audio_worker(std::shared_ptr<Session> session, config::Config cfg, 
 
     // The session ended: close out whatever is buffered. A partial frame
     // (the capture thread's last sub-30 ms) is dropped — both prior
-    // engines consume whole frames only.
-    if (auto final_utterance = detector.flush()) accept(*final_utterance);
+    // engines consume whole frames only. In batch mode the WHOLE session
+    // buffer is the utterance: it goes through the same gates as a live
+    // one, then one decode.
+    if (batch_mode) {
+        if (!batch.empty()) {
+            // The duration is computed BEFORE the move: initializers run in
+            // order, and a moved-from vector's size is 0 — the first version
+            // of this line read the size after the move and every batch was
+            // rejected by the min_utterance gate as a zero-second utterance.
+            double duration = double(batch.size()) / audio::kSampleRate;
+            segment::Utterance whole{std::move(batch), duration};
+            accept(whole);
+        }
+    } else if (auto final_utterance = detector.flush()) {
+        accept(*final_utterance);
+    }
     session->queue.flush();
 }
 

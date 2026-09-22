@@ -198,6 +198,7 @@ struct SettingInfo {
 const SettingInfo kSettings[] = {
     {"hotkey", "Not used here — your compositor binds a key to: mynah toggle"},
     {"trigger", "toggle (press to start and stop) or ptt (hold to talk)"},
+    {"transcription_mode", "live (transcribe as you pause) or on_stop (transcribe the whole session at the end)"},
     {"language", "Spoken language code"},
     {"model", "Speech model name or path (empty = the tier's default)"},
     {"prompt", "initial_prompt to bias recognition (empty = built-in)"},
@@ -218,6 +219,7 @@ const SettingInfo kSettings[] = {
 const std::pair<const char*, const char*> kFriendly[] = {
     {"hotkey", "hotkey"},           {"key", "hotkey"},
     {"trigger", "trigger"},         {"mode", "trigger"},
+    {"transcription_mode", "transcription_mode"}, {"batch", "transcription_mode"},
     {"language", "language"},       {"lang", "language"},
     {"model", "model"},             {"prompt", "prompt"},
     {"idle_timeout", "idle_timeout"}, {"idle", "idle_timeout"},
@@ -242,33 +244,33 @@ int config_command() {
         std::fprintf(stderr, "mynah: %s\n", read.message.c_str());
     const mynah::config::Config& config = read.config;
     std::fprintf(stderr, "settings (%s)\n", mynah::config::default_path().c_str());
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "hotkey", config.hotkey.c_str(),
-                 kSettings[0].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "trigger", config.trigger.c_str(),
-                 kSettings[1].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "language", config.language.c_str(),
-                 kSettings[2].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "model",
-                 config.model.empty() ? "(default)" : config.model.c_str(),
-                 kSettings[3].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "prompt",
-                 config.prompt.empty() ? "(default)" : config.prompt.c_str(),
-                 kSettings[4].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "idle_timeout",
-                 show_number(config.idle_timeout).c_str(), kSettings[5].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "auto_stop_silence",
-                 show_number(config.auto_stop_silence).c_str(), kSettings[6].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "vad", show_bool(config.vad).c_str(),
-                 kSettings[7].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "gpu", show_bool(config.gpu).c_str(),
-                 kSettings[8].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "show_indicator",
-                 show_bool(config.show_indicator).c_str(), kSettings[9].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "idle_visible",
-                 show_bool(config.idle_visible).c_str(), kSettings[10].description);
-    std::fprintf(stderr, "  %-16s %-12s %s\n", "injector",
-                 config.injector.empty() ? "(smart)" : config.injector.c_str(),
-                 kSettings[11].description);
+    // Key, then the value as the engine sees it. One row per setting, driven
+    // off the same table `set` validates against — the listing cannot drift
+    // when a setting is added.
+    auto row = [&](const char* key, const std::string& value) {
+        for (const SettingInfo& setting : kSettings)
+            if (std::string(setting.key) == key) {
+                std::fprintf(stderr, "  %-16s %-12s %s\n", key, value.c_str(),
+                             setting.description);
+                return;
+            }
+    };
+    row("hotkey", config.hotkey);
+    row("trigger", config.trigger);
+    row("transcription_mode", config.transcription_mode);
+    row("language", config.language);
+    row("model", config.model.empty() ? "(default)" : config.model);
+    row("prompt", config.prompt.empty() ? "(default)" : config.prompt);
+    row("idle_timeout", show_number(config.idle_timeout));
+    row("auto_stop_silence", show_number(config.auto_stop_silence));
+    row("vad", show_bool(config.vad));
+    row("gpu", show_bool(config.gpu));
+    row("show_indicator", show_bool(config.show_indicator));
+    row("idle_visible", show_bool(config.idle_visible));
+    row("injector", config.injector.empty() ? "(smart)" : config.injector);
+    row("frame_energy", show_number(config.frame_energy));
+    row("min_energy", show_number(config.min_energy));
+    row("min_utterance", show_number(config.min_utterance));
     std::fprintf(stderr, "  %-16s %-12s %s\n", "frame_energy",
                  show_number(config.frame_energy).c_str(), kSettings[12].description);
     std::fprintf(stderr, "  %-16s %-12s %s\n", "min_energy",
@@ -300,6 +302,10 @@ int set_command(const std::string& assignment) {
     if (key_name == "trigger") {
         if (raw != "toggle" && raw != "ptt")
             return fail("trigger is one of toggle or ptt, got '" + raw + "'");
+        value = mynah::flat_toml::str(raw);
+    } else if (key_name == "transcription_mode") {
+        if (raw != "live" && raw != "on_stop")
+            return fail("transcription_mode is live or on_stop, got '" + raw + "'");
         value = mynah::flat_toml::str(raw);
     } else if (key_name == "vad" || key_name == "gpu" || key_name == "show_indicator" ||
                key_name == "idle_visible") {

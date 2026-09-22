@@ -261,6 +261,7 @@ static std::string config_to_json(const mynah::config::Config& config) {
     json << "\"prompt\":" << quoted(config.prompt) << ',';
     json << "\"hotkey\":" << quoted(config.hotkey) << ',';
     json << "\"trigger\":" << quoted(config.trigger) << ',';
+    json << "\"transcription_mode\":" << quoted(config.transcription_mode) << ',';
     json << "\"injector\":" << quoted(config.injector) << ',';
     json << "\"vad\":" << (config.vad ? "true" : "false") << ',';
     json << "\"gpu\":" << (config.gpu ? "true" : "false") << ',';
@@ -306,6 +307,10 @@ bool apply_json_value(mynah::config::Config& config, const std::string& key,
                 config.injector = *v;
                 return true;
             }
+        }
+    } else if (key == "transcription_mode") {
+        if (auto v = as_string()) {
+            if (*v == "live" || *v == "on_stop") { config.transcription_mode = *v; return true; }
         }
     } else if (key == "vad") { if (auto v = as_bool()) { config.vad = *v; return true; } }
     else if (key == "gpu") { if (auto v = as_bool()) { config.gpu = *v; return true; } }

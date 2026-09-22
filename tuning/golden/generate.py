@@ -355,7 +355,50 @@ def reference_speech_regions(
     return regions
 
 
+def _verify_constants_against_tuning() -> None:
+    """Refuse to regenerate from constants that no longer match the contract.
+
+    The values below are duplicated from tuning/tuning.toml to synthesize
+    fixtures. A contract change that misses one of them would regenerate the
+    corpus from stale numbers, and every implementation would then be pinned
+    to a lie. This used to be a pytest case (tests/test_tuning.py); it lives
+    here since Phase 6 retired the Python package, because here it runs at
+    exactly the moment it matters — before anything is written.
+    """
+    import tomllib
+
+    contract_path = HERE.parent / "tuning.toml"
+    with contract_path.open("rb") as fh:
+        contract = tomllib.load(fh)
+
+    pinned = {
+        "utterance_silence": UTTERANCE_SILENCE,
+        "trailing_padding": TRAILING_PADDING,
+        "frame_energy_default": FRAME_ENERGY_DEFAULT,
+        "min_energy_default": MIN_ENERGY_DEFAULT,
+        "min_utterance_default": MIN_UTTERANCE_DEFAULT,
+        "noise_calibration_seconds": CAL_WINDOW,
+        "noise_frame_multiplier": FRAME_MULT,
+        "noise_utterance_multiplier": UTT_MULT,
+        "noise_min_samples": MIN_SAMPLES,
+        "calibration_speech_floor": CAL_SPEECH_FLOOR,
+    }
+    drifted = [
+        f"  {key}: generate.py has {mine!r}, tuning.toml says {contract[key]!r}"
+        for key, mine in pinned.items()
+        if key not in contract or contract[key] != mine
+    ]
+    if drifted:
+        raise SystemExit(
+            "generate.py's constants no longer match tuning/tuning.toml:\n"
+            + "\n".join(drifted)
+            + "\n\nUpdate them together, or the corpus pins values no engine uses."
+        )
+
+
 def main() -> None:
+    _verify_constants_against_tuning()
+
     cases: dict[str, list[int]] = {}
 
     # 1. Two utterances in a quiet room. The 1.2s lead-in exceeds the

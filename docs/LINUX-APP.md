@@ -2,37 +2,48 @@
 
 The same engine as macOS, with the edges turned outward.
 
-On macOS mynah owns everything: it grabs its own hotkey with pynput, transcribes
-in-process with mlx-whisper, types with the Accessibility API and draws its own
-NSPanel. On Wayland it can do none of those things, and that is not a gap to
-work around — it is the design of the platform. A client may not read the
-keyboard globally, and the shell, not the app, draws the desktop.
+**State: written, not yet run.** Every piece below exists and its tests pass —
+on a Mac. Nothing in `linux/` has been compiled on Linux, no AUR package is
+published, and the Omarchy plugin acceptance run has not happened. What ships
+today is still the retired Python engine, from the commit the plugin pins. Read
+this as the design and the plan, not as a description of something working.
 
-So the Linux side is a set of providers plus one socket:
+On macOS the app owns everything: it registers its own hotkey, types with the
+Accessibility API and draws its own panel. On Wayland it can do none of those,
+and that is not a gap to work around — it is the design of the platform. A
+client may not read the keyboard globally, and the shell, not the app, draws the
+desktop.
+
+So on Linux the engine is a headless binary plus one socket, and the desktop
+supplies the rest:
 
 | Concern | Here | Why |
 |---|---|---|
-| Speech | `whisper-cli` (whisper.cpp), a subprocess per utterance | the binary the distro already packages; no Python speech dependency at all |
+| Engine | `libmynah`, linked in | the same segmentation, VAD, whisper and filter as the Mac app — one implementation, not a port |
+| Speech | whisper.cpp **in-process**, model kept warm | the Python engine spawned `whisper-cli` per utterance and reloaded the model each time; in-process removes both, and the audio never touches a file |
 | Typing | `wtype`, text on **stdin**; the clipboard where that fails | the virtual-keyboard protocol is the compositor-blessed way to synthesize input — where it is honoured |
 | Indicator | published on the control socket | the shell draws it, in the desktop's own idiom |
 | Hotkey | your compositor, bound to `mynah toggle` | no Wayland client may grab a global key |
-| Capture | `sounddevice`, 16 kHz mono, 30 ms frames | unchanged from macOS; PipeWire serves it through PortAudio |
-| Segmentation | unchanged | the golden corpus pins one implementation for both platforms |
+| Capture | PipeWire directly, 16 kHz mono float | what Omarchy and Plasma both run; no PortAudio layer to keep compatible |
+| Segmentation | the core's | the golden corpus pins one implementation for every front end |
 | Service | `systemd --user`, tied to `graphical-session.target` | the Linux equivalent of the LaunchAgent |
 
-Install:
+Build it (there is no package yet):
 
 ```bash
-pipx install "git+https://github.com/ReidenXerx/mynah.git"
-# The extra comes from this repository: the bare name `mynah` on PyPI is an
-# unrelated package, and pip would happily fetch that instead.
-pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"
-sudo pacman -S whisper-cpp wtype wl-clipboard
-mynah setup
+git clone --recurse-submodules https://github.com/ReidenXerx/mynah.git
+cd mynah
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
+./build/linux/mynah setup       # checks typing, speech, microphone, hotkey
 ```
 
-`mynah setup` checks each of those, names what is missing, and prints the exact
-command that fixes it — including the `curl` that downloads a model.
+Needs Node-free but not dependency-free: `pipewire`, `wtype`, `wl-clipboard`,
+`curl`, `openssl`, and for the `gpu` tier `vulkan-icd-loader` (plus
+`vulkan-headers` and `shaderc` to build it). `linux/packaging/` carries the
+PKGBUILDs and the systemd unit for when this is packaged.
+
+`mynah setup` checks each requirement, names what is missing, and prints the
+command that fixes it — including `mynah models download small`.
 
 ## The control socket
 
@@ -107,17 +118,25 @@ utterance, not per second of speech. On a 22-core Meteor Lake laptop, CPU only:
 | `ggml-base` (142 MB) | ~1.5 s | "The **feed** is computed on **bros**, but it should be net." |
 | `ggml-small` (466 MB) | ~4.2 s | exact |
 
-(Synthetic speech, which is harder than a real voice.) Utterances pipeline — the
-next is captured while the last is transcribed — but talk faster than your
-machine transcribes and the text falls further behind. `small` is the default
-because a wrong word costs more than a second; `mynah set model=base` is there
-for a slower machine or a faster feel.
+(Synthetic speech, which is harder than a real voice.) **Measured against the
+Python engine**, which spawned `whisper-cli` per utterance and reloaded the
+model every time; the binary keeps the model warm, so these numbers are an
+upper bound it should beat — by how much is unmeasured, because nothing has run
+on Linux yet. Utterances pipeline — the next is captured while the last is
+transcribed — but talk faster than your machine transcribes and the text falls
+further behind.
 
-A GPU backend would change this picture: whisper.cpp loads `ggml-*` backends
-from `/usr/lib/ggml`, and on Arch `ggml-cuda`, `ggml-hip` and `ggml-openvino` are
-packaged. None is installed by default, and mynah does not install one: waking a
-discrete GPU for every sentence is a choice for the machine's owner, not for a
-dictation tool.
+Which model to run is no longer a setting you are expected to guess. The tiers
+(`gpu` → turbo, `small`, `base`) are chosen by `mynah models benchmark`, which
+times each candidate on a bundled clip and picks the largest that meets a
+latency budget; `mynah set model=…` still overrides. **The budgets are
+placeholders** from the migration plan, and the bundled clip is still a tone
+rather than speech — both wait on the measurement pass (Phase 0).
+
+The `gpu` tier builds the Vulkan backend into the package. An integrated GPU is
+used automatically; a discrete one only when you set `gpu = true`, because
+waking a dGPU for every sentence is the machine owner's choice, not a dictation
+tool's.
 
 ## Wayland only
 

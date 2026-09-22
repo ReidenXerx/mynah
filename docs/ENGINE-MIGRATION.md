@@ -1,6 +1,16 @@
 # Migrating the engine to C++
 
-Status: **plan, not started.** One dictation engine, written once in C++ behind a
+Status, 2026-09-22: **phases 1, 2, 5 and 6 done; 3 written but never built or
+run on Linux; 4 not started; 0 skipped.** Phase 6 retired the Python package in
+this commit — the engine, both front ends' tests and the golden corpus stand on
+their own. What that leaves: Linux has no working dictation until phase 3 is
+verified on a Linux machine (the Omarchy plugin's pinned install still fetches
+the Python engine from an earlier commit), and phase 0's measurements — the
+recognition test set, the latency baselines, the tier budgets and the real
+benchmark clip — were never made, so every quality and tier claim below is
+still unproven.
+
+Original status: **plan, not started.** One dictation engine, written once in C++ behind a
 C API, replacing the Python package on Linux and the Swift engine inside
 `Mynah.app`. Each desktop keeps a front end in its own idiom.
 
@@ -172,7 +182,7 @@ Linux goes first: the Omarchy plugin is a finished acceptance test for the
 engine, and Linux is where the per-utterance subprocess costs the most. macOS
 goes last because its native engine already works.
 
-### Phase 0 — Groundwork
+### Phase 0 — Groundwork ⚠ skipped
 
 - Update Xcode to 27 so `swift test` runs; set up CI: GitHub Actions on an
   Apple Silicon runner and an Arch container.
@@ -187,7 +197,7 @@ goes last because its native engine already works.
 
 **Exit:** decisions confirmed, baselines written down, test set exists.
 
-### Phase 1 — Core skeleton
+### Phase 1 — Core skeleton ✅ done
 
 - Move the whisper.cpp submodule to `third_party/`; CMake project for core and
   whisper.cpp; CI builds on both platforms.
@@ -201,7 +211,7 @@ goes last because its native engine already works.
 
 **Exit:** `libmynah` builds on macOS and Arch, tests green.
 
-### Phase 2 — The engine
+### Phase 2 — The engine ✅ done (exit criteria need Phase 0's baselines)
 
 - Calibration (speech-aware, capped at `calibration_speech_floor`), gates,
   utterance detector, spectrum bands.
@@ -222,7 +232,7 @@ goes last because its native engine already works.
 baseline on turbo (Metal) and `small` (CPU); session tests clean under TSan and
 ASan; short fuzz runs of `push_audio` and the config parser.
 
-### Phase 3 — Headless `mynah` for Linux (Omarchy)
+### Phase 3 — Headless `mynah` for Linux (Omarchy) ⚠ written, unverified on Linux
 
 - PipeWire capture; control socket server (protocol v2); port the socket tests
   from `tests/test_linux.py`.
@@ -262,7 +272,7 @@ ASan; short fuzz runs of `push_audio` and the config parser.
 
 **Exit:** AUR package published; Omarchy users can `pipx uninstall mynah`.
 
-### Phase 4 — `mynah-kde`
+### Phase 4 — `mynah-kde` ⏳ not started
 
 - Qt6/QML app linking `libmynah` and `linux/common`.
 - Global shortcut through **KGlobalAccel**, default Meta+Alt+D (same as
@@ -288,7 +298,7 @@ ASan; short fuzz runs of `push_audio` and the config parser.
 **Exit:** a fresh Arch + Plasma VM goes from package install to dictation
 without opening a terminal.
 
-### Phase 5 — macOS on the core
+### Phase 5 — macOS on the core ✅ done (no release zip built yet)
 
 - Build: CMake builds core and whisper.cpp statically (Metal library embedded,
   `GGML_NATIVE=OFF`, deployment target 13.0); a `CMynah` module map replaces
@@ -310,7 +320,7 @@ without opening a terminal.
 
 **Exit:** a release zip built on the core.
 
-### Phase 6 — Retire Python
+### Phase 6 — Retire Python ✅ done
 
 - Delete `mynah/`, `tests/`, `pyproject.toml`, the LaunchAgent code.
   `tuning/golden/generate.py` stays as a stdlib-only dev tool.

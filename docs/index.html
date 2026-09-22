@@ -235,8 +235,8 @@
     <h1>Say it. It types <em>where you are</em>.</h1>
     <p class="lede">Press a key and talk. Your words land in whatever window has focus — a commit message, a chat, a form — <b>as you pause, not when you stop.</b> The speech never leaves the machine you are sitting at.</p>
     <div class="cta">
-      <button class="button primary" type="button" data-copy='pipx install "git+https://github.com/ReidenXerx/mynah.git"' >
-        <span>pipx install …/mynah.git</span><span class="copied" aria-hidden="true">copied</span>
+      <button class="button primary" type="button" data-copy='git clone --recurse-submodules https://github.com/ReidenXerx/mynah.git &amp;&amp; cd mynah &amp;&amp; make install-app' >
+        <span>clone &amp; make install-app</span><span class="copied" aria-hidden="true">copied</span>
       </button>
       <a class="button" href="https://github.com/ReidenXerx/mynah">Read the source</a>
       <a class="button" href="#install">Install</a>
@@ -367,12 +367,13 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
       <thead><tr><th>&nbsp;</th><th>macOS</th><th>Linux · Wayland</th></tr></thead>
       <tbody>
         <tr><th scope="row">The engine, segmentation and tuning</th><td class="shared" colspan="2">one implementation, shared — a platform never re-derives it</td></tr>
-        <tr><th scope="row">Speech, on your own hardware</th><td>mlx-whisper, Apple GPU</td><td>whisper.cpp</td></tr>
+        <tr><th scope="row">Speech, on your own hardware</th><td>whisper.cpp on Metal</td><td>whisper.cpp, Vulkan for the gpu tier</td></tr>
         <tr><th scope="row">Typing into the focused window</th><td>Accessibility API</td><td>wtype, on wlroots and KDE</td></tr>
-        <tr><th scope="row">The hotkey</th><td>pynput</td><td>your compositor's, bound to mynah toggle</td></tr>
+        <tr><th scope="row">The hotkey</th><td>Carbon RegisterEventHotKey</td><td>your compositor's, bound to mynah toggle</td></tr>
         <tr><th scope="row">Indicator and menu</th><td>native pill and menu bar</td><td>the shell's, through mynah watch</td></tr>
         <tr><th scope="row">Runs at login</th><td>SMAppService</td><td>systemd --user</td></tr>
-        <tr><th scope="row">Where the face comes from</th><td>Mynah.app, no Python at runtime</td><td>the desktop&rsquo;s own shell</td></tr>
+        <tr><th scope="row">Where the face comes from</th><td>Mynah.app</td><td>the mynah binary and the desktop&rsquo;s own shell</td></tr>
+        <tr><th scope="row">State</th><td>shipping</td><td>written, not yet built or run on Linux</td></tr>
       </tbody>
     </table>
   </div>
@@ -381,38 +382,36 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
 
 <section id="install">
   <p class="label">Install</p>
-  <h2>One command, then a guided first run</h2>
+  <h2>Build it, then a guided first run</h2>
   <div class="two">
     <div>
-<pre><span class="dim">macOS</span>
-<span class="cmd">$ pipx install "git+https://github.com/ReidenXerx/mynah.git"</span>
-<span class="cmd">$ pipx inject mynah "mynah[macos] @ git+https://github.com/ReidenXerx/mynah.git"</span>
+<pre><span class="dim">macOS — the menu bar app</span>
+<span class="cmd">$ git clone --recurse-submodules https://github.com/ReidenXerx/mynah.git</span>
+<span class="cmd">$ cd mynah &amp;&amp; make install-app</span>
 
-<span class="dim">Linux</span>
-<span class="cmd">$ pipx inject mynah "mynah[linux] @ git+https://github.com/ReidenXerx/mynah.git"</span>
-<span class="cmd">$ sudo pacman -S whisper-cpp wtype wl-clipboard</span>
-
-<span class="cmd">$ mynah setup</span>
+<span class="dim">Linux — not finished; the binary is written, not yet run</span>
+<span class="cmd">$ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release &amp;&amp; cmake --build build -j</span>
+<span class="cmd">$ ./build/linux/mynah setup</span>
 
 <span class="dim">mynah — first-time setup</span>
-
-  <span class="ok">✓</span> Runtime extra — <span class="dim">sounddevice, pynput, webrtcvad, pyobjc</span>
+  <span class="ok">✓</span> Signing identity — <span class="dim">mynah-dev, so the grant survives rebuilds</span>
   <span class="cmd">✗</span> Accessibility — <span class="dim">Not granted yet</span>
       <span class="dim">System Settings → Privacy &amp; Security → Accessibility
-      Add mynah and enable it, then re-run: mynah setup</span>
+      Add mynah and enable it — once; every later build keeps it</span>
   <span class="ok">✓</span> Microphone — <span class="dim">Reachable</span>
   <span class="ok">✓</span> Hotkey — <span class="dim">Valid (&lt;cmd&gt;+&lt;shift&gt;+.)</span></pre>
-      <p class="note" style="margin-top: 14px;">The extras are requested from this repository, never as a bare <code>mynah[macos]</code> — that name on PyPI is an unrelated package. The first run installs the speech runtime itself, then names whatever is still missing and what to do about it. The login service is installed last, once the rest passes — never on top of a check that failed.</p>
+      <p class="note" style="margin-top: 14px;">There are no published packages yet: one C++ engine, a front end per desktop, both built from source. On macOS <code>make install-app</code> builds the core and the app, installs it, and signs it with a local identity so the Accessibility grant you give once survives every rebuild. On Linux the binary and its Arch packaging exist and their tests pass, but nothing has been built or run on Linux yet.</p>
     </div>
     <div>
       <h3>The settings worth knowing</h3>
       <div class="scroll" style="margin-top: 12px;">
         <table class="settings">
           <tbody>
-            <tr><td>hotkey</td><td>The global key, pynput syntax — <code>&lt;f8&gt;</code>, <code>&lt;ctrl&gt;+&lt;space&gt;</code></td></tr>
+            <tr><td>hotkey</td><td>The global key — <code>&lt;cmd&gt;+&lt;shift&gt;+.</code>, <code>&lt;f8&gt;</code></td></tr>
             <tr><td>trigger</td><td><code>toggle</code> to press twice, <code>ptt</code> to hold while you talk</td></tr>
             <tr><td>language</td><td>The language you speak</td></tr>
-            <tr><td>vad</td><td>Off means the text arrives only when the session ends</td></tr>
+            <tr><td>vad</td><td>Reject anything that is not a voice, per utterance (Silero)</td></tr>
+            <tr><td>transcription_mode</td><td><code>live</code> types as you pause; <code>on_stop</code> decodes the whole session at the end</td></tr>
             <tr><td>frame_energy</td><td>Your floor for what counts as speech — lower hears more of the room</td></tr>
             <tr><td>auto_stop_silence</td><td>Seconds of silence that end a session by themselves</td></tr>
             <tr><td>idle_timeout</td><td>How long the model stays warm afterwards (0 = never unload)</td></tr>

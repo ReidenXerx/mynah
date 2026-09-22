@@ -69,13 +69,17 @@ extension AppConfig {
     /// The settings this config would change relative to `other`, each as
     /// (snake_case key, JSON-encoded value) — the shape `mynah_config_set`
     /// takes. Used by the controller to write back only what changed.
+    ///
+    /// The value sent is THEIRS — the new value. The first version of this
+    /// sent `mine`, so every change wrote the *previous* setting back and
+    /// the UI snapped to it: toggles, pickers and sliders all looked broken.
     func changes(toward other: AppConfig) -> [(key: String, json: String)] {
         var changes: [(key: String, json: String)] = []
         func add(_ key: String, _ mine: String, _ theirs: String) {
-            if mine != theirs { changes.append((key: key, json: mine.jsonEncoded)) }
+            if mine != theirs { changes.append((key: key, json: theirs.jsonEncoded)) }
         }
         func add(_ key: String, _ mine: Bool, _ theirs: Bool) {
-            if mine != theirs { changes.append((key: key, json: mine ? "true" : "false")) }
+            if mine != theirs { changes.append((key: key, json: theirs ? "true" : "false")) }
         }
         func add(_ key: String, _ mine: Double, _ theirs: Double) {
             if mine != theirs {
@@ -83,9 +87,9 @@ extension AppConfig {
                 // the engine's TOML reader accepts either shape, but the
                 // Python side wrote floats with one too.
                 changes.append((key: key,
-                                json: mine == mine.rounded() && abs(mine) < 1e15
-                                    ? String(format: "%.1f", mine)
-                                    : String(mine)))
+                                json: theirs == theirs.rounded() && abs(theirs) < 1e15
+                                    ? String(format: "%.1f", theirs)
+                                    : String(theirs)))
             }
         }
 
@@ -110,11 +114,14 @@ extension AppConfig {
 }
 
 private extension String {
-    /// This string as a JSON scalar value.
+    /// This string as a JSON scalar value — WITH the quotes. The first
+    /// version serialized an array and took its first *element* back, which
+    /// stripped the quotes: the engine's JSON parser then refused the bare
+    /// word ("json: bad number") and every string setting snapped back.
     var jsonEncoded: String {
-        guard let data = try? JSONSerialization.data(withJSONObject: [self]),
-              let array = try? JSONSerialization.jsonObject(with: data) as? [String],
-              let encoded = array.first else { return "\"\"" }
+        guard let data = try? JSONSerialization.data(withJSONObject: self,
+                                                     options: [.fragmentsAllowed]),
+              let encoded = String(data: data, encoding: .utf8) else { return "\"\"" }
         return encoded
     }
 }

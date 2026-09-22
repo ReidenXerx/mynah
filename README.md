@@ -10,11 +10,13 @@ Press a key, talk, and your words land in whatever window has focus — as you p
 Everything runs on the machine you are sitting at.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-F5B301)](LICENSE)
-[![Python ≥3.11](https://img.shields.io/badge/python-%E2%89%A53.11-F5B301)](https://www.python.org/)
 [![macOS](https://img.shields.io/badge/macOS-shipping-3FBF9A)](#where-it-runs)
-[![Linux · Wayland](https://img.shields.io/badge/Linux%20%C2%B7%20Wayland-shipping-3FBF9A)](docs/LINUX-APP.md)
+[![Linux · Wayland](https://img.shields.io/badge/Linux%20%C2%B7%20Wayland-in%20progress-F5B301)](docs/LINUX-APP.md)
 
-**[Install](#install)** — a few commands, pinned to a commit and hash-checked, then `mynah setup`
+```bash
+git clone --recurse-submodules https://github.com/ReidenXerx/mynah.git
+cd mynah && make install-app          # macOS: builds and installs Mynah.app
+```
 
 **[duduphudu.app/mynah](https://duduphudu.app/mynah/)** — what it does, and what it refuses to do
 
@@ -58,105 +60,60 @@ unloads and Mynah costs nothing at all.
 
 ## Install
 
-**macOS**
+Mynah is one C++ engine (`libmynah`) with a front end per desktop. There are no
+published packages yet — both paths build from source, submodules included.
+
+**macOS** — the menu bar app:
 
 ```bash
-MYNAH=<the commit you are installing>   # a full 40-character SHA, never a branch name
-pipx install "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
-pipx inject mynah "mynah[macos] @ git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
-mynah setup                          # dependencies, permissions, hotkey, login service
+git clone --recurse-submodules https://github.com/ReidenXerx/mynah.git
+cd mynah
+make install-app        # builds the core + the app, installs it, launches it
 ```
 
-**The macOS extra is not locked yet**, and this path says so rather than implying otherwise: the
-commit is pinned, but `mlx-whisper`, `pynput`, the pyobjc frameworks and `rumps` are still resolved
-from PyPI at install time, and pip's build isolation may fetch an unchecked build backend. Locking
-it means generating and testing the set on an Apple Silicon machine, which is the honest gate on
-saying it is done. Linux below is fully locked.
+It installs to `/Applications/Mynah.app` and signs every build with one local
+identity, so the Accessibility grant you give it once survives every rebuild
+(see [SWIFT-APP.md](docs/SWIFT-APP.md)). Then: bird → Settings… → Recognition to
+download a model, grant Accessibility, and press ⌘⇧. in any text field.
 
-**Linux (Wayland)**
+**Linux (Wayland)** — *not finished.* The headless `mynah` binary and its
+Arch packaging are written and their tests pass, but nothing has been built or
+run on Linux yet, and no AUR package is published. See
+[LINUX-APP.md](docs/LINUX-APP.md) for what exists and what is left.
 
-```bash
-MYNAH=<the commit you are installing>   # a full 40-character SHA, never a branch name
-LOCKS=https://raw.githubusercontent.com/ReidenXerx/mynah/$MYNAH/requirements
-
-# Build the engine in a private directory of its own, with a build backend that
-# is hash-verified before it runs. The subshell keeps the trap and the failure
-# exits to this block, so it is safe to paste into a shell you are still using.
-BUILD="$(mktemp -d)" && (
-  set -eu
-  trap 'rm -rf "$BUILD"' EXIT
-  # mktemp -d creates it 0700; refuse to build in it if it is anything else.
-  [ "$(stat -c %a "$BUILD")" = 700 ] || { echo "refusing: $BUILD is not private"; exit 1; }
-
-  python3 -m venv "$BUILD/venv"
-  "$BUILD/venv/bin/pip" install --require-hashes --only-binary :all: -r "$LOCKS/build.lock"
-
-  # --no-build-isolation is what stops pip fetching a build backend of its own
-  # choosing; the only one present is the verified one installed above.
-  "$BUILD/venv/bin/pip" wheel --no-build-isolation --no-deps -w "$BUILD/wheel" \
-      "git+https://github.com/ReidenXerx/mynah.git@$MYNAH"
-
-  # A wheel runs no build backend at all.
-  pipx install --pip-args="--no-deps" "$BUILD"/wheel/mynah-*.whl
-)
-
-# What the engine imports, at pinned versions, every artifact checked against its hash.
-pipx runpip mynah install --require-hashes --only-binary :all: -r "$LOCKS/build.lock"
-pipx runpip mynah install --require-hashes --only-binary :all: \
-    --no-binary webrtcvad-wheels --no-build-isolation -r "$LOCKS/linux.lock"
-
-sudo pacman -S whisper-cpp wtype wl-clipboard   # speech, typing, and pasting
-mynah setup                          # checks each of these and names what is missing
-```
-
-`--require-hashes` makes pip refuse anything not named in the lock, so nothing that runs here is
-decided by PyPI after you read this. `requirements/linux.lock` covers CPython 3.11 to 3.14 on
-x86_64 and aarch64, glibc and musl; `tools/lock.py` writes it, and `tools/lock.py --check` says
-whether it is still current. One package is built from source rather than installed as a wheel:
-webrtcvad-wheels publishes no wheel for CPython 3.14, which is what Arch ships. Its source archive
-is hash-checked like everything else and builds against the pinned setuptools, with pip's build
-isolation off so no unchecked build backend can be fetched in its place.
-
-**Why the engine is built separately rather than installed straight from git.** `pipx install
-git+…` builds the source distribution, and pip's build isolation fetches a build backend for that
-build from PyPI without checking it against anything — `--no-deps` does not turn isolation off, and
-no ordering of `pipx --preinstall` gets in front of it, because pipx builds the source once more
-just to learn the package name. Steps 1 and 2 move that build somewhere the backend is already
-pinned and verified; step 3 then installs an artifact that needs no backend at all. The engine's
-provenance is unchanged — it is still the git commit you named, and nothing else.
-
-**Why the build directory is made with `mktemp -d`.** A fixed path under `/tmp` is a shared name:
-on a machine with more than one account, anybody can create it first, or swap the wheel between the
-build and the install, and what gets installed is then theirs rather than yours. `mktemp -d` makes a
-private directory nobody can guess, the block refuses to use it if it is not owner-only, the venv
-and the wheel both live inside it, and the trap removes it whatever happens.
-
-`mynah setup` is the honest path: it checks each requirement, says which one is missing and what to
-do about it — including the one `curl` that downloads a speech model — and only installs the login
-service once everything else passes.
-
-On Omarchy, [omarchy-mynah](https://github.com/ReidenXerx/omarchy-mynah) adds the desktop half: it
-binds the key, puts the bird in the bar with a live level, and shows a pill while it listens.
+On Omarchy, [omarchy-mynah](https://github.com/ReidenXerx/omarchy-mynah) is the
+desktop half: it binds the key, puts the bird in the bar with a live level, and
+shows a pill while it listens. Its pinned install still fetches the retired
+Python engine; it moves to the binary when Linux ships.
 
 ## Commands
 
+On macOS the app is the interface — there is no CLI. On Linux the `mynah` binary
+is both the engine and the way anything else drives it, because no Wayland
+client may grab a global hotkey:
+
 ```bash
-mynah                    # start dictating; the hotkey opens and closes a session
-mynah setup              # first run: dependencies, permissions, hotkey, service
+mynah                    # run the engine (your compositor binds a key to `mynah toggle`)
+mynah toggle             # start or end a session
+mynah status             # what it is doing right now
+mynah watch              # stream state, level and typed text as JSON lines
+mynah setup              # check typing, speech, microphone, hotkey
 mynah config             # what it is set to, and where that file is
 mynah set hotkey=<f8>    # change one setting
-mynah service status     # install | uninstall | status of the login service
-mynah providers          # what can listen, type and show an indicator here
+mynah models download small
+mynah service install    # start it at login (systemd --user)
 ```
 
-Settings live in `~/.config/mynah/config.toml`, shared with the macOS app. Useful ones:
+Settings live in `~/.config/mynah/config.toml`, read and written by both front
+ends through the core. Useful ones:
 
 | Setting | What it does |
 | --- | --- |
-| `hotkey` | The global key, in pynput syntax (`<ctrl>+<space>`, `<f8>`). macOS only — on Wayland your compositor binds `mynah toggle` |
+| `hotkey` | The global key (`<cmd>+<shift>+.`, `<f8>`). macOS only — on Wayland your compositor binds `mynah toggle` |
 | `trigger` | `toggle` — press to start and stop — or `ptt`, hold to talk |
 | `language` | Spoken language code |
-| `model` | Speech model repo or path; empty means the provider's default |
+| `model` | Speech model name or path; empty means the best one on disk |
+| `transcription_mode` | `live` types each utterance as you pause; `on_stop` decodes the whole session at the end |
 | `vad` | Split speech into utterances. Off means text only arrives at the end |
 | `frame_energy` | Per-frame speech floor: lower hears more, and more of the room |
 | `auto_stop_silence` | Seconds of silence that end a session by themselves |
@@ -165,17 +122,20 @@ Settings live in `~/.config/mynah/config.toml`, shared with the macOS app. Usefu
 
 | | macOS | Linux |
 | --- | --- | --- |
-| Dictation engine, segmentation, tuning | ✅ | ✅ |
-| Speech | mlx-whisper on the Apple GPU | whisper.cpp |
+| Dictation engine, segmentation, tuning | `libmynah` | the same `libmynah` |
+| Speech | whisper.cpp on Metal | whisper.cpp (Vulkan for the `gpu` tier) |
 | Typing into the focused window | Accessibility API | `wtype`, and the clipboard for apps that ignore it |
-| Hotkey | pynput | the compositor's own binding, to `mynah toggle` |
+| Hotkey | Carbon `RegisterEventHotKey` | the compositor's own binding, to `mynah toggle` |
 | Indicator and menu | native pill + menu bar item | the shell's, through `mynah watch` — a bar widget and a pill on Omarchy |
-| Runs at login | `SMAppService` / LaunchAgent | `systemd --user`, tied to the graphical session |
-| Native app | `Mynah.app`, no Python at runtime — see [SWIFT-APP.md](docs/SWIFT-APP.md) | the desktop's own shell — see [LINUX-APP.md](docs/LINUX-APP.md) |
+| Runs at login | `SMAppService` | `systemd --user`, tied to the graphical session |
+| Front end | `Mynah.app` — see [SWIFT-APP.md](docs/SWIFT-APP.md) | the `mynah` binary + the desktop's own shell — see [LINUX-APP.md](docs/LINUX-APP.md) |
+| State | shipping | written, not yet built or run on Linux |
 
-The engine is provider-abstracted: speech, typing and indicator are interfaces, and a platform is a
-set of implementations. That is why the Linux port is three small providers rather than a rewrite —
-and why the tuning contract is shared instead of re-derived.
+One engine, written once: segmentation, the tuning contract, voice detection,
+speech recognition and the hallucination filter all live in `libmynah` behind a
+C API. A front end is capture, input and interface — nothing that decides what
+a word is. That is why the tuning contract is shared rather than re-derived, and
+why it cannot drift between platforms any more: there is only one copy of it.
 
 Wayland only on Linux, deliberately: on X11 any client can already read the keyboard and inject
 keystrokes, so there is nothing to grant and nothing to revoke. GNOME is the gap — it does not
@@ -183,14 +143,9 @@ implement the virtual-keyboard protocol `wtype` needs, and a portal injector is 
 
 ## Nothing leaves your machine
 
-Speech is transcribed locally — mlx-whisper on macOS, whisper.cpp elsewhere. There is no account, no
-API key and no endpoint to disable, because there is none to begin with. The only file Mynah writes
+Speech is transcribed locally by whisper.cpp, linked into the engine. There is no account, no API
+key and no endpoint to disable, because there is none to begin with. The only file Mynah writes
 outside its own config is the text it types, into the window you were already in.
-
-> **The name `mynah` on PyPI is not this project.** It belongs to an unrelated
-> package, so the extras are always requested from this repository —
-> `mynah[linux] @ git+…` — and never as a bare `mynah[linux]`, which pip would
-> fetch from PyPI. `mynah setup` does the same thing for you.
 
 ## It came out of whiz
 
@@ -204,17 +159,22 @@ Your old settings are not lost: the first run imports the `dictate_*` keys from
 ## Tests
 
 ```bash
-pip install pytest && python -m pytest   # Python engine + config
-make core-test                          # C++ core (config, filter, pins)
+make core-test                  # the engine and the Linux front end (C++)
+swift test --package-path macos # the macOS app's own logic
 ```
 
-The Python suite covers the shipping engine; `make core-test` builds `core/` —
-the C++ engine behind a C API that is replacing it ([the migration
-plan](docs/ENGINE-MIGRATION.md)) — and runs its suites: the config and TOML
-compatibility tests shared with Python and the Swift app, the hallucination
-filter, and the pins against `tuning/tuning.toml`. 261 Python tests, and the
-ones that matter most are the golden-corpus tests: recordings with known
-boundaries, asserted against the segmentation contract.
+`make core-test` runs both C++ suites: the engine's (config, TOML round trips,
+the hallucination filter, segmentation against the golden corpus, the session
+state machine, three fuzzers) and the Linux front end's (control socket,
+injectors, downloads, model tiers). `swift test` covers what is on the app's
+side of the C API — the settings wire format and the hotkey parser.
+
+The ones that matter most are the golden-corpus tests: synthesized recordings
+with pinned boundaries in `tuning/golden/`, asserted against the segmentation
+contract in `tuning/tuning.toml`. `python3 tuning/golden/generate.py`
+regenerates them, and refuses to run if its constants have drifted from the
+contract — the one piece of Python left, and a developer tool rather than part
+of the product.
 
 ## License
 

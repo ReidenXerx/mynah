@@ -256,3 +256,25 @@ already follows, and it costs context to say so. If a rule here turns out to be 
 project rather than this one, it belongs upstream — say so and it can be promoted.
 
 <!-- Add PP-1, PP-2, … here. -->
+
+**PP-1 — A test result is only evidence if the binary was rebuilt from the code you are claiming
+about.** Confirm the rebuild happened (a compile line, a changed object timestamp) before reading a
+pass or a failure as proof. Applies doubly to incremental CMake targets, to a build tree that skips
+work on a freshness check, and to anything sanitized in a second build directory.
+
+*Scar:* a `config_set` fix was reported as verified on the strength of a run whose library had not
+been recompiled — the output actually shown was the FAILING run, read too fast. `make core-test`
+caught it minutes later. The same day, an ASan binary reported 107 test cases while TSan reported
+109 from the same source, for the same reason. The related build-script hole — a freshness check
+that ignored the pinned whisper.cpp submodule, so a bump would have linked the old library — is
+fixed in `macos/scripts/build-core.sh` by stamping the submodule commit into `vendor/install`.
+
+**PP-2 — On any platform boundary, name the platform in the test, not in the hope.** POSIX calls
+differ where it matters most: `close()` does not wake a blocked `recv()` on Linux, `shutdown()` does
+not wake `accept()` on macOS, and BSD hands accepted sockets the listening socket's `O_NONBLOCK`
+while Linux does not. Code that passes on the dev machine and has never been compiled for the target
+is not "written" — it is a draft.
+
+*Scar:* the whole Linux front end (`linux/`) passed 41 tests on a Mac while containing a child-process
+fd leak that hung dictation on the first utterance, a downloader that wrote zero bytes, and a
+`stop()` that would have hung forever on Linux.

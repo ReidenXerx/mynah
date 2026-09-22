@@ -12,12 +12,17 @@ import Foundation
 /// slow here (transcription above all) causes dropouts.
 final class AudioCapture: @unchecked Sendable {
 
+    /// Whisper is trained on 16 kHz mono — the engine's own sample domain.
+    private static let sampleRate: Double = 16_000
+
     private let engine = AVAudioEngine()
     private var converter: AVAudioConverter?
     private var isRunning = false
 
-    /// Called on the audio thread with 16 kHz mono samples plus their RMS level.
-    private var onFrame: (@Sendable ([Float], Double) -> Void)?
+    /// Called on the audio thread with 16 kHz mono samples. Level and the
+    /// spectrum are the engine's business now — it meters inside its own
+    /// frame loop — so the tap delivers samples and nothing else.
+    private var onFrame: (@Sendable ([Float]) -> Void)?
 
     /// Called when a configuration change (device switch, Bluetooth
     /// connect/disconnect) invalidates the running stream. The owner decides
@@ -38,7 +43,7 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     func start(
-        onFrame: @escaping @Sendable ([Float], Double) -> Void,
+        onFrame: @escaping @Sendable ([Float]) -> Void,
         onConfigurationChange: (@Sendable () -> Void)? = nil
     ) throws {
         guard !isRunning else { return }
@@ -103,7 +108,7 @@ final class AudioCapture: @unchecked Sendable {
 
         guard let targetFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
-            sampleRate: WhisperEngine.sampleRate,
+            sampleRate: Self.sampleRate,
             channels: 1,
             interleaved: false
         ) else { throw AudioCaptureError.unsupportedFormat }
@@ -119,8 +124,7 @@ final class AudioCapture: @unchecked Sendable {
                 return
             }
             self.consecutiveConversionFailures = 0
-            let level = min(1.0, TranscriptFilter.rms(converted) * 8)
-            self.onFrame?(converted, level)
+            self.onFrame?(converted)
         }
     }
 

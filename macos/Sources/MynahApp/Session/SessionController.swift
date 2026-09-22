@@ -1,23 +1,34 @@
+import AppKit
 import Combine
+import CMynah
 import Foundation
 
-/// Owns dictation session state and drives the UI.
+/// Bridges the SwiftUI app to the C++ core.
 ///
-/// The Swift counterpart to `DictationEngine` in `mynah/dictate/engine.py`, and
-/// it keeps that file's threading contract: audio capture never blocks on
-/// transcription. The tap thread only buffers and segments; a detached task
-/// transcribes and injects. Blocking the tap causes dropouts.
+/// Phase 5: everything that used to live in this file and in
+/// `UtteranceDetector` / `TranscriptFilter` / `WhisperEngine` / `SileroVAD` /
+/// `WhisperModel` is now `libmynah` behind the C API. What remains here is
+/// the adapter's three jobs:
 ///
-/// Uses `ObservableObject` rather than the newer `@Observable` macro, which is
-/// macOS 14+. Deployment target is 13 (see Package.swift), so do not "modernise"
-/// this without also raising the floor and dropping 2017-era Macs.
+///   1. publish the engine's events to SwiftUI — they arrive on engine
+///      threads and hop to the main actor here;
+///   2. own the capture (`AudioCapture` → `mynah_push_audio`, the only call
+///      the engine allows from a real-time thread);
+///   3. surface the config for the settings UI, writing through
+///      `mynah_config_set` (the core saves; the app never touches the file).
+///
+/// The engine's own semantics replace the Swift ones they supersede: the
+/// cold model load is asynchronous inside the engine (LOADING arrives as a
+/// state event), stop returns at once and drains as events, auto-stop and
+/// the idle unload are the core's. The old Swift counterparts are gone.
 @MainActor
 final class SessionController: ObservableObject {
 
     @Published private(set) var state: DictationState = .idle
     @Published private(set) var isSessionActive = false
 
-    /// Live mic amplitude in 0...1, feeding the pill's waveform bars.
+    /// Live mic amplitude in 0...1, feeding the pill's waveform bars. The
+    /// engine meters inside its own frame loop; the tap delivers raw samples.
     @Published private(set) var level: Double = 0.0
 
     /// Surfaced in the menu so failures are visible rather than silent.
@@ -31,159 +42,189 @@ final class SessionController: ObservableObject {
     /// failed. TCC sends no notification, so polling is the only option.
     @Published private(set) var isAccessibilityTrusted = Permissions.isAccessibilityTrusted
 
-    @Published var config: MynahConfig
+    @Published var config: AppConfig
+
+    /// True when `vad` is on but the Silero model could not be loaded: the
+    /// toggle reading "on" must not silently mean "loudness-only rejection"
+    /// (M5). The engine reports the degradation as a `vad_degraded` problem.
+    @Published private(set) var isVADDegraded = false
 
     private let capture = AudioCapture()
-    private var whisper: WhisperEngine?
-    private var vad: SileroVAD?
-    private lazy var detector = makeDetector()
-    private var idleUnloadTask: Task<Void, Never>?
 
-    /// The in-flight `beginSession()`, while the model is still loading.
-    ///
-    /// A cold load takes seconds, and `isSessionActive` only flips once it
-    /// finishes — so without this a second hotkey press during the load saw an
-    /// inactive session, started a *second* one, and the user's attempt to
-    /// cancel brought the session up anyway moments later.
-    private var startTask: Task<Void, Never>?
+    /// The engine pointer lives in a Sendable box so the nonisolated deinit
+    /// can read it without touching main-actor state. The main-actor code
+    /// reads it through `engine` (guarded by the actor).
+    private let engineBox = EngineBox()
+    private var engine: OpaquePointer? { engineBox.value }
+    private let eventSink = EventSink()
 
-    /// Guards against a finished start clearing a *newer* one.
-    ///
-    /// Cancel-then-immediately-restart produces: task A cancelled, `startTask`
-    /// set to B, then A's continuation runs and would null out B — leaving a
-    /// live start that `isEngaged` cannot see. Everything here is main-actor
-    /// serialised, so a counter is enough to tell the two apart.
-    private var startGeneration = 0
+    /// True while a session is live or still loading — the engine's
+    /// LOADING state is what the old `startTask` bookkeeping tracked by hand.
+    var isEngaged: Bool { state != .idle }
 
-    /// True while a session is live *or* still starting. This is what the
-    /// trigger should test, not `isSessionActive` alone.
-    var isEngaged: Bool { isSessionActive || startTask != nil }
+    init() {
+        config = AppConfig()
+        var error: UnsafeMutablePointer<CChar>? = nil
+        // config = NULL: the default path, with the one-time whiz import.
+        // The sink travels as the callback's user pointer — the engine can
+        // deliver the moment it is created — and the controller attaches
+        // itself to the sink right after, before any session can start.
+        engineBox.value = mynah_create(nil, Self.eventTrampoline,
+                                       Unmanaged.passUnretained(eventSink).toOpaque(),
+                                       &error)
+        if let error {
+            lastError = String(cString: error)
+            free(error)
+        }
+        reloadConfigFromEngine()
+        eventSink.attach(self)
+    }
 
-    /// Serialises transcription so utterances are injected in the order spoken.
-    /// Without this, a short utterance following a long one could finish first
-    /// and type its text ahead of the earlier sentence.
-    private var transcriptionChain: Task<Void, Never> = Task {}
-
-    init(config: MynahConfig = .load()) {
-        self.config = config
+    deinit {
+        // Normally the engine is destroyed by `shutdownBlocking` at quit; a
+        // controller dropped without that still has to free it. Plain C call,
+        // safe from the nonisolated deinit through the Sendable box.
+        if let engine = engineBox.value { mynah_destroy(engine) }
     }
 
     // MARK: - Trigger
 
     func toggleSession() {
-        isEngaged ? endSession() : startSession()
+        guard let engine else { return }
+        mynah_toggle(engine)
     }
 
+    /// Starts a session. The model load happens inside the engine — the
+    /// LOADING state arrives as an event, and a second press of the hotkey
+    /// cancels the whole thing (`mynah_stop` on a pending start is its
+    /// cancel). The microphone is requested in parallel: the old app asked
+    /// before starting capture because granting mid-session yields silence
+    /// for that whole session.
     func startSession() {
-        guard !isEngaged else { return }
-        idleUnloadTask?.cancel()
-        idleUnloadTask = nil
+        guard let engine, !isEngaged else { return }
         lastError = nil
-        startGeneration += 1
-        let generation = startGeneration
-        startTask = Task { [weak self] in
-            await self?.beginSession()
-            self?.clearStartTask(generation)
-        }
-    }
+        mynah_start(engine)
 
-    /// Async because a cold model load takes seconds. `engine.py` did this
-    /// synchronously; on the main thread that would beachball the menu bar.
-    private func beginSession() async {
-        // Re-read the config file so edits made since launch — from the
-        // settings window, `mynah dictate set`, or a text editor — take effect on
-        // the next dictation instead of requiring a restart.
-        let (loaded, loadError) = MynahConfig.loadReporting()
-        config = loaded
-        if let loadError {
-            // M10: an unreadable config used to become a silent reset to
-            // defaults — the user's settings vanish with no visible cause.
-            // Defaults still apply (the app must keep working), but the
-            // failure is surfaced like every other one.
-            Log.session.error(
-                "config.toml unreadable — dictation settings reset to defaults")
-            lastError = Self.configReadErrorMessage(loadError)
-        }
-
-        // Load before claiming the session is live, so a missing model surfaces
-        // immediately rather than after the user has spoken a whole sentence
-        // into a dead session.
-        do {
-            try await ensureModelLoaded()
-        } catch {
-            Log.stt.error("model load failed: \(error.localizedDescription, privacy: .public)")
-            lastError = error.localizedDescription
-            state = .idle
-            return
-        }
-        // The user may have pressed the hotkey again while the model loaded.
-        guard !Task.isCancelled else {
-            Log.session.notice("session start cancelled during model load")
-            state = .idle
-            return
-        }
-        // Ask for the microphone before starting capture. Granting it while
-        // the engine is already running yields silence for the whole session.
-        // The prompt can stay open for a long while — the user may also cancel
-        // the session (press the hotkey again, quit the app) while it is up, so
-        // re-check cancellation on the other side of the await too, and treat
-        // "Don't Allow" as a deny, not as "carry on into a dead session".
-        guard await Permissions.requestMicrophone() else {
-            if Task.isCancelled {
-                Log.session.notice("session start cancelled during the microphone prompt")
+        Task { [weak self] in
+            guard let self else { return }
+            let granted = await Permissions.requestMicrophone()
+            guard isEngaged else { return } // cancelled during the prompt or the load
+            if granted {
+                do {
+                    try startCapture()
+                } catch {
+                    Log.audio.error(
+                        "capture failed: \(error.localizedDescription, privacy: .public)")
+                    lastError = error.localizedDescription
+                    endSession()
+                }
             } else {
                 Log.session.error("microphone permission denied")
                 lastError = "Microphone access is required. Enable mynah in "
                     + "System Settings → Privacy & Security → Microphone."
+                endSession()
             }
-            state = .idle
-            return
-        }
-        // A cancel that landed while the permission prompt was up must not
-        // start capture on the other side of it — the old code only checked
-        // cancellation before the prompt, so "cancel" brought the session up
-        // anyway a moment later.
-        guard !Task.isCancelled else {
-            Log.session.notice("session start cancelled after the microphone prompt")
-            state = .idle
-            return
-        }
-        // Warn but continue: recognition still works and is worth seeing, but
-        // nothing will reach the focused app until this is granted.
-        refreshPermissions()
-        if !isAccessibilityTrusted {
-            Log.session.error("Accessibility not granted — transcription will not be typed")
-            lastError = "Accessibility not granted — text cannot be typed. "
-                + "Use \"Grant Accessibility…\" above."
-        }
-        guard !isSessionActive else { return }
-
-        detector = makeDetector()
-        isSessionActive = true
-        state = .listening
-
-        do {
-            try capture.start { [weak self] samples, level in
-                // Audio thread. Hop to the main actor before touching state.
-                Task { @MainActor in self?.ingest(samples, level: level) }
-            } onConfigurationChange: { [weak self] in
-                // Device change (BT connect/disconnect, default-mic switch):
-                // rebuild the stream, or the converter sits dead and the
-                // session silently captures nothing (M6).
-                Task { @MainActor in self?.handleCaptureConfigurationChange() }
-            }
-            Log.session.notice("session started")
-        } catch {
-            Log.audio.error("capture failed: \(error.localizedDescription, privacy: .public)")
-            lastError = error.localizedDescription
-            isSessionActive = false
-            state = .idle
         }
     }
 
-    /// A device change invalidated the capture graph. Rebuild it; if the
-    /// rebuild fails, end the session and surface the error rather than
-    /// pretending a dead stream is a live one.
+    func endSession() {
+        guard let engine else { return }
+        // Returns at once; remaining utterances arrive as events and the
+        // state falls back to idle as they complete.
+        mynah_stop(engine)
+        isSessionActive = false
+        level = 0
+    }
+
+    // MARK: - Config
+
+    /// The config file's path, for the "Open Config File" menu item.
+    var configFilePath: String {
+        guard let engine, let path = mynah_config_path(engine) else {
+            return NSString(string: "~/.config/mynah/config.toml").expandingTildeInPath
+        }
+        let value = String(cString: path)
+        free(path)
+        return value
+    }
+
+    /// Mutate settings, persist them through the core, and republish what
+    /// the engine accepted. Saving is the core's read-modify-write, so keys
+    /// owned by any other writer survive. Most settings take effect on the
+    /// next session; the ones that cannot are marked in the UI.
+    func updateConfig(_ mutate: (inout AppConfig) -> Void) {
+        var updated = config
+        mutate(&updated)
+        guard updated != config else { return }
+        guard let engine else { return }
+
+        // One key at a time: mynah_config_set validates each value against
+        // the engine's own rules, so a mistyped bool can never reach the
+        // file — and a refused key leaves the rest applied.
+        let previous = config
+        for change in previous.changes(toward: updated) {
+            let code = change.json.withCString { json in
+                mynah_config_set(engine, change.key, json)
+            }
+            if code != 0 {
+                Log.session.error(
+                    "the engine refused \(change.key, privacy: .public) — not saved")
+            }
+        }
+        reloadConfigFromEngine()
+
+        // A flipped VAD toggle applies at the next session start; the
+        // engine reports a degradation (if any) as a problem event then.
+        if updated.vad != previous.vad { isVADDegraded = false }
+    }
+
+    /// Reload the config from the engine into the published struct — the
+    /// engine is the authority on what the file now says.
+    private func reloadConfigFromEngine() {
+        guard let engine, let json = mynah_config_json(engine) else { return }
+        config = AppConfig(json: String(cString: json))
+        free(json)
+    }
+
+    // MARK: - Model surface for the settings window
+
+    /// The model the engine would load for the configured value, or nil —
+    /// which is what Settings turns into a download (M4: turbo, or a
+    /// `no_model` problem that Settings turns into a download).
+    var installedModel: String? {
+        guard let path = mynah_find_model(config.model) else { return nil }
+        defer { free(path) }
+        return URL(fileURLWithPath: String(cString: path)).lastPathComponent
+    }
+
+    /// Whether the Silero VAD model is on disk, resolved through the same
+    /// directories the engine's session loader uses.
+    var hasVADModel: Bool {
+        guard let path = mynah_find_vad() else { return false }
+        defer { free(path) }
+        return true
+    }
+
+    // MARK: - Capture
+
+    private func startCapture() throws {
+        guard let engine else { return }
+        // The engine pointer is an identity, not state: it never changes and
+        // outlives the tap. An Int64 travels through @Sendable closures;
+        // pointers do not.
+        let target = Int64(bitPattern: UInt64(UInt(bitPattern: engine)))
+        // The tap runs on the audio thread; `mynah_push_audio` is the one
+        // call the engine allows from a real-time thread (never blocks,
+        // never allocates). Samples pushed before the engine arms are
+        // dropped by the ring, so arming slightly early is free.
+        try capture.start { samples in
+            mynah_push_audio(OpaquePointer(bitPattern: UInt(truncatingIfNeeded: target)),
+                             samples, samples.count)
+        } onConfigurationChange: { [weak self] in
+            Task { @MainActor in self?.handleCaptureConfigurationChange() }
+        }
+    }
+
     private func handleCaptureConfigurationChange() {
         guard isSessionActive else { return }
         do {
@@ -198,139 +239,7 @@ final class SessionController: ObservableObject {
         }
     }
 
-    private static func configReadErrorMessage(_ error: MynahConfig.ConfigReadError) -> String {
-        switch error {
-        case .unreadable(let path, let underlying):
-            return "config.toml could not be read — dictation settings were reset "
-                + "to defaults. \(underlying). Fix or delete the file, then restart "
-                + "mynah: \(path)"
-        }
-    }
-
-    func endSession() {
-        // Cancel a start that has not completed yet, so the second press of the
-        // hotkey aborts a cold load rather than being ignored.
-        if let startTask {
-            startTask.cancel()
-            self.startTask = nil
-            if !isSessionActive {
-                state = .idle
-                return
-            }
-        }
-        guard isSessionActive else { return }
-        capture.stop()
-        isSessionActive = false
-        level = 0
-
-        // Whatever is still buffered is real speech the user just finished.
-        if let final = detector.flush() {
-            enqueue(final)
-        }
-        state = .idle
-        scheduleIdleUnload()
-    }
-
-    // MARK: - Audio
-
-    private func ingest(_ samples: [Float], level: Double) {
-        self.level = level
-        guard let utterance = detector.process(samples) else {
-            checkAutoStop()
-            return
-        }
-        enqueue(utterance)
-    }
-
-    /// Auto-stop on prolonged silence (M1, wave-2): end the session after
-    /// `auto_stop_silence` seconds of continuous silence with no
-    /// utterance open. Python's engine has honored the key since wave-1
-    /// (its `_process_vad_frames` sets `_end_session_requested`); the Swift
-    /// port used to round-trip the config value without ever reading it,
-    /// so the setting silently did nothing here. Unlike Python — whose
-    /// audio callback must not block, so it only sets a flag — this runs
-    /// on the main actor after the thread hop, so it can call
-    /// `endSession()` directly. `endSession()` is idempotent, so a frame
-    /// delivered by an in-flight hop after the stop is harmless.
-    private func checkAutoStop() {
-        guard config.autoStopSilence > 0,
-              !detector.isCurrentlySpeaking,
-              detector.continuousSilence >= config.autoStopSilence else { return }
-        Log.session.notice(
-            "auto-stop: \(self.detector.continuousSilence, format: .fixed(precision: 1))s of silence — ending session")
-        endSession()
-    }
-
-    private func makeDetector() -> UtteranceDetector {
-        UtteranceDetector(
-            sampleRate: WhisperEngine.sampleRate,
-            frameFloor: config.frameEnergy,
-            utteranceFloor: config.minEnergy)
-    }
-
-    /// Surface a failure raised outside the controller (e.g. hotkey registration).
-    func reportError(_ message: String) {
-        lastError = message
-    }
-
-    private func clearStartTask(_ generation: Int) {
-        guard generation == startGeneration else { return }
-        startTask = nil
-    }
-
-    /// Mutate settings, persist them, and apply what can be applied live.
-    ///
-    /// Saving is read-modify-write, so keys owned by the Python CLI survive.
-    func updateConfig(_ mutate: (inout MynahConfig) -> Void) {
-        var updated = config
-        mutate(&updated)
-        guard updated != config else { return }
-        let oldVAD = config.vad
-        config = updated
-        do {
-            try updated.save()
-        } catch {
-            Log.session.error("could not save config: \(error.localizedDescription, privacy: .public)")
-            lastError = "Could not save settings: \(error.localizedDescription)"
-        }
-        // M5: the VAD check is a per-utterance decision made against the
-        // `vad` actor, so a toggle flip can apply to the session in flight —
-        // nothing about it is session-scoped the way the detector's energy
-        // calibration is. Cheap to apply, so apply it live instead of
-        // silently ignoring the toggle until the next session.
-        if updated.vad != oldVAD, isSessionActive {
-            Task { await applyVADSetting() }
-        }
-    }
-
-    /// Bring the live session's VAD state in line with `config.vad`:
-    /// load/unload the Silero detector as needed. Runs detached so a cold
-    /// VAD load (small, but not free) never blocks the settings UI.
-    private func applyVADSetting() async {
-        guard isSessionActive else { return }
-        if config.vad {
-            if vad != nil { return }
-            await loadVADModel()
-            if vad == nil {
-                // Degrade is surfaced through `isVADDegraded`/`lastError`,
-                // but say it here too — this log line is the one a user
-                // debugging "why didn't my toggle do anything" will read.
-                Log.session.notice(
-                    "VAD toggle is ON but no Silero model could be loaded — loudness-only rejection for this session")
-            }
-        } else {
-            await vad?.unload()
-            vad = nil
-            isVADDegraded = false
-            Log.session.notice("VAD disabled for the live session")
-        }
-    }
-
-    /// Whether the energy gates alone are deciding what counts as speech for
-    /// the *current* session: true when `vad` is on but no Silero
-    /// detector could be loaded. Surfaced so the VAD toggle reading "on" does
-    /// not silently mean "loudness-only rejection" (M5).
-    @Published private(set) var isVADDegraded = false
+    // MARK: - Permissions and errors
 
     /// Re-read permission state. Called on a timer from `AppDelegate`.
     func refreshPermissions() {
@@ -340,228 +249,98 @@ final class SessionController: ObservableObject {
         Log.ui.notice("accessibility trust changed: \(trusted, privacy: .public)")
         // Clear the stale complaint as soon as the grant lands, so the menu does
         // not keep accusing the user of something they have already done.
-        if trusted, lastError?.contains("Accessibility") == true {
-            lastError = nil
-        }
+        if trusted, lastError?.contains("Accessibility") == true { lastError = nil }
     }
 
-    private func enqueue(_ utterance: UtteranceDetector.Utterance) {
-        // Both rejections below used to `return` silently, which is why the
-        // first real test logged "utterance 0.90s" and then nothing at all.
-        let energy = TranscriptFilter.rms(utterance.samples)
-        let gate = detector.currentEnergyThreshold
-        Log.session.notice(
-            "utterance \(utterance.duration, format: .fixed(precision: 2))s rms \(energy, format: .fixed(precision: 4)) gate \(gate, format: .fixed(precision: 4))")
-
-        guard utterance.duration >= config.minUtterance else {
-            Log.session.notice("utterance rejected: shorter than min_utterance")
-            return
-        }
-        guard energy >= gate else {
-            Log.session.notice("utterance rejected: below the energy gate")
-            return
-        }
-
-        guard let whisper else {
-            Log.session.error("utterance dropped: no model loaded")
-            return
-        }
-        let language = config.language
-        let prompt = config.prompt.isEmpty ? DefaultPrompt.russian : config.prompt
-
-        state = .transcribing
-        let samples = utterance.samples
-        let voiceDetector = vad
-        let previous = transcriptionChain
-        transcriptionChain = Task { [weak self] in
-            // Await the previous utterance so text is injected in the order it
-            // was spoken. Actor isolation serialises access to the whisper
-            // context but says nothing about ordering.
-            _ = await previous.result
-
-            // The energy gates decided this was loud enough; Silero decides
-            // whether it is actually a voice. This is where fan noise and
-            // keyboard clacks are rejected before Whisper can hallucinate
-            // subtitle credits out of them.
-            if let voiceDetector, !(await voiceDetector.containsSpeech(samples)) {
-                Log.session.notice("utterance rejected by VAD: no speech detected")
-                self?.finishTranscription()
-                return
-            }
-
-            do {
-                let text = try await whisper.transcribe(
-                    samples: samples, language: language, prompt: prompt)
-                self?.deliver(.success(text))
-            } catch {
-                self?.deliver(.failure(error))
-            }
-        }
+    /// Surface a failure raised outside the controller (e.g. hotkey registration).
+    func reportError(_ message: String) {
+        lastError = message
     }
 
-    /// Return to the resting state without injecting anything.
-    private func finishTranscription() {
-        state = isSessionActive ? .listening : .idle
-    }
+    // MARK: - Shutdown
 
-    private func deliver(_ result: Result<String, Error>) {
-        switch result {
-        case .failure(let error):
-            Log.stt.error("transcribe failed: \(error.localizedDescription, privacy: .public)")
-            lastError = error.localizedDescription
-        case .success(let text):
-            // The last line of defence: energy gating misses low-but-audible
-            // noise that the decoder then turns into subtitle credits.
-            if TranscriptFilter.isHallucination(text) {
-                Log.stt.notice("dropped hallucination: \(text, privacy: .public)")
-            } else {
-                Log.stt.notice("injecting \(text.count) chars")
-                TextInjector.type(text)
-            }
-        }
-        state = isSessionActive ? .listening : .idle
-    }
-
-    // MARK: - Model lifecycle
-
-    private func ensureModelLoaded() async throws {
-        if let whisper, await whisper.isLoaded {
-            // A session starting while the models sit warm from the last one:
-            // the VAD state must still match the config — the toggle may have
-            // been flipped while idle (M5).
-            if config.vad, vad == nil {
-                await loadVADModel()
-            } else if !config.vad, vad != nil {
-                await vad?.unload()
-                vad = nil
-                isVADDegraded = false
-            }
-            return
-        }
-        guard let modelURL = WhisperModel.resolve(configured: config.model) else {
-            throw WhisperError.noModelFound
-        }
-        let engine = whisper ?? WhisperEngine(modelURL: modelURL)
-        try await engine.load()
-        whisper = engine
-
-        // Optional: dictation still works without it, just with cruder
-        // noise rejection. A missing model must not block a session.
-        if config.vad, vad == nil {
-            await loadVADModel()
-        }
-    }
-
-    /// Load the Silero VAD if the config asks for it and it is not loaded.
+    /// Free the engine before the process exits, blocking for it.
     ///
-    /// Optional in the sense that a failed load must not block a session —
-    /// but it must not be *silent* either (M5): the toggle reads ON while
-    /// the app degrades to energy-gates-only, which from the outside is
-    /// "mynah stopped rejecting fans". So a missing or broken model marks
-    /// `isVADDegraded` and surfaces a complaint the user can act on.
-    private func loadVADModel() async {
-        guard config.vad, vad == nil else { return }
-        guard let vadURL = WhisperModel.resolveVAD() else {
+    /// The destroy contract is what makes quitting with a model loaded exit
+    /// 0: it joins the engine's workers and frees the whisper and VAD
+    /// contexts before returning — ggml aborts at exit if a Metal context is
+    /// still alive (the old `shutdownBlocking` existed for the same reason).
+    ///
+    /// Blocking the main thread is acceptable here; the app is terminating.
+    func shutdownBlocking() {
+        endSession()
+        capture.stop()
+        if let engine {
+            mynah_destroy(engine)
+            engineBox.value = nil
+        }
+    }
+
+    // MARK: - Events from the core
+
+    /// The event handler, on the main actor. The engine delivers on its own
+    /// threads; `EventSink` copies each event out of the callback's memory
+    /// and hops here.
+    private func handle(_ event: EngineEventData) {
+        switch event.kind {
+        case .state:
+            state = event.state
+            isSessionActive = event.state != .idle
+            if event.state == .idle { level = 0 }
+        case .level:
+            level = event.level
+        case .text:
+            // The last line of defence (the hallucination filter) already ran
+            // in the core; this is where the text reaches the keyboard.
+            TextInjector.type(event.text)
+        case .problem:
+            if event.problemCode == "vad_degraded" { isVADDegraded = true }
+            Log.session.error(
+                "\(event.problemCode, privacy: .public): \(event.problemMessage, privacy: .public)")
+            lastError = event.problemMessage
+        case .model:
             Log.stt.notice(
-                "no Silero VAD model — energy gates only; get it in Settings → Recognition")
-            isVADDegraded = true
-            lastError = "Reject non-speech is ON but the Silero model is missing — "
-                + "only loudness gates are active. Download it in Settings → "
-                + "Recognition (0.8 MB)."
-            return
-        }
-        let detector = SileroVAD(modelURL: vadURL)
-        do {
-            try await detector.load()
-            vad = detector
-            isVADDegraded = false
-            if lastError?.contains("Silero") == true { lastError = nil }
-            Log.stt.notice("Silero VAD loaded: \(vadURL.lastPathComponent, privacy: .public)")
-        } catch {
-            Log.stt.error("Silero VAD failed to load: \(error.localizedDescription, privacy: .public)")
-            isVADDegraded = true
-            lastError = "Reject non-speech is ON but Silero failed to load — "
-                + "only loudness gates are active. \(error.localizedDescription) "
-                + "Try re-downloading it in Settings → Recognition."
+                "model \(event.modelStatus, privacy: .public) \(event.modelName, privacy: .public)")
+            if event.modelStatus == "loaded" {
+                isVADDegraded = false
+                if lastError?.contains("model") == true { lastError = nil }
+            }
         }
     }
 
-    /// Keep the model resident for `idle_timeout` so back-to-back
-    /// dictation stays warm, then free it — the "zero RAM at idle" behaviour
-    /// from `engine.py`. A timeout of 0 means never unload.
-    private func scheduleIdleUnload() {
-        idleUnloadTask?.cancel()
-        let timeout = config.idleTimeout
-        guard timeout > 0 else { return }
-
-        idleUnloadTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            await self?.unloadModel()
-        }
+    nonisolated func receive(_ event: EngineEventData) {
+        Task { @MainActor in handle(event) }
     }
 
-    /// Free the whisper and VAD contexts before the process exits, blocking
-    /// briefly for it.
-    ///
-    /// ggml's Metal backend asserts in `ggml_metal_device_free` when a device is
-    /// torn down with residency sets still registered, and that runs from a
-    /// static destructor at exit — so quitting with a model loaded turns a clean
-    /// quit into `SIGABRT` and a crash report. Verified: exit code 134 without
-    /// this, 0 with it.
-    ///
-    /// Blocking the main thread is acceptable here; the app is terminating and
-    /// the unload is a couple of `free()` calls.
-    func shutdownBlocking(timeout: TimeInterval = 2) {
-        let engine = whisper
-        let detector = vad
-        whisper = nil
-        vad = nil
-        guard engine != nil || detector != nil else { return }
-
-        let done = DispatchSemaphore(value: 0)
-        Task.detached {
-            await engine?.unload()
-            await detector?.unload()
-            done.signal()
-        }
-        if done.wait(timeout: .now() + timeout) == .timedOut {
-            Log.stt.error("timed out unloading models at shutdown")
-        }
+    /// The C trampoline. Static, `@convention(c)`, nonisolated — no captures,
+    /// the sink comes through the user pointer. `mynah_event` is opaque (no
+    /// public layout), so the event travels as an OpaquePointer and every
+    /// read goes through the accessor functions.
+    fileprivate nonisolated static let eventTrampoline: mynah_event_fn = { event, user in
+        guard let event, let user else { return }
+        EventSink.deliver(event, to: user)
     }
 
-    private func unloadModel() async {
-        guard !isSessionActive else { return }
-        await whisper?.unload()
-        whisper = nil
-        await vad?.unload()
-        vad = nil
+    fileprivate nonisolated static func dictationState(_ state: mynah_state) -> DictationState {
+        switch state {
+        case MYNAH_IDLE: return .idle
+        case MYNAH_LOADING: return .loading
+        case MYNAH_LISTENING: return .listening
+        case MYNAH_TRANSCRIBING: return .transcribing
+        default: return .idle
+        }
     }
-}
-
-/// Default `initial_prompt` when `prompt` is unset.
-///
-/// Carried over verbatim from `DEFAULT_RUSSIAN_PROMPT` in `engine.py`. Informal
-/// Russian in the prompt biases the decoder toward reproducing informal Russian
-/// verbatim instead of sanitising it — Whisper treats the prompt as prior
-/// context, so seeing obscenity makes it far likelier to transcribe obscenity
-/// rather than censoring it. Removing this silently degrades the product.
-enum DefaultPrompt {
-    static let russian = """
-        Это разговорная запись с неформальной лексикой, сленгом и матом. \
-        Запиши всё как есть, без цензуры: пиздец, охуенно, хуйня, ебать, \
-        заебись, бля, сука, хуй, пизда, мудак.
-        """
 }
 
 #if DEBUG
 extension SessionController {
     /// Builds a controller in a chosen visual state, for SwiftUI previews.
     ///
-    /// Lives here rather than beside the views because `state` and `level` are
-    /// `private(set)` — the point of which is that only the session lifecycle
-    /// moves them. Previews are the one legitimate exception, and confining the
-    /// escape hatch to `#if DEBUG` keeps it out of shipping builds.
+    /// `state` and `level` are `private(set)` — only the session lifecycle
+    /// moves them. Previews are the one legitimate exception, and confining
+    /// the escape hatch to `#if DEBUG` keeps it out of shipping builds. The
+    /// extension lives in this file so the `private(set)` setters are
+    /// reachable.
     static func preview(
         state: DictationState = .listening,
         level: Double = 0.55,
@@ -575,3 +354,92 @@ extension SessionController {
     }
 }
 #endif
+
+/// The engine pointer as a Sendable value the nonisolated deinit can read
+/// without touching main-actor state.
+final class EngineBox: @unchecked Sendable {
+    var value: OpaquePointer?
+}
+
+/// The engine's events, copied out of the callback's `mynah_event` (valid
+/// only for the callback's duration) before hopping to the main actor.
+///
+/// All fields are value types, so the copy is Sendable end to end.
+struct EngineEventData: Sendable {
+    enum Kind: Sendable {
+        case state
+        case level
+        case text
+        case problem
+        case model
+    }
+
+    var kind: Kind
+    var state: DictationState = .idle
+    var level: Double = 0
+    var text: String = ""
+    var problemCode: String = ""
+    var problemMessage: String = ""
+    var modelStatus: String = ""
+    var modelName: String = ""
+}
+
+/// Holds the Swift-side event routing for the C callback's lifetime. The
+/// engine gets the sink as its callback's user pointer at create time, and
+/// the controller attaches itself right after init — events cannot fire
+/// before a session starts, so the nil window is unreachable in practice,
+/// and a nil attachment degrades to a no-op rather than a crash.
+final class EventSink: @unchecked Sendable {
+    private weak var controller: SessionController?
+
+    init() {}
+
+    func attach(_ controller: SessionController) {
+        self.controller = controller
+    }
+
+    fileprivate static func deliver(_ event: OpaquePointer, to user: UnsafeMutableRawPointer) {
+        let sink = Unmanaged<EventSink>.fromOpaque(user).takeUnretainedValue()
+        var data = EngineEventData(kind: .state)
+        switch mynah_event_get_kind(event) {
+        case MYNAH_EVENT_STATE:
+            data = EngineEventData(kind: .state,
+                                   state: SessionController.dictationState(
+                                       mynah_event_state(event)))
+        case MYNAH_EVENT_LEVEL:
+            data = EngineEventData(kind: .level, level: Double(mynah_event_level(event)))
+        case MYNAH_EVENT_TEXT:
+            data = EngineEventData(kind: .text, text: stringFrom(event) { mynah_event_text($0) })
+        case MYNAH_EVENT_PROBLEM:
+            data = EngineEventData(kind: .problem,
+                                   problemCode: stringFrom(event) { mynah_event_problem_code($0) },
+                                   problemMessage: stringFrom(event) {
+                                       mynah_event_problem_message($0)
+                                   })
+        case MYNAH_EVENT_MODEL:
+            data = EngineEventData(kind: .model,
+                                   modelStatus: modelStatusWord(mynah_event_model_status(event)),
+                                   modelName: stringFrom(event) { mynah_event_model_name($0) })
+        default:
+            return
+        }
+        sink.controller?.receive(data)
+    }
+
+    private static func stringFrom(_ event: OpaquePointer,
+                                   _ accessor: (OpaquePointer) -> UnsafePointer<CChar>?)
+        -> String
+    {
+        guard let raw = accessor(event) else { return "" }
+        return String(cString: raw)
+    }
+
+    private static func modelStatusWord(_ status: mynah_model_status) -> String {
+        switch status {
+        case MYNAH_MODEL_LOADING: return "loading"
+        case MYNAH_MODEL_LOADED: return "loaded"
+        case MYNAH_MODEL_UNLOADED: return "unloaded"
+        default: return "unloaded"
+        }
+    }
+}

@@ -146,6 +146,11 @@ void Engine::set_config(config::Config config) {
     config_ = std::move(config);
 }
 
+config::Config Engine::config_snapshot() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return config_;
+}
+
 bool Engine::is_engaged() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return active_.load(std::memory_order_acquire) ||

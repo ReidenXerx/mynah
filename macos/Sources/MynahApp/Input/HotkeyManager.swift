@@ -15,30 +15,39 @@ final class HotkeyManager {
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
-    private var onTrigger: (() -> Void)?
+    private var onPress: (() -> Void)?
+    private var onRelease: (() -> Void)?
 
     private static let signature: OSType = 0x77_68_7A_6B  // 'whzk'
 
-    /// Register `spec` (pynput syntax, e.g. `<cmd>+<shift>+.`). Returns false
-    /// if the spec cannot be parsed or the combination is already claimed by
-    /// another app.
+    /// Register `spec` (pynput syntax, e.g. `<cmd>+<shift>+.`). `onPress`
+    /// fires on key-down; `onRelease` on key-up, which is what push-to-talk
+    /// needs (`kEventHotKeyReleased` arrives for a registered hotkey without
+    /// extra registration). Returns false if the spec cannot be parsed or
+    /// the combination is already claimed by another app.
     @discardableResult
-    func register(_ spec: String, onTrigger: @escaping () -> Void) -> Bool {
+    func register(_ spec: String,
+                  onPress: @escaping () -> Void,
+                  onRelease: (() -> Void)? = nil) -> Bool {
         unregister()
 
         guard let combo = HotkeySpec.parse(spec) else {
             NSLog("mynah: could not parse hotkey '\(spec)'")
             return false
         }
-        self.onTrigger = onTrigger
+        self.onPress = onPress
+        self.onRelease = onRelease
 
-        var eventType = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
+        var eventTypes = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
+                          eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
+                          eventKind: UInt32(kEventHotKeyReleased)),
+        ]
         let context = Unmanaged.passUnretained(self).toOpaque()
 
-        InstallEventHandler(GetApplicationEventTarget(), hotkeyHandler, 1, &eventType, context, &eventHandler)
+        InstallEventHandler(GetApplicationEventTarget(), hotkeyHandler, 2, &eventTypes,
+                            context, &eventHandler)
 
         let id = EventHotKeyID(signature: Self.signature, id: 1)
         let status = RegisterEventHotKey(
@@ -56,19 +65,24 @@ final class HotkeyManager {
         if let eventHandler { RemoveEventHandler(eventHandler) }
         hotKeyRef = nil
         eventHandler = nil
-        onTrigger = nil
+        onPress = nil
+        onRelease = nil
     }
 
-    fileprivate func fire() {
-        onTrigger?()
+    fileprivate func fire(release: Bool) {
+        release ? onRelease?() : onPress?()
     }
 }
 
-/// Carbon calls this from the main run loop.
-private let hotkeyHandler: EventHandlerUPP = { _, _, context in
+/// Carbon calls this from the main run loop, once per press and once per
+/// release of the registered combination.
+private let hotkeyHandler: EventHandlerUPP = { _, event, context in
     guard let context else { return noErr }
     let manager = Unmanaged<HotkeyManager>.fromOpaque(context).takeUnretainedValue()
-    MainActor.assumeIsolated { manager.fire() }
+    let kind = GetEventKind(event)
+    MainActor.assumeIsolated {
+        manager.fire(release: kind == EventKind(kEventHotKeyReleased))
+    }
     return noErr
 }
 

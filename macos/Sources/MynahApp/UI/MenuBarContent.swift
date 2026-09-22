@@ -59,7 +59,7 @@ struct MenuBarContent: View {
         .keyboardShortcut(",")
 
         Button("Open Config File") {
-            NSWorkspace.shared.open(MynahConfig.path)
+            NSWorkspace.shared.open(URL(fileURLWithPath: controller.configFilePath))
         }
 
         Button("Reveal Log…") {

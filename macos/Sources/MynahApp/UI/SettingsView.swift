@@ -9,9 +9,9 @@ import SwiftUI
 /// indistinguishable from a bug.
 ///
 /// `auto_stop_silence` is honored here since wave-2 (M1):
-/// SessionController ends the session after the configured silence. It has
+/// the engine ends the session after the configured silence. It has
 /// no dedicated control in this window — set it with
-/// `mynah dictate set silence=<seconds>`.
+/// `mynah set silence=<seconds>`.
 ///
 /// Edits write to `~/.config/mynah/config.toml` immediately, preserving the keys
 /// the Python CLI owns. Most take effect on the next dictation session; the ones
@@ -131,7 +131,7 @@ struct SettingsView: View {
             Section {
                 Button("Restore Defaults") {
                     controller.updateConfig { config in
-                        let defaults = MynahConfig()
+                        let defaults = AppConfig()
                         config.frameEnergy = defaults.frameEnergy
                         config.minEnergy = defaults.minEnergy
                         config.minUtterance = defaults.minUtterance
@@ -159,8 +159,9 @@ struct SettingsView: View {
         }
     }
 
-    /// Writes through to the config file on every edit.
-    private func binding<V>(_ path: WritableKeyPath<MynahConfig, V>) -> Binding<V> {
+    /// Writes through to the config file on every edit — via the engine,
+    /// which owns the file (Phase 5).
+    private func binding<V>(_ path: WritableKeyPath<AppConfig, V>) -> Binding<V> {
         Binding(
             get: { controller.config[keyPath: path] },
             set: { newValue in controller.updateConfig { $0[keyPath: path] = newValue } }

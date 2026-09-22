@@ -1,0 +1,206 @@
+[
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/cc -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -o CMakeFiles/ggml-base.dir/ggml.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml.c",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml.c",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml.c.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-base.dir/ggml.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/cc -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -o CMakeFiles/ggml-base.dir/ggml-alloc.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-alloc.c",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-alloc.c",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml-alloc.c.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-base.dir/ggml-backend.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml-backend.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-base.dir/ggml-backend-meta.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend-meta.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend-meta.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml-backend-meta.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-base.dir/ggml-opt.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-opt.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-opt.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml-opt.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-base.dir/ggml-threading.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-threading.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-threading.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml-threading.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/cc -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -o CMakeFiles/ggml-base.dir/ggml-quants.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-quants.c",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-quants.c",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/ggml-quants.c.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_COMMIT=\\\"306c88f4\\\" -DGGML_SCHED_MAX_COPIES=4 -DGGML_VERSION=\\\"0.18.1\\\" -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-base.dir/gguf.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/gguf.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/gguf.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-base.dir/gguf.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/cc -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.c.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/repack.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/repack.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/repack.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/repack.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/hbm.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/hbm.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/hbm.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/hbm.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/cc -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/quants.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/quants.c",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/quants.c",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/quants.c.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/traits.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/traits.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/traits.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/traits.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/amx.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/amx/amx.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/amx/amx.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/amx.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/mmq.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/amx/mmq.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/amx/mmq.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/mmq.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/binary-ops.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/binary-ops.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/binary-ops.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/binary-ops.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/unary-ops.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/unary-ops.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/unary-ops.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/unary-ops.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/vec.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/vec.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/vec.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/vec.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/ops.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/ops.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/ops.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ops.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/cc -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/arm/quants.c.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/arch/arm/quants.c",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/arch/arm/quants.c",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/arm/quants.c.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DACCELERATE_LAPACK_ILP64 -DACCELERATE_NEW_LAPACK -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_ACCELERATE -DGGML_USE_CPU_REPACK -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -march=armv8.2-a+dotprod+fp16 -o CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/arm/repack.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/arch/arm/repack.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-cpu/arch/arm/repack.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/arm/repack.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_CPU -DGGML_USE_METAL -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml.dir/ggml-backend-dl.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend-dl.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend-dl.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml.dir/ggml-backend-dl.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src",
+  "command": "/usr/bin/c++ -DGGML_SCHED_MAX_COPIES=4 -DGGML_USE_CPU -DGGML_USE_METAL -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml.dir/ggml-backend-reg.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend-reg.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-backend-reg.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/CMakeFiles/ggml.dir/ggml-backend-reg.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal",
+  "command": "/usr/bin/c++ -DGGML_METAL_EMBED_LIBRARY -DGGML_SCHED_MAX_COPIES=4 -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-metal.dir/ggml-metal.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal",
+  "command": "/usr/bin/cc -DGGML_METAL_EMBED_LIBRARY -DGGML_SCHED_MAX_COPIES=4 -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -o CMakeFiles/ggml-metal.dir/ggml-metal-device.m.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-device.m",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-device.m",
+  "output": "third_party/whisper.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-device.m.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal",
+  "command": "/usr/bin/c++ -DGGML_METAL_EMBED_LIBRARY -DGGML_SCHED_MAX_COPIES=4 -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-metal.dir/ggml-metal-device.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-device.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-device.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-device.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal",
+  "command": "/usr/bin/c++ -DGGML_METAL_EMBED_LIBRARY -DGGML_SCHED_MAX_COPIES=4 -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-metal.dir/ggml-metal-common.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-common.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-common.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-common.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal",
+  "command": "/usr/bin/cc -DGGML_METAL_EMBED_LIBRARY -DGGML_SCHED_MAX_COPIES=4 -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu11 -arch arm64 -mmacosx-version-min=13.0 -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes -Werror=implicit-int -Werror=implicit-function-declaration -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion -o CMakeFiles/ggml-metal.dir/ggml-metal-context.m.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-context.m",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-context.m",
+  "output": "third_party/whisper.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-context.m.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal",
+  "command": "/usr/bin/c++ -DGGML_METAL_EMBED_LIBRARY -DGGML_SCHED_MAX_COPIES=4 -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks -O3 -DNDEBUG -std=gnu++17 -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi -o CMakeFiles/ggml-metal.dir/ggml-metal-ops.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-ops.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/ggml-metal-ops.cpp",
+  "output": "third_party/whisper.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-ops.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal",
+  "command": "/usr/bin/cc -DGGML_METAL_EMBED_LIBRARY -DGGML_SCHED_MAX_COPIES=4 -D_DARWIN_C_SOURCE -D_XOPEN_SOURCE=600 -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/ggml-metal/.. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Metal.framework -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/MetalKit.framework -O3 -DNDEBUG -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -mmacosx-version-min=13.0 -o CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed.s.o -c /Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s",
+  "output": "third_party/whisper.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed.s.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/src",
+  "command": "/usr/bin/c++ -DGGML_USE_CPU -DGGML_USE_METAL -DWHISPER_VERSION=\\\"1.9.2\\\" -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/../include -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -o CMakeFiles/whisper.dir/whisper.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/whisper.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/whisper.cpp",
+  "output": "third_party/whisper.cpp/src/CMakeFiles/whisper.dir/whisper.cpp.o"
+},
+{
+  "directory": "/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/src",
+  "command": "/usr/bin/c++ -DGGML_USE_CPU -DGGML_USE_METAL -DPARAKEET_VERSION=\\\"1.9.2\\\" -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/. -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/../include -I/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/ggml/src/../include -O3 -DNDEBUG -arch arm64 -mmacosx-version-min=13.0 -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -o CMakeFiles/parakeet.dir/parakeet.cpp.o -c /Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/parakeet.cpp",
+  "file": "/Users/sldkvdmzhaaa/Projects/mynah/third_party/whisper.cpp/src/parakeet.cpp",
+  "output": "third_party/whisper.cpp/src/CMakeFiles/parakeet.dir/parakeet.cpp.o"
+}
+]

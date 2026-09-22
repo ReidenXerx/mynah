@@ -99,12 +99,12 @@ struct ModelSectionView: View {
 
     private var installedModel: String? {
         _ = refresh  // re-evaluate after a download completes
-        return WhisperModel.resolve(configured: controller.config.model)?.lastPathComponent
+        return controller.installedModel
     }
 
     private var hasVAD: Bool {
         _ = refresh
-        return WhisperModel.resolveVAD() != nil
+        return controller.hasVADModel
     }
 
     private var vadBinding: Binding<Bool> {

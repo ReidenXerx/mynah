@@ -103,6 +103,10 @@ public:
     // calibration and queue belong to it).
     void set_config(config::Config config);
 
+    // The config the engine is currently running with. Thread-safe: a front
+    // end reads this while the session lifecycle mutates it.
+    config::Config config_snapshot() const;
+
     // Trigger semantics: toggle flips, PTT press/release start and stop.
     void toggle();
     void start(); // asynchronous; LOADING..LISTENING arrive as events

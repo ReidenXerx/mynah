@@ -1,0 +1,14 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/cmake_install.cmake",
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/cmake_install.cmake",
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/cmake_install.cmake",
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/cmake_install.cmake",
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-cpu/cmake_install.cmake",
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/ggml/src/ggml-metal/cmake_install.cmake",
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/third_party/whisper.cpp/src/cmake_install.cmake",
+		"/Users/sldkvdmzhaaa/Projects/mynah/macos/vendor/core-build/core/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

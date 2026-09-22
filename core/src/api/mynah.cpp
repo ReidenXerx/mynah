@@ -12,9 +12,15 @@
 #include <filesystem>
 #include <memory>
 #include <new>
+#include <optional>
+#include <sstream>
 #include <string>
 
+#include <whisper.h>
+
 #include "config/config.hpp"
+#include "json.hpp"
+#include "models/resolve.hpp"
 #include "session/session.hpp"
 #include "stt/stt.hpp"
 #include "vad/vad.hpp"
@@ -238,6 +244,164 @@ int mynah_reload_config(mynah_engine* engine) {
     } catch (...) {
         return -1; // keep running on the config we already have
     }
+}
+
+// --- config (the settings surface for the front ends) ----------------------
+
+namespace {
+
+// The config as a flat JSON object. Keys are snake_case, exactly the TOML
+// keys, so the front end's adapter is a dictionary lookup with no mapping
+// table to drift.
+std::string config_to_json(const mynah::config::Config& config) {
+    using mynah::json::quoted;
+    std::ostringstream json;
+    json << "{";
+    json << "\"model\":" << quoted(config.model) << ',';
+    json << "\"language\":" << quoted(config.language) << ',';
+    json << "\"prompt\":" << quoted(config.prompt) << ',';
+    json << "\"hotkey\":" << quoted(config.hotkey) << ',';
+    json << "\"trigger\":" << quoted(config.trigger) << ',';
+    json << "\"injector\":" << quoted(config.injector) << ',';
+    json << "\"vad\":" << (config.vad ? "true" : "false") << ',';
+    json << "\"gpu\":" << (config.gpu ? "true" : "false") << ',';
+    json << "\"show_indicator\":" << (config.show_indicator ? "true" : "false") << ',';
+    json << "\"idle_visible\":" << (config.idle_visible ? "true" : "false") << ',';
+    json << "\"idle_timeout\":" << config.idle_timeout << ',';
+    json << "\"auto_stop_silence\":" << config.auto_stop_silence << ',';
+    json << "\"frame_energy\":" << config.frame_energy << ',';
+    json << "\"min_energy\":" << config.min_energy << ',';
+    json << "\"min_utterance\":" << config.min_utterance;
+    return json.str();
+}
+
+// Apply a JSON-encoded value to one config key. Returns false for an
+// unknown key or a value of the wrong shape — the config file is never
+// touched with a half-applied change.
+bool apply_json_value(mynah::config::Config& config, const std::string& key,
+                      const mynah::json::Value& value) {
+    auto as_string = [&]() -> std::optional<std::string> {
+        if (value.tag == mynah::json::Value::Tag::String) return value.text;
+        return std::nullopt;
+    };
+    auto as_bool = [&]() -> std::optional<bool> {
+        if (value.tag == mynah::json::Value::Tag::Bool) return value.boolean;
+        return std::nullopt;
+    };
+    auto as_number = [&]() -> std::optional<double> {
+        if (value.tag == mynah::json::Value::Tag::Number) return value.number;
+        return std::nullopt;
+    };
+
+    if (key == "model") { if (auto v = as_string()) { config.model = *v; return true; } }
+    else if (key == "language") { if (auto v = as_string()) { config.language = *v; return true; } }
+    else if (key == "prompt") { if (auto v = as_string()) { config.prompt = *v; return true; } }
+    else if (key == "hotkey") { if (auto v = as_string()) { config.hotkey = *v; return true; } }
+    else if (key == "trigger") {
+        if (auto v = as_string()) {
+            if (*v == "toggle" || *v == "ptt") { config.trigger = *v; return true; }
+        }
+    } else if (key == "injector") {
+        if (auto v = as_string()) {
+            if (v->empty() || *v == "smart" || *v == "wtype" || *v == "clipboard") {
+                config.injector = *v;
+                return true;
+            }
+        }
+    } else if (key == "vad") { if (auto v = as_bool()) { config.vad = *v; return true; } }
+    else if (key == "gpu") { if (auto v = as_bool()) { config.gpu = *v; return true; } }
+    else if (key == "show_indicator") { if (auto v = as_bool()) { config.show_indicator = *v; return true; } }
+    else if (key == "idle_visible") { if (auto v = as_bool()) { config.idle_visible = *v; return true; } }
+    else if (key == "idle_timeout") { if (auto v = as_number()) { config.idle_timeout = *v; return true; } }
+    else if (key == "auto_stop_silence") { if (auto v = as_number()) { config.auto_stop_silence = *v; return true; } }
+    else if (key == "frame_energy") { if (auto v = as_number()) { config.frame_energy = *v; return true; } }
+    else if (key == "min_energy") { if (auto v = as_number()) { config.min_energy = *v; return true; } }
+    else if (key == "min_utterance") { if (auto v = as_number()) { config.min_utterance = *v; return true; } }
+    return false;
+}
+
+} // namespace
+
+char* mynah_config_json(const mynah_engine* engine) {
+    if (!engine) return nullptr;
+    try {
+        std::string json = config_to_json(engine->session->config_snapshot());
+        char* copy = static_cast<char*>(std::malloc(json.size() + 1));
+        if (copy) std::memcpy(copy, json.c_str(), json.size() + 1);
+        return copy;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+int mynah_config_set(mynah_engine* engine, const char* key, const char* json_value) {
+    if (!engine || !key || !json_value) return -1;
+    try {
+        mynah::json::Value value = mynah::json::parse(json_value);
+        mynah::config::Config config = engine->session->config_snapshot();
+        if (!apply_json_value(config, key, value)) return -1;
+        mynah::config::save(config); // read-modify-write: other writers keep their keys
+        engine->session->set_config(std::move(config));
+        return 0;
+    } catch (...) {
+        return -1;
+    }
+}
+
+char* mynah_config_path(const mynah_engine* engine) {
+    if (!engine) return nullptr;
+    const std::string& path = engine->config_path.string();
+    char* copy = static_cast<char*>(std::malloc(path.size() + 1));
+    if (copy) std::memcpy(copy, path.c_str(), path.size() + 1);
+    return copy;
+}
+
+char* mynah_find_model(const char* configured) {
+    try {
+        std::string wanted = configured ? configured : "";
+        std::filesystem::path found =
+            mynah::models::resolve(wanted, mynah::models::search_directories());
+        if (found.empty()) return nullptr;
+        std::string path = found.string();
+        char* copy = static_cast<char*>(std::malloc(path.size() + 1));
+        if (copy) std::memcpy(copy, path.c_str(), path.size() + 1);
+        return copy;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char* mynah_find_vad(void) {
+    try {
+        std::filesystem::path found =
+            mynah::models::resolve_vad(mynah::models::search_directories());
+        if (found.empty()) return nullptr;
+        std::string path = found.string();
+        char* copy = static_cast<char*>(std::malloc(path.size() + 1));
+        if (copy) std::memcpy(copy, path.c_str(), path.size() + 1);
+        return copy;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+// --- the language table ------------------------------------------------------
+
+int mynah_language_count(void) {
+    return whisper_lang_max_id() + 1;
+}
+
+const char* mynah_language_code(int id) {
+    return whisper_lang_str(id);
+}
+
+const char* mynah_language_name(int id) {
+    return whisper_lang_str_full(id);
+}
+
+int mynah_language_id(const char* code) {
+    if (!code) return -1;
+    return whisper_lang_id(code);
 }
 
 mynah_event_kind mynah_event_get_kind(const mynah_event* event) {

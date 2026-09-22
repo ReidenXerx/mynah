@@ -37,6 +37,11 @@ target_compile_definitions(mynah PRIVATE MYNAH_VERSION="${PROJECT_VERSION}")
 # front ends linking libmynah get the whisper symbols the C API drives.
 target_link_libraries(mynah PUBLIC whisper)
 
+# Installed by the macOS app's build-core.sh into macos/vendor/install,
+# where the CMynah module map and the Swift link line point.
+install(TARGETS mynah ARCHIVE DESTINATION lib)
+install(DIRECTORY include/ DESTINATION include)
+
 # Dev tool: a WAV through the full engine, events and transcripts out.
 add_executable(mynah-replay tools/mynah-replay/main.cpp)
 target_link_libraries(mynah-replay PRIVATE mynah)
@@ -56,7 +61,7 @@ if(MYNAH_BUILD_TESTS)
         tests/test_toml.cpp
     )
     target_link_libraries(mynah_tests PRIVATE mynah)
-    target_include_directories(mynah_tests PRIVATE src tests ${CMAKE_CURRENT_SOURCE_DIR}/../linux/common)
+    target_include_directories(mynah_tests PRIVATE src tests)
     target_compile_definitions(mynah_tests PRIVATE
         MYNAH_VERSION="${PROJECT_VERSION}"
         # The suites pin the core's constants against the shared contract the

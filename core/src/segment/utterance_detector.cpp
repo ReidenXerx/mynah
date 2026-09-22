@@ -1,6 +1,7 @@
 #include "utterance_detector.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace mynah::segment {
 

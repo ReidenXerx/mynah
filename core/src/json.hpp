@@ -38,6 +38,16 @@ struct Value {
     std::vector<Value> array;
     Object object;
 
+    // Declared here, defaulted below the class: implicit ones are defined
+    // where Value is still incomplete for std::pair<std::string, Value>, which
+    // Clang with libstdc++ 16 rejects (GCC and libc++ happen to accept it).
+    Value();
+    Value(const Value&);
+    Value(Value&&) noexcept;
+    Value& operator=(const Value&);
+    Value& operator=(Value&&) noexcept;
+    ~Value();
+
     bool is_object() const { return tag == Tag::Object; }
     bool is_array() const { return tag == Tag::Array; }
     bool is_number() const { return tag == Tag::Number; }
@@ -57,6 +67,13 @@ struct Value {
         return &array[index];
     }
 };
+
+inline Value::Value() = default;
+inline Value::Value(const Value&) = default;
+inline Value::Value(Value&&) noexcept = default;
+inline Value& Value::operator=(const Value&) = default;
+inline Value& Value::operator=(Value&&) noexcept = default;
+inline Value::~Value() = default;
 
 namespace detail {
 

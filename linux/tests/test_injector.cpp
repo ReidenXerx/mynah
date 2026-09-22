@@ -93,6 +93,33 @@ Tools tools_with(const Fakes& fakes) {
     return tools;
 }
 
+// Whether the fake clipboard holds `expected` within 1.5 s.
+bool clipboard_becomes(const Fakes& fakes, const std::string& expected) {
+    auto began = std::chrono::steady_clock::now();
+    while (read_file(fakes.copy_stdin) != expected) {
+        if (std::chrono::steady_clock::now() - began > std::chrono::milliseconds(1500))
+            return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    return true;
+}
+
+// A wl-paste that serves whatever the fake wl-copy last wrote — the
+// clipboard as the next read really sees it — or the user's text before
+// anything was copied.
+std::string make_live_paste(const Fakes& fakes) {
+    std::string script = (fakes.dir.path() / "wl-paste-live").string();
+    std::ofstream out(script);
+    out << "#!/bin/sh\n";
+    out << "cat > /dev/null\n";
+    out << "if [ \"$1\" = --list-types ]; then echo text/plain; exit 0; fi\n";
+    out << "if [ -f " << fakes.copy_stdin << " ]; then cat " << fakes.copy_stdin
+        << "; else printf 'the users text'; fi\n";
+    out.close();
+    ::chmod(script.c_str(), 0755);
+    return script;
+}
+
 } // namespace
 
 TEST_CASE("the text goes in on stdin, never in argv") {
@@ -245,21 +272,37 @@ TEST_CASE("the clipboard is borrowed and given back") {
     CHECK(wrote_text);
     std::string written = read_file(fakes.copy_stdin);
 
-    // …and within ~1.5 s the original came back.
-    auto began = std::chrono::steady_clock::now();
-    std::string restored;
-    while (std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count() <
-           1.5) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        std::ifstream in(fakes.copy_stdin, std::ios::binary);
-        std::string current((std::istreambuf_iterator<char>(in)),
-                           std::istreambuf_iterator<char>());
-        if (current != written) {
-            restored = current;
-            break;
-        }
-    }
-    CHECK(restored == "the users text");
+    CHECK(written == "привет");
+
+    // …and within ~1.5 s the original came back. Waited for by content, not
+    // by "changed": the fake wl-copy truncates before it writes, so a read
+    // in between sees an empty file.
+    CHECK(clipboard_becomes(fakes, "the users text"));
+}
+
+TEST_CASE("two utterances in a row still give back the user's clipboard") {
+    // The second paste reads the clipboard while the first one's text is
+    // still on it; restoring what IT saved would lose the user's text.
+    Fakes fakes;
+    Tools tools = tools_with(fakes);
+    tools.wl_paste = make_live_paste(fakes);
+
+    auto injector = mynah::inject::make_clipboard(tools);
+    REQUIRE(injector->type_text("первое"));
+    REQUIRE(injector->type_text("второе"));
+    CHECK(read_file(fakes.copy_stdin) == "второе");
+    CHECK(clipboard_becomes(fakes, "the users text"));
+}
+
+TEST_CASE("quitting right after a paste still gives the clipboard back") {
+    Fakes fakes;
+    Tools tools = tools_with(fakes);
+    tools.wl_paste = make_live_paste(fakes);
+
+    auto injector = mynah::inject::make_clipboard(tools);
+    REQUIRE(injector->type_text("привет"));
+    injector.reset(); // waits for the pending restore, and nothing outlives it
+    CHECK(read_file(fakes.copy_stdin) == "the users text");
 }
 
 TEST_CASE("an image on the clipboard is left alone") {

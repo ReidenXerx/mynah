@@ -34,9 +34,13 @@ if(PIPEWIRE_FOUND)
     target_sources(mynah-linux-common PRIVATE common/pipewire_capture.cpp)
     target_link_libraries(mynah-linux-common PUBLIC PkgConfig::PIPEWIRE)
 
-    add_executable(mynah cli/main.cpp)
-    target_link_libraries(mynah PRIVATE mynah-linux-common)
-    install(TARGETS mynah DESTINATION bin)
+    # The target is `mynah-cli` because `mynah` is the library's
+    # (core/CMakeLists.txt); the file it builds is still `mynah`.
+    add_executable(mynah-cli cli/main.cpp)
+    set_target_properties(mynah-cli PROPERTIES OUTPUT_NAME mynah)
+    target_link_libraries(mynah-cli PRIVATE mynah-linux-common)
+    target_compile_definitions(mynah-cli PRIVATE MYNAH_VERSION="${PROJECT_VERSION}")
+    install(TARGETS mynah-cli DESTINATION bin)
 endif()
 
 if(MYNAH_BUILD_TESTS)

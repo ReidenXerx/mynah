@@ -11,10 +11,12 @@
 #include <cctype>
 #include <cerrno>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -316,7 +318,19 @@ private:
 class ClipboardInjector final : public Injector {
 public:
     explicit ClipboardInjector(Tools tools)
-        : tools_(tools), fallback_(static_cast<WtypeInjector*>(make_wtype(tools).release())) {}
+        : tools_(tools), fallback_(std::make_unique<WtypeInjector>(tools)) {}
+
+    // A restore still pending runs before this returns (at most
+    // kRestoreAfter): quitting right after dictating must not leave the
+    // dictated text on the clipboard in place of the user's.
+    ~ClipboardInjector() override {
+        {
+            std::lock_guard<std::mutex> lock(restore_mutex_);
+            stopping_ = true;
+        }
+        restore_wake_.notify_all();
+        if (restorer_.joinable()) restorer_.join();
+    }
 
     bool type_text(const std::string& text) override {
         if (text.empty()) return true;
@@ -398,21 +412,51 @@ private:
     }
 
     void restore_later(std::optional<std::string> saved) const {
-        if (!saved) return;
-        // The latest utterance's restore wins — Python cancelled the pending
-        // timer, and two racing restores would leave whatever landed in
-        // between.
-        const int generation = ++restore_generation_;
-        std::thread([this, generation, text = std::move(*saved)] {
-            std::this_thread::sleep_for(std::chrono::duration<double>(kRestoreAfter));
-            if (generation != restore_generation_.load()) return;
+        std::lock_guard<std::mutex> lock(restore_mutex_);
+        // One restore, however many pastes: a second utterance inside the
+        // window reads OUR text off the clipboard, so the first saved
+        // content is the user's and is kept; each paste only moves the
+        // deadline, so no restore lands while an app is still pasting.
+        if (saved && !pending_) pending_ = std::move(saved);
+        if (!pending_) return;
+        restore_at_ = std::chrono::steady_clock::now() +
+                      std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                          std::chrono::duration<double>(kRestoreAfter));
+        if (!restorer_.joinable()) restorer_ = std::thread([this] { restore_loop(); });
+        restore_wake_.notify_all();
+    }
+
+    // The one restorer thread, joined by the destructor — never detached,
+    // so it cannot outlive the injector it writes through.
+    void restore_loop() const {
+        std::unique_lock<std::mutex> lock(restore_mutex_);
+        for (;;) {
+            if (!pending_) {
+                if (stopping_) return;
+                restore_wake_.wait(lock);
+                continue;
+            }
+            if (std::chrono::steady_clock::now() < restore_at_) {
+                restore_wake_.wait_until(lock, restore_at_);
+                continue; // a newer paste may have moved the deadline
+            }
+            std::string text = std::move(*pending_);
+            pending_.reset();
+            lock.unlock();
             write_clipboard(text);
-        }).detach();
+            lock.lock();
+        }
     }
 
     Tools tools_;
-    WtypeInjector* fallback_;
-    mutable std::atomic<int> restore_generation_{0};
+    std::unique_ptr<WtypeInjector> fallback_;
+
+    mutable std::mutex restore_mutex_;
+    mutable std::condition_variable restore_wake_;
+    mutable std::thread restorer_;
+    mutable std::optional<std::string> pending_;
+    mutable std::chrono::steady_clock::time_point restore_at_;
+    mutable bool stopping_ = false;
 };
 
 // --- smart ------------------------------------------------------------------------

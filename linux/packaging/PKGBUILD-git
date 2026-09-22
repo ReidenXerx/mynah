@@ -60,12 +60,8 @@ build() {
     cmake -S "$srcdir/mynah" -B build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
-        -DGGML_NATIVE=OFF \
-        -DGGML_VULKAN=ON \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DWHISPER_BUILD_TESTS=OFF \
-        -DWHISPER_BUILD_EXAMPLES=OFF \
-        -DWHISPER_BUILD_SERVER=OFF \
+        -DMYNAH_CPU=x86-64-v3 \
+        -DMYNAH_VULKAN=ON \
         -DMYNAH_BUILD_TESTS=OFF
     cmake --build build -j"$(nproc)"
 }

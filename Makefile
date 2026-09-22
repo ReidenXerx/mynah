@@ -1,17 +1,37 @@
 # Developer entry points. The scripts hold the logic; these are just names.
 
-.PHONY: dev build-app install-app uninstall-app core core-test
+.PHONY: dev build-app install-app uninstall-app core core-test asan tsan clang
 
 NPROC := $(shell sysctl -n hw.ncpu 2>/dev/null || nproc)
 
-# Configure + build the C++ core (libmynah + the pinned whisper.cpp).
-core:
-	cmake -S . -B build -DMYNAH_WITH_WHISPER=ON
-	cmake --build build -j $(NPROC)
+# The build tree and extra CMake flags; the targets below reuse `core` with
+# their own. e.g. `make core CMAKE_FLAGS=-DMYNAH_CPU=native`
+BUILD ?= build
+CMAKE_FLAGS ?=
 
-# Build the core and run its test suite (doctest + ctest).
+# Configure + build the C++ core (libmynah + the pinned whisper.cpp). On
+# Linux this is also the headless `mynah` (build/linux/mynah) and its suite.
+core:
+	cmake -S . -B $(BUILD) $(CMAKE_FLAGS)
+	cmake --build $(BUILD) -j $(NPROC)
+
+# Build and run every test suite (doctest + ctest).
 core-test: core
-	ctest --test-dir build --output-on-failure
+	ctest --test-dir $(BUILD) --output-on-failure
+
+# The suites under AddressSanitizer + UBSan, and under ThreadSanitizer, each
+# in a build tree of its own. CPU-only: the suites never touch a GPU, and
+# GPU drivers are noise under a sanitizer.
+SANITIZED := -DCMAKE_BUILD_TYPE=Debug -DMYNAH_CPU=native -DMYNAH_VULKAN=OFF
+asan:
+	@$(MAKE) core-test BUILD=build-asan CMAKE_FLAGS="$(SANITIZED) -DMYNAH_SANITIZE=address"
+tsan:
+	@$(MAKE) core-test BUILD=build-tsan CMAKE_FLAGS="$(SANITIZED) -DMYNAH_SANITIZE=thread"
+
+# The same suites built with Clang (the default compiler is GCC on Arch,
+# Apple clang on macOS) — each catches what the other lets through.
+clang:
+	@$(MAKE) core-test BUILD=build-clang CMAKE_FLAGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ $(CMAKE_FLAGS)"
 
 # Build the macOS app (debug), launch it and stream its log. Ctrl+C quits.
 dev:

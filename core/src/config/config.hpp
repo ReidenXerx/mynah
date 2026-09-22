@@ -75,10 +75,14 @@ struct Config {
 
     // --- which implementation (Linux) ---
     std::string injector;
-    // Linux tiers (M5): a discrete GPU runs the `gpu` tier only when the
-    // user opted in — waking a dGPU per sentence spins fans for a
-    // two-word utterance. An integrated GPU is used automatically.
-    bool gpu = false;
+    // Linux (M5): prefer a discrete GPU for speech when there is one; off
+    // means an integrated GPU or the CPU only. On by default since
+    // 2026-09-23: NVIDIA's fine-grained runtime D3 puts the dGPU into D3cold
+    // about ten seconds after its last work, even with turbo still loaded
+    // (measured on an RTX 5070 laptop), so the fan cost that made this
+    // opt-in is a few seconds per session, not the session's length.
+    // Ignored on macOS, which is always Metal (M4).
+    bool gpu = true;
 
     bool operator==(const Config&) const = default;
 };

@@ -1,0 +1,11 @@
+# LeakSanitizer suppressions for the Linux suite under `make asan`.
+#
+# PipeWire loads its client modules with dlopen when a context is created and
+# dlcloses them when it is destroyed. What they allocate — on the caller's
+# thread through pw_context_load_module, or on PipeWire's own loop thread
+# through libspa-support — is still referenced from the module's static data
+# at that point, and once the module is unloaded LSan can no longer see those
+# references: every report is "<unknown module>" frames under one of these
+# two. None has a mynah frame; checked 2026-09-23 with malloc_context_size=100.
+leak:pw_context_load_module
+leak:libspa-support.so

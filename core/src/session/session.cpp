@@ -245,7 +245,8 @@ void Engine::loader_body(int start_generation) {
 
     // Resolved even when the model is already loaded: the VAD model is
     // looked for beside it before the shared search directories.
-    std::filesystem::path model = models::resolve(cfg.model, model_dirs_);
+    std::filesystem::path model =
+        models::resolve(cfg.model, model_dirs_, stt_->gpu_available(cfg.gpu));
     bool need_load = !stt_->is_loaded();
     if (need_load) {
         if (model.empty()) {
@@ -265,7 +266,7 @@ void Engine::loader_body(int start_generation) {
         }
         set_state(State::Loading);
         if (events_.model) events_.model(ModelStatus::Loading, model.filename().string());
-        if (!stt_->load(model)) {
+        if (!stt_->load(model, cfg.gpu)) {
             {
                 std::lock_guard<std::mutex> lock(mutex_);
                 if (start_generation_.load() == start_generation)

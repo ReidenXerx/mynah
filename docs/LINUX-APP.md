@@ -39,7 +39,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
 
 Needs Node-free but not dependency-free: `pipewire`, `wtype`, `wl-clipboard`,
 `curl`, `openssl`, and for the `gpu` tier `vulkan-icd-loader` (plus
-`vulkan-headers` and `shaderc` to build it). `linux/packaging/` carries the
+`vulkan-headers`, `spirv-headers` and `shaderc` to build it). `linux/packaging/` carries the
 PKGBUILDs and the systemd unit for when this is packaged.
 
 `mynah setup` checks each requirement, names what is missing, and prints the

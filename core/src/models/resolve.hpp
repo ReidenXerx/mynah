@@ -6,8 +6,10 @@
 // core/tests/test_models.cpp — the twin of
 // macos/Tests/MynahAppTests/AliasResolutionTests.swift.
 //
-// Linux model tiers (M5) do not exist yet; they arrive in Phase 3 and grow
-// into resolve() without changing what a configured path means.
+// Linux model tiers (M5) are picked by the CLI's benchmark, which stores its
+// choice as `model`; resolve() only decides what an EMPTY `model` means
+// before that has happened: turbo first with a GPU, small first without
+// (kUntieredPreference).
 
 #pragma once
 
@@ -34,6 +36,25 @@ inline constexpr const char* kPreference[] = {
     "ggml-base-q5_0.bin",
 };
 
+// What an empty `model` means on Linux without a GPU, where no benchmark has
+// picked a tier yet (no clip, nothing on disk at first start, or a model
+// added later): the CPU-safe choice first. kPreference's turbo-first order
+// is right on a GPU and wrong on a CPU, where turbo takes many seconds a
+// sentence. Same NS-15 rules.
+inline constexpr const char* kUntieredPreference[] = {
+    "ggml-small.bin",
+    "ggml-small-q5_0.bin",
+    "ggml-base.bin",
+    "ggml-base-q5_0.bin",
+    "ggml-medium.bin",
+    "ggml-medium-q5_0.bin",
+    "ggml-large-v3-turbo.bin",
+    "ggml-large-v3-turbo-q8_0.bin",
+    "ggml-large-v3-turbo-q5_0.bin",
+    "ggml-large-v3.bin",
+    "ggml-large-v3-q5_0.bin",
+};
+
 // The conventional whisper.cpp locations, most user-specific first:
 // $MYNAH_MODEL_DIR if set, then ~/.cache/whisper (where the macOS
 // downloader writes, so what a front end fetches the core finds), then the
@@ -51,13 +72,16 @@ std::string alias_from_filename(const std::string& name);
 //   3. an alias: full (`large-v3-turbo-q5_0`), short (`turbo`, only when
 //      it matches exactly one model — ambiguity resolves to nothing), or
 //      prefix (`large-v3`, picking the best on-disk variant by preference)
-// Empty configured walks the preference list. Returns an empty path when
-// nothing resolves — the session turns that into a `no_model` problem.
+// Empty configured walks a preference list: kPreference when `gpu_ready`
+// (always on macOS — Metal, M4), kUntieredPreference on a Linux CPU.
+// Returns an empty path when nothing resolves — the session turns that
+// into a `no_model` problem.
 //
 // `dirs` lets the tests point resolution at a temp directory; production
 // callers use the default.
 std::filesystem::path resolve(const std::string& configured,
-                             const std::vector<std::filesystem::path>& dirs);
+                             const std::vector<std::filesystem::path>& dirs,
+                             bool gpu_ready);
 
 // The Silero VAD model, v5.1.2 first for whisper-cli compatibility.
 std::filesystem::path resolve_vad(const std::vector<std::filesystem::path>& dirs);

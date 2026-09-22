@@ -7,28 +7,23 @@
 #include <iterator>
 #include <vector>
 
-#include <ggml-backend.h>
-
 #include "audio/wav.hpp"
 #include "table.hpp"
 
 namespace mynah::models {
 
 bool gpu_available(bool user_opted_into_discrete) {
-    // An integrated GPU is free of the fan cost and used automatically; a
-    // discrete one is the opt-in. Enumerated after ggml_backend_load_all()
-    // (the STT and VAD modules do this before any init).
-    ggml_backend_dev_t integrated = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_IGPU);
-    if (integrated != nullptr) return true;
-    if (!user_opted_into_discrete) return false;
-    return ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU) != nullptr;
+    // The same choice the STT makes when it loads, so the benchmark
+    // measures turbo on the GPU it will really run on.
+    return stt::pick_gpu(user_opted_into_discrete).has_value();
 }
 
 std::optional<BenchmarkResult> benchmark(stt::SpeechToText& stt,
                                          const std::string& model,
                                          const std::string& clip_path,
-                                         const std::string& language) {
-    if (!stt.load(model)) return std::nullopt;
+                                         const std::string& language,
+                                         bool discrete_gpu) {
+    if (!stt.load(model, discrete_gpu)) return std::nullopt;
 
     std::vector<float> samples;
     try {

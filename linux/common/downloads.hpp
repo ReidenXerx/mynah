@@ -32,4 +32,11 @@ Result fetch(const std::string& url, const std::string& directory,
 // and by `mynah models list` to say what is actually on disk.
 std::string file_sha256(const std::string& path);
 
+namespace detail {
+// One response header line into the expected size: Content-Length in any
+// case sets it, a status line ("HTTP/…", a new response after a redirect)
+// clears it. Exposed for the tests.
+void header_total(const char* header, std::uint64_t& total);
+} // namespace detail
+
 } // namespace mynah::download

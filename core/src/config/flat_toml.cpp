@@ -1,8 +1,11 @@
 #include "flat_toml.hpp"
 
+#include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <locale.h>
 #if defined(__APPLE__)
@@ -237,28 +240,36 @@ bool parse_value(std::string_view raw, Value& out) {
 // Python repr() for doubles: the shortest string that round-trips, always
 // with a decimal point or exponent so the value stays a float on re-read
 // (repr(45.0) == "45.0"). Apple's libc++ has no floating-point to_chars, so
-// this is the portable way: %g with increasing precision until it parses
-// back exactly.
+// this is the portable way: the fewest significant digits that parse back
+// exactly, then laid out the way repr lays them out — positional for
+// exponents -4..15 ("10.0", "0.0001"), scientific outside ("1e+16",
+// "1e-05"). Plain %g was the old layout, and it goes scientific as soon as
+// the exponent reaches the digit count: 10.0 came out as "1e+01", which is
+// what `auto_stop_silence = 10` was written back as.
 std::string format_double(double d) { return number_to_string(d); }
 
 std::string format_double_impl(double d) {
     CLocaleScope c_locale;
+    char buf[64];
+    if (!std::isfinite(d)) { // "inf", "-inf", "nan": already floats on re-read
+        std::snprintf(buf, sizeof(buf), "%g", d);
+        return buf;
+    }
+    int digits = 17; // 17 significant digits always round-trip
     for (int precision = 1; precision <= 17; ++precision) {
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "%.*g", precision, d);
-        double back = std::strtod(buf, nullptr);
-        if (back == d) {
-            std::string s(buf);
-            // "45" -> "45.0": keep it a float on the next read. Exponent
-            // forms ("1e+22") and inf/nan already qualify.
-            if (s.find_first_of(".ein") == std::string::npos) s += ".0";
-            return s;
+        std::snprintf(buf, sizeof(buf), "%.*e", precision - 1, d);
+        if (std::strtod(buf, nullptr) == d) {
+            digits = precision;
+            break;
         }
     }
-    // Unreachable in practice: 17 significant digits always round-trip.
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "%.17g", d);
-    return buf;
+    std::snprintf(buf, sizeof(buf), "%.*e", digits - 1, d);
+    const int exponent = std::atoi(std::strchr(buf, 'e') + 1);
+    if (exponent < -4 || exponent >= 16) return buf; // "1e+16", "1.5e-05"
+    std::snprintf(buf, sizeof(buf), "%.*f", std::max(digits - 1 - exponent, 0), d);
+    std::string s(buf);
+    if (s.find('.') == std::string::npos) s += ".0"; // "45" -> "45.0"
+    return s;
 }
 
 std::string escape(std::string_view s) {

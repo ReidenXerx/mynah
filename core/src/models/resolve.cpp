@@ -104,7 +104,8 @@ std::string alias_from_filename(const std::string& name) {
 }
 
 std::filesystem::path resolve(const std::string& configured,
-                              const std::vector<std::filesystem::path>& dirs) {
+                              const std::vector<std::filesystem::path>& dirs,
+                              bool gpu_ready) {
     if (!configured.empty()) {
         std::string expanded = expand_tilde(configured);
         std::filesystem::path direct(expanded);
@@ -144,7 +145,13 @@ std::filesystem::path resolve(const std::string& configured,
         }
         return {};
     }
-    for (const char* name : kPreference)
+#if defined(__APPLE__)
+    (void)gpu_ready;
+    const auto& order = kPreference;
+#else
+    const auto& order = gpu_ready ? kPreference : kUntieredPreference;
+#endif
+    for (const char* name : order)
         for (const auto& dir : dirs) {
             std::filesystem::path candidate = dir / name;
             if (is_file(candidate)) return candidate;

@@ -390,8 +390,14 @@ char* mynah_config_path(const mynah_engine* engine) {
 char* mynah_find_model(const char* configured) {
     try {
         std::string wanted = configured ? configured : "";
+#if defined(__APPLE__)
+        const bool gpu_ready = true; // Metal (M4)
+#else
+        // The engine's own answer for an empty `model` (Session::load).
+        const bool gpu_ready = mynah::stt::pick_gpu(mynah::config::load().gpu).has_value();
+#endif
         std::filesystem::path found =
-            mynah::models::resolve(wanted, mynah::models::search_directories());
+            mynah::models::resolve(wanted, mynah::models::search_directories(), gpu_ready);
         if (found.empty()) return nullptr;
         std::string path = found.string();
         char* copy = static_cast<char*>(std::malloc(path.size() + 1));

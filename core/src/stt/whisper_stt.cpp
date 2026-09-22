@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <thread>
+#include <vector>
 
 #include <ggml-backend.h>
 #include <whisper.h>
@@ -26,15 +27,26 @@ class WhisperStt final : public SpeechToText {
 public:
     ~WhisperStt() override { unload(); }
 
-    bool load(const std::filesystem::path& model) override {
+    bool load(const std::filesystem::path& model, bool discrete_gpu) override {
         std::lock_guard<std::mutex> lock(mutex_);
         if (context_) return true;
         register_ggml_backends_once();
 
         whisper_context_params params = whisper_context_default_params();
+#if defined(__APPLE__)
         // Metal on Apple Silicon — the whole reason for a GPU-capable
-        // runtime. flash_attn: faster and slightly more accurate with it.
+        // runtime (M4: always, no tiers).
+        (void)discrete_gpu;
         params.use_gpu = true;
+#else
+        // Chosen, not whisper.cpp's default of "the first GPU it finds":
+        // with Vulkan that can be the discrete GPU, woken for every
+        // sentence even with `gpu` off.
+        std::optional<GpuChoice> gpu = pick_gpu(discrete_gpu);
+        params.use_gpu = gpu.has_value();
+        params.gpu_device = gpu ? gpu->index : 0;
+#endif
+        // flash_attn: faster and slightly more accurate with it.
         params.flash_attn = true;
 
         context_ = whisper_init_from_file_with_params(model.string().c_str(), params);
@@ -44,6 +56,15 @@ public:
     bool is_loaded() const override {
         std::lock_guard<std::mutex> lock(mutex_);
         return context_ != nullptr;
+    }
+
+    bool gpu_available(bool discrete_gpu) const override {
+#if defined(__APPLE__)
+        (void)discrete_gpu;
+        return true; // Metal
+#else
+        return pick_gpu(discrete_gpu).has_value();
+#endif
     }
 
     void unload() override {
@@ -118,6 +139,41 @@ private:
 
 std::unique_ptr<SpeechToText> make_whisper() {
     return std::make_unique<WhisperStt>();
+}
+
+std::optional<int> choose_gpu(const std::vector<GpuKind>& gpus, bool discrete_allowed) {
+    auto first = [&gpus](GpuKind kind) -> std::optional<int> {
+        for (std::size_t i = 0; i < gpus.size(); ++i)
+            if (gpus[i] == kind) return int(i);
+        return std::nullopt;
+    };
+    if (discrete_allowed)
+        if (auto discrete = first(GpuKind::Discrete)) return discrete;
+    return first(GpuKind::Integrated);
+}
+
+std::optional<GpuChoice> pick_gpu(bool discrete_allowed) {
+    register_ggml_backends_once();
+    // The same walk as whisper_backend_init_gpu: GPU and IGPU devices, in
+    // registry order, counted together — so the index means the same there.
+    std::vector<GpuKind> kinds;
+    std::vector<ggml_backend_dev_t> devices;
+    for (std::size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+        ggml_backend_dev_t device = ggml_backend_dev_get(i);
+        switch (ggml_backend_dev_type(device)) {
+        case GGML_BACKEND_DEVICE_TYPE_GPU: kinds.push_back(GpuKind::Discrete); break;
+        case GGML_BACKEND_DEVICE_TYPE_IGPU: kinds.push_back(GpuKind::Integrated); break;
+        default: continue;
+        }
+        devices.push_back(device);
+    }
+    std::optional<int> index = choose_gpu(kinds, discrete_allowed);
+    if (!index) return std::nullopt;
+    GpuChoice choice;
+    choice.index = *index;
+    choice.name = ggml_backend_dev_description(devices[std::size_t(*index)]);
+    choice.kind = kinds[std::size_t(*index)];
+    return choice;
 }
 
 } // namespace mynah::stt

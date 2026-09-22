@@ -50,6 +50,7 @@ if(MYNAH_BUILD_TESTS)
         tests/test_downloads.cpp
         tests/test_injector.cpp
         tests/test_tiers.cpp
+        tests/test_typing_queue.cpp
     )
     target_link_libraries(mynah-linux-tests PRIVATE mynah-linux-common) # carries libmynah
     target_include_directories(mynah-linux-tests PRIVATE
@@ -57,5 +58,12 @@ if(MYNAH_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../core/src
         ${CMAKE_CURRENT_SOURCE_DIR}/../core/tests
     )
+    if(PIPEWIRE_FOUND)
+        target_sources(mynah-linux-tests PRIVATE tests/test_capture.cpp)
+    endif()
     add_test(NAME mynah-linux-tests COMMAND mynah-linux-tests)
+    if(MYNAH_SANITIZE STREQUAL "address")
+        set_tests_properties(mynah-linux-tests PROPERTIES ENVIRONMENT
+            "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/tests/lsan.supp")
+    endif()
 endif()

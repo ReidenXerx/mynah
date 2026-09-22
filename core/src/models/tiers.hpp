@@ -29,8 +29,7 @@ inline constexpr double kSmallBudgetSeconds = 5.0; // small, CPU
 
 // Whether a GPU backend is available for the `gpu` tier: an integrated
 // GPU counts always, a discrete one only when the user opted in
-// (config `gpu`). Evaluated through ggml's device registry, which is
-// populated by ggml_backend_load_all().
+// (config `gpu`) — stt::pick_gpu, the choice the STT itself makes.
 bool gpu_available(bool user_opted_into_discrete);
 
 struct BenchmarkResult {
@@ -40,11 +39,13 @@ struct BenchmarkResult {
 };
 
 // Time one candidate against the clip. The STT is loaded with `model`
-// first; a load failure returns nullopt (the caller skips the candidate).
+// (and config `gpu`) first; a load failure returns nullopt (the caller
+// skips the candidate).
 std::optional<BenchmarkResult> benchmark(stt::SpeechToText& stt,
                                           const std::string& model,
                                           const std::string& clip_path,
-                                          const std::string& language);
+                                          const std::string& language,
+                                          bool discrete_gpu);
 
 // The tier the measurements pick: `gpu` if the GPU is there and turbo
 // meets its budget; else `small` if it meets its budget; else `base`.

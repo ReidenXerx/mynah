@@ -22,6 +22,7 @@ depends=(
 makedepends=(
     'cmake' 'git' 'pkgconf'
     'vulkan-headers'     # the ggml Vulkan backend (-DGGML_VULKAN=ON) …
+    'spirv-headers'      # … which also needs the SPIR-V headers, and …
     'shaderc'            # … compiles its shaders with glslc at build time
 )
 provides=('mynah')

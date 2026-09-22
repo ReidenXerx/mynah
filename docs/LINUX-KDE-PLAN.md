@@ -317,8 +317,31 @@ unload then also frees its video memory. ggml-vulkan caches its `VkDevice`
 for the life of the process (`vk_instance.devices`), and the probe shows
 that this does not keep the GPU awake.
 
-Still to measure with the Vulkan build: the latency of the first sentence
-after the dGPU has gone to D3cold.
+With the Vulkan build and turbo on the RTX 5070 (2026-09-23):
+
+- **ggml's Resizable-BAR path hangs after D3cold.** On a discrete GPU with
+  ReBAR, ggml memcpy()s into VRAM the CPU maps. A turbo reload after the
+  GPU had been in D3cold spun a core at 100% in that memcpy and never
+  finished. whisper.cpp alone reproduces it, so it is not mynah's code.
+  `mynah::ggml::register_backends_once` (`core/src/stt/backends.hpp`) now
+  sets `GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM=1`, which sends uploads through
+  a staging buffer:
+
+  | 10 s of speech, turbo | ReBAR (default) | staging |
+  |---|---|---|
+  | transcription, GPU awake | 0.16 s | 0.12 s |
+  | transcription, GPU in D3cold, turbo loaded | 3.42 s | 1.16 s |
+  | reload after unload + D3cold | hangs | 3.27 s |
+
+- **Vulkan starts with the engine**, not on the first toggle. It takes
+  2.8 s with the dGPU in D3cold, and the first toggle paid it while audio
+  was being dropped.
+- **Toggle to listening, turbo not loaded, dGPU in D3cold: 3.2–3.4 s.**
+  Audio before LISTENING is dropped, so after the 45 s unload the first
+  ~3 s of speech are lost. This is the open problem (see K7).
+- **The first transcription in a new binary took 13.5 s**: NVIDIA compiles
+  ggml's pipelines and caches them per application. It is paid once per
+  install, not per session.
 
 On this machine `~/.config/environment.d/90-gpu-default-igpu.conf` hides
 the NVIDIA Vulkan driver from every app (`VK_LOADER_DRIVERS_DISABLE=*nvidia*`),
@@ -336,3 +359,4 @@ and an `UnsetEnvironment=` line in the service unit in Stage 4.
 | K4 | CPU level of the packaged binary | **Decided 2026-09-22: x86-64-v3** (AVX2, FMA, F16C, BMI2). That drops Intel Core before Haswell (2013), AMD before Excavator (2015), and the Pentium/Celeron/Atom lines that shipped without AVX until about 2021. Those machines are too slow for `small` anyway |
 | K5 | Use the RTX 5070 at all? | **Revised 2026-09-23: by default** (`gpu = on` is the new default). It wakes for a session and sleeps on its own afterwards, see "The dGPU's sleep" |
 | K6 | The look of `mynah-kde` | **Decided 2026-09-22: follow the macOS app** |
+| K7 | The first ~3 s of speech after the 45 s unload are dropped while turbo reloads | Open. Options: capture during loading (core, helps macOS too); a longer `idle_timeout` on a dGPU (VRAM only, and the GPU sleeps anyway); pre-wake the GPU at toggle |

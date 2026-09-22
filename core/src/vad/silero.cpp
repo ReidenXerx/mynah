@@ -6,23 +6,12 @@
 #include <ggml-backend.h>
 #include <whisper.h>
 
+#include "stt/backends.hpp"
+
 namespace mynah::vad {
 
 namespace {
 
-// ggml ships Metal, BLAS and CPU as separately-loadable modules that are
-// not registered automatically. Any whisper_*_init_* call made before
-// ggml_backend_load_all() finds an empty device registry and hits
-// GGML_ASSERT(device), which calls abort() — it does not return null, so
-// it cannot be caught. Idempotent; the first call compiles the Metal
-// library and can take seconds.
-void register_ggml_backends_once() {
-    static bool registered = [] {
-        ggml_backend_load_all();
-        return true;
-    }();
-    (void)registered;
-}
 
 class SileroVad final : public VoiceActivity {
 public:
@@ -31,7 +20,7 @@ public:
     bool load(const std::filesystem::path& model) override {
         std::lock_guard<std::mutex> lock(mutex_);
         if (context_) return true;
-        register_ggml_backends_once();
+        mynah::ggml::register_backends_once();
 
         whisper_vad_context_params params = whisper_vad_default_context_params();
         int cores = int(std::thread::hardware_concurrency());

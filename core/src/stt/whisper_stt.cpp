@@ -7,21 +7,14 @@
 #include <ggml-backend.h>
 #include <whisper.h>
 
+#include "backends.hpp"
+
 #include "tuning/constants.hpp"
 
 namespace mynah::stt {
 
 namespace {
 
-// See vad/silero.cpp for why this must run before any whisper_*_init_*:
-// an unregistered backend hits GGML_ASSERT, which aborts the process.
-void register_ggml_backends_once() {
-    static bool registered = [] {
-        ggml_backend_load_all();
-        return true;
-    }();
-    (void)registered;
-}
 
 class WhisperStt final : public SpeechToText {
 public:
@@ -30,7 +23,7 @@ public:
     bool load(const std::filesystem::path& model, bool discrete_gpu) override {
         std::lock_guard<std::mutex> lock(mutex_);
         if (context_) return true;
-        register_ggml_backends_once();
+        mynah::ggml::register_backends_once();
 
         whisper_context_params params = whisper_context_default_params();
 #if defined(__APPLE__)
@@ -153,7 +146,7 @@ std::optional<int> choose_gpu(const std::vector<GpuKind>& gpus, bool discrete_al
 }
 
 std::optional<GpuChoice> pick_gpu(bool discrete_allowed) {
-    register_ggml_backends_once();
+    mynah::ggml::register_backends_once();
     // The same walk as whisper_backend_init_gpu: GPU and IGPU devices, in
     // registry order, counted together — so the index means the same there.
     std::vector<GpuKind> kinds;

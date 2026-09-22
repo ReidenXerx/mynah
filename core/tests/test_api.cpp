@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <clocale>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -272,4 +273,83 @@ TEST_CASE("an engine created with an explicit config file writes back to THAT fi
     CHECK(mynah::config::read_file(explicit_file).config.language == "uk");
     // The default file is not created, let alone written.
     CHECK(!std::filesystem::exists(dir.path() / "default" / "config.toml"));
+}
+
+TEST_CASE("config numbers survive the JSON round trip exactly") {
+    // The settings UI reads these, shows them, and writes back whatever it
+    // was shown. Six significant digits (the stream default) turned a
+    // hand-set 0.0123456789 into 0.0123457, and touching that field wrote
+    // the rounded value back to the file.
+    TmpDir dir;
+    EnvOverride override_dir("MYNAH_CONFIG_DIR", dir.path().string());
+    write_file(mynah::config::default_path(),
+               "frame_energy = 0.0123456789\nidle_timeout = 45.0\nmin_utterance = 0.25\n");
+
+    mynah_engine* engine = mynah_create(nullptr, nullptr, nullptr, nullptr);
+    REQUIRE(engine != nullptr);
+    char* json = mynah_config_json(engine);
+    REQUIRE(json != nullptr);
+    mynah::json::Value parsed = mynah::json::parse(json);
+    free(json);
+    mynah_destroy(engine);
+
+    CHECK(parsed.find("frame_energy")->number == 0.0123456789);
+    CHECK(parsed.find("idle_timeout")->number == 45.0);
+    CHECK(parsed.find("min_utterance")->number == 0.25);
+}
+
+TEST_CASE("a non-finite number in the file still yields parseable JSON") {
+    // TOML accepts `nan`; JSON has no spelling for it. Emitting one made the
+    // whole object unparseable, and a front end that cannot parse the config
+    // shows every setting as its default — a far bigger lie than one absent
+    // key.
+    TmpDir dir;
+    EnvOverride override_dir("MYNAH_CONFIG_DIR", dir.path().string());
+    write_file(mynah::config::default_path(), "frame_energy = nan\nlanguage = \"uk\"\n");
+
+    mynah_engine* engine = mynah_create(nullptr, nullptr, nullptr, nullptr);
+    REQUIRE(engine != nullptr);
+    char* json = mynah_config_json(engine);
+    REQUIRE(json != nullptr);
+    std::string text(json);
+    free(json);
+    mynah_destroy(engine);
+
+    mynah::json::Value parsed = mynah::json::parse(text); // throws if invalid
+    CHECK(parsed.find("frame_energy")->tag == mynah::json::Value::Tag::Null);
+    CHECK(parsed.find("language")->text == "uk"); // the rest survives
+}
+
+TEST_CASE("the config JSON is the same under a comma-decimal locale") {
+    // A Qt front end calls setlocale(LC_ALL, "") at startup, so mynah-kde on
+    // a Russian or Ukrainian desktop runs with ',' as the decimal separator.
+    // "frame_energy":0,02 is not JSON.
+    const char* previous = std::setlocale(LC_ALL, nullptr);
+    std::string saved = previous ? previous : "C";
+    bool comma = false;
+    for (const char* name : {"ru_RU.UTF-8", "uk_UA.UTF-8", "de_DE.UTF-8", "fr_FR.UTF-8"})
+        if (std::setlocale(LC_ALL, name) && std::localeconv()->decimal_point[0] == ',') {
+            comma = true;
+            break;
+        }
+    if (!comma) {
+        std::setlocale(LC_ALL, saved.c_str());
+        MESSAGE("no comma-decimal locale installed; skipping");
+        return;
+    }
+
+    TmpDir dir;
+    EnvOverride override_dir("MYNAH_CONFIG_DIR", dir.path().string());
+    write_file(mynah::config::default_path(), "frame_energy = 0.02\n");
+    mynah_engine* engine = mynah_create(nullptr, nullptr, nullptr, nullptr);
+    REQUIRE(engine != nullptr);
+    char* json = mynah_config_json(engine);
+    REQUIRE(json != nullptr);
+    std::string text(json);
+    free(json);
+    mynah_destroy(engine);
+    std::setlocale(LC_ALL, saved.c_str());
+
+    mynah::json::Value parsed = mynah::json::parse(text);
+    CHECK(parsed.find("frame_energy")->number == 0.02);
 }

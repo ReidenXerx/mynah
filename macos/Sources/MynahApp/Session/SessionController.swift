@@ -101,7 +101,12 @@ final class SessionController: ObservableObject {
         // toggle MUST route through it. Calling mynah_toggle directly runs
         // the engine with nobody pushing samples — a listening pill with a
         // dead microphone (the exact bug this fixed).
-        isEngaged ? endSession() : startSession()
+        //
+        // `sessionWanted` is checked as well as the published state, which
+        // arrives an event hop later: a second press during a cold model
+        // load is a CANCEL, and deciding on the state alone made it start a
+        // second session instead.
+        (sessionWanted || isEngaged) ? endSession() : startSession()
     }
 
     /// True from `startSession` until `endSession` — what the microphone
@@ -353,6 +358,17 @@ final class SessionController: ObservableObject {
             Log.session.error(
                 "\(event.problemCode, privacy: .public): \(event.problemMessage, privacy: .public)")
             lastError = event.problemMessage
+            // A start that failed never reaches LISTENING, and the engine
+            // was already idle — so no state event follows to clean up
+            // after it. Without this the tap armed by startSession keeps
+            // running: the microphone indicator stays lit and every frame
+            // is pushed into an engine that has no session to put it in.
+            if event.problemCode == "no_model" || event.problemCode == "model_load_failed" {
+                sessionWanted = false
+                capture.stop()
+                isSessionActive = false
+                level = 0
+            }
         case .model:
             Log.stt.notice(
                 "model \(event.modelStatus, privacy: .public) \(event.modelName, privacy: .public)")
@@ -364,7 +380,16 @@ final class SessionController: ObservableObject {
     }
 
     nonisolated func receive(_ event: EngineEventData) {
-        Task { @MainActor in handle(event) }
+        // The main queue, not `Task { @MainActor in }`: separately created
+        // tasks carry no ordering guarantee between them, and for TEXT
+        // events the order IS the typing order — two utterances finishing
+        // close together could reach the keyboard swapped. Dispatching to
+        // the main queue is strictly FIFO, and the main queue is the main
+        // actor's executor, so `assumeIsolated` is exact rather than a
+        // promise.
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self.handle(event) }
+        }
     }
 
     /// The C trampoline. Static, `@convention(c)`, nonisolated — no captures,

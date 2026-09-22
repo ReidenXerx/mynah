@@ -1,8 +1,10 @@
 # The macOS Swift app
 
-`macos/` holds a native menu bar app that is replacing the PyObjC dictation
-daemon. The Python package is unchanged and still installs and runs on its own —
-this is additive until the cutover in phase 3.
+`macos/` holds the native menu bar app. Since Phase 5 it runs on the shared
+C++ core (`libmynah`) rather than on an engine of its own, and it is what
+dictation on macOS is: the PyObjC daemon it replaced is gone from the app's
+path entirely. The Python package still installs and runs on Linux until
+Phase 6 retires it.
 
 ## Why
 
@@ -24,30 +26,38 @@ its complexity is the cost of that impersonation:
 An app bundle has a name, a stable identity, and a working animation backend by
 construction, so all of the above stops being necessary rather than being fixed.
 
-## What is in the scaffold
+## What the app is made of
 
-| Area | File | Replaces |
+Since Phase 5 the app is the front end and nothing else: config, model
+resolution, segmentation, VAD, whisper and the hallucination filter all live
+in `libmynah` behind the C API (`Sources/CMynah`, one header). What is left in
+Swift is capture, input, and the interface.
+
+| Area | File | Was |
 |---|---|---|
 | Entry point, menu bar item | `MynahApp.swift` | `macos_rumps.py` |
 | Menu contents | `UI/MenuBarContent.swift` | `macos_rumps.py` |
 | Floating pill | `UI/IndicatorPanel.swift` | `macos_indicator.py` (519 → ~150 lines) |
 | Bird mark | `UI/MynahLogo.swift` | `macos_logo.py` |
-| Session state | `Session/SessionController.swift` | part of `engine.py` |
-| Mic level | `Session/MicLevelMonitor.swift` | part of `engine.py` |
-| Global hotkey | `Input/HotkeyManager.swift` | `pynput` |
+| Engine adapter (events → SwiftUI, capture → the core) | `Session/SessionController.swift` | its own Swift engine, and `engine.py` before that |
+| Settings mirror of the core's config | `Session/AppConfig.swift` | `Config/FlatTOML.swift`, `Config/MynahConfig.swift` |
+| Global hotkey, push-to-talk | `Input/HotkeyManager.swift` | `pynput` |
 | Text injection | `Input/TextInjector.swift` | `macos_inject.py` |
-| Accessibility | `System/Permissions.swift` | `macos_inject.py` |
+| Accessibility + microphone | `System/Permissions.swift` | `macos_inject.py` |
 | Start at login | `System/LoginItem.swift` | `service.py` (343 lines → 2 calls) |
-| Config | `Config/FlatTOML.swift`, `Config/MynahConfig.swift` | shares `config.py`'s file |
-| Speech recognition | `STT/WhisperEngine.swift`, `Sources/CWhisper` | `providers/mlx.py` |
-| Voice activity detection | `STT/SileroVAD.swift` | `webrtcvad` via `vad.py` |
-| Model resolution + download | `STT/WhisperModel.swift`, `STT/ModelDownloader.swift` | model resolution in `providers/mlx.py` / `linux_stt.py` |
-| Language list | `STT/WhisperLanguages.swift` | — |
-| ggml backend registration | `STT/GGMLBackends.swift` | — |
-| Gates + hallucination filter | `STT/TranscriptFilter.swift` | `engine.py` constants |
-| Utterance segmentation | `STT/UtteranceDetector.swift` | `vad.py` + `engine.py` |
+| Model download | `STT/ModelDownloader.swift` | `mynah models download` |
+| Language list | `STT/WhisperLanguages.swift` | its own table; now the core's `mynah_language_*` |
 | Mic capture (16 kHz mono) | `Session/AudioCapture.swift` | `sounddevice` |
 | Settings window | `UI/SettingsWindow.swift`, `UI/SettingsView.swift`, `UI/ModelSectionView.swift` | — |
+
+Gone into the core, with their tests: `STT/WhisperEngine.swift`,
+`STT/SileroVAD.swift`, `STT/UtteranceDetector.swift`,
+`STT/TranscriptFilter.swift`, `STT/WhisperModel.swift`,
+`STT/GGMLBackends.swift`, `Config/FlatTOML.swift`, `Config/MynahConfig.swift`.
+
+The app's own suite (`swift test`) covers what is on this side of the C API —
+`AppConfig`'s wire format and `HotkeySpec` — because the core's suite cannot
+see it, and three settings bugs shipped while it could not.
 
 Speech recognition is wired and has been exercised by hand, including in a room
 with a robot vacuum running. What remains unverified is called out in
@@ -83,7 +93,8 @@ has actually tried it yet.
 
 ### Chosen
 
-whisper.cpp, linked in-process through its C API (`Sources/CWhisper`), running
+whisper.cpp, linked in-process through its C API (in the core; the app
+reaches it through `Sources/CMynah`), running
 `ggml-large-v3-turbo.bin` at **full precision**.
 
 ### Why
@@ -423,8 +434,10 @@ scaffold was verified:
 ```sh
 swiftc -sdk "$(xcrun --show-sdk-path)" -target arm64-apple-macosx13.0 \
   -swift-version 6 -parse-as-library \
-  -Xcc -I/opt/homebrew/include -I macos/Sources/CWhisper \
-  -L/opt/homebrew/lib -lwhisper -lggml -lggml-base \
+  -Xcc -I macos/vendor/install/include -I macos/Sources/CMynah \
+  macos/vendor/install/lib/libmynah.a macos/vendor/install/lib/libwhisper.a \
+  macos/vendor/install/lib/libggml.a macos/vendor/install/lib/libggml-metal.a \
+  macos/vendor/install/lib/libggml-cpu.a macos/vendor/install/lib/libggml-base.a -lc++ \
   $(find macos/Sources/MynahApp -name '*.swift') -o /tmp/MynahApp
 ```
 

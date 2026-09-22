@@ -27,12 +27,20 @@ if [ ! -f "$REPO/third_party/whisper.cpp/CMakeLists.txt" ]; then
   exit 1
 fi
 
-# Skip the (slow) rebuild when the install tree is newer than the sources —
-# including the headers: a C API addition must not be answered by a stale
-# install without its symbols.
+# Skip the (slow) rebuild only when nothing that goes into the install tree
+# has changed. Everything the library is built FROM has to be in this list:
+# a stale install is the worst kind of build failure, because it looks like
+# a pass. (The sources and headers were checked from the start; the build
+# files and the pinned whisper.cpp were not — and a submodule bump answered
+# by yesterday's libwhisper is exactly the silent version skew M6 exists to
+# prevent.)
+WHISPER_COMMIT="$(git -C "$REPO/third_party/whisper.cpp" rev-parse HEAD 2>/dev/null || echo unknown)"
+STAMP="$PREFIX/.built-from"
 if [ -f "$PREFIX/lib/libmynah.a" ] &&
-   [ -z "$(find "$REPO/core/include" "$REPO/core/src" "$REPO/CMakeLists.txt" \
-            -newer "$PREFIX/lib/libmynah.a" 2>/dev/null)" ]; then
+   [ -z "$(find "$REPO/core/include" "$REPO/core/src" "$REPO/core/CMakeLists.txt" \
+            "$REPO/CMakeLists.txt" "$ROOT/scripts/build-core.sh" \
+            -newer "$PREFIX/lib/libmynah.a" 2>/dev/null)" ] &&
+   [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$WHISPER_COMMIT" ]; then
   echo "core already built at $PREFIX (delete vendor/install to force)"
   exit 0
 fi
@@ -58,6 +66,9 @@ cmake -S "$REPO" -B "$BUILD" \
 echo "building…"
 cmake --build "$BUILD" --config Release -j "$(sysctl -n hw.ncpu)"
 cmake --install "$BUILD" > /dev/null
+
+# What this install was built from, for the freshness check above.
+printf '%s' "$WHISPER_COMMIT" > "$STAMP"
 
 echo "installed to $PREFIX"
 find "$PREFIX/lib" -name '*.a' | sed 's|.*/|  |'

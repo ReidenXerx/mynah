@@ -123,6 +123,42 @@ mynah_state mynah_get_state(const mynah_engine *engine);
  * session depends on take effect on the next session. */
 int mynah_reload_config(mynah_engine *engine);
 
+/* --- config (P5: the core owns the file; front ends read and set) --------- */
+
+/* The engine's config as a flat JSON object, snake_case keys exactly as in
+ * config.toml (model, language, prompt, idle_timeout, hotkey, trigger, vad,
+ * gpu, auto_stop_silence, show_indicator, idle_visible, injector,
+ * frame_energy, min_energy, min_utterance). Malloc'd; caller frees(). NULL
+ * on error. */
+char *mynah_config_json(const mynah_engine *engine);
+
+/* Set ONE setting. key is a snake_case key from the list above; value is
+ * the JSON encoding of the new value ("ru", true, 45.0). Validates the key
+ * and the value, saves with the config module's read-modify-write (every
+ * other writer's keys survive), and reloads into the engine — a live
+ * session keeps its calibration and picks the change up next session.
+ * Returns 0 on success, -1 for an unknown key, a bad value, or a save
+ * failure. */
+int mynah_config_set(mynah_engine *engine, const char *key, const char *json_value);
+
+/* The config file the engine was created with (malloc'd; caller frees()). */
+char *mynah_config_path(const mynah_engine *engine);
+
+/* Model resolution (M4/M5): where a configured model actually lives, or
+ * NULL when nothing resolves. malloc'd; caller frees(). */
+char *mynah_find_model(const char *configured);
+char *mynah_find_vad(void);
+
+/* --- the engine's language table (the settings picker reads it) ----------- */
+
+/* whisper.cpp's languages, as (code, full name): "en", "english". Context-
+ * free queries on the pinned library, so the list cannot drift from the
+ * engine when the submodule is bumped. */
+int mynah_language_count(void);             /* languages 0..count-1 */
+const char *mynah_language_code(int id);    /* NULL out of range */
+const char *mynah_language_name(int id);    /* full name, NULL out of range */
+int mynah_language_id(const char *code);    /* -1 when unknown */
+
 /* --- event accessors (no public layout) ----------------------------------- */
 
 mynah_event_kind    mynah_event_get_kind(const mynah_event *event);

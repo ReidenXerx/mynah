@@ -1,0 +1,18 @@
+//
+//  module.modulemap
+//  MynahApp
+//
+//  The C API of libmynah — the one header a front end includes. Replaces
+//  CWhisper: the app speaks to the core, and the core speaks to
+//  whisper.cpp.
+//
+//  Headers are referenced by a path relative to this file, pointing into
+//  the installed build produced by `scripts/build-core.sh` from the pinned
+//  sources — never Homebrew.
+//
+//  SwiftPM resolves header paths relative to the including file's directory
+//  first, and both headers are installed side by side.
+module CMynah [system] {
+    header "../../vendor/install/include/mynah/mynah.h"
+    export *
+}

@@ -12,25 +12,18 @@ import PackageDescription
 // it would be wrong.
 // Paths in `unsafeFlags` are NOT resolved relative to the package root — they
 // reach the compiler as written and are interpreted against its working
-// directory, so "vendor/install/include" silently fails to find whisper.h.
+// directory, so "vendor/install/include" silently fails to find mynah.h.
 // Deriving an absolute path from the manifest's own location works from any
 // checkout and any invocation directory.
 let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
 let vendorInclude = "\(packageDirectory)/vendor/install/include"
 let vendorLib = "\(packageDirectory)/vendor/install/lib"
 
-let cltFrameworks = "/Library/Developer/CommandLineTools/Library/Developer/Frameworks"
-let testFrameworkFlags: [String] =
-    FileManager.default.fileExists(atPath: cltFrameworks + "/Testing.framework")
-        ? ["-F", cltFrameworks]
-        : []
-
-// The mynah macOS app.
+// The mynah macOS app, running on the C++ core (Phase 5).
 //
-// Deliberately dependency-free. The one thing an external package would buy
-// us is TOML parsing, but mynah's config schema is a flat `key = value` file
-// (see `mynah/config.py:_emit_toml`), so `FlatTOML.swift` handles it in ~120
-// lines and the package builds offline.
+// Deliberately dependency-free on the Swift side: config, segmentation,
+// VAD, whisper and the hallucination filter all live in libmynah now, and
+// the app's Swift is capture, input and UI.
 //
 // SwiftPM produces a bare executable; `scripts/build-app.sh` wraps it into a
 // proper `Mynah.app` bundle with Info.plist. That is what gives us a stable
@@ -49,35 +42,27 @@ let package = Package(
     // see SessionController.
     platforms: [.macOS(.v13)],
     targets: [
-        // whisper.cpp's C API. Homebrew's prefix differs by architecture and
-        // SwiftPM has no way to ask for it, so both are listed; the one that
-        // does not exist is ignored.
+        // The core's C API — the only header a front end includes. Built
+        // into `vendor/install` by `scripts/build-core.sh` from the pinned
+        // sources, statically, with the whisper.cpp submodule (M6) — never
+        // from Homebrew.
         .systemLibrary(
-            name: "CWhisper",
-            path: "Sources/CWhisper"
+            name: "CMynah",
+            path: "Sources/CMynah"
         ),
         .executableTarget(
             name: "MynahApp",
-            dependencies: ["CWhisper"],
+            dependencies: ["CMynah"],
             path: "Sources/MynahApp",
-            // Headers and libraries come from the vendored whisper.cpp build in
-            // `vendor/install`, produced by `scripts/build-whisper.sh` from the
-            // pinned submodule — never from Homebrew.
+            // Headers and libraries come from the installed core in
+            // `vendor/install`, produced by `scripts/build-core.sh`.
             //
-            // This manifest previously pointed at /opt/homebrew, which was wrong
-            // in both directions: `swift build` failed outright on machines
-            // without Homebrew whisper.cpp, and on machines that had it, it
-            // silently linked that copy — a different, unpinned build than the
-            // v1.9.2 submodule the app is compiled against everywhere else.
+            // Link order matters for static archives: dependents before
+            // dependencies — mynah -> whisper -> ggml -> backends -> base.
             //
-            // The paths are relative to this package root, so they work from any
-            // checkout. SwiftPM has no way to resolve a path at manifest
-            // evaluation time, hence the literal "vendor/install".
-            //
-            // NOTE: `swift build` still needs `scripts/build-whisper.sh` to have
-            // run first. `scripts/build-app.sh` does that automatically and is
-            // the supported path; this manifest exists for `swift test` and
-            // editor tooling.
+            // -lc++ is required: the core, whisper.cpp and ggml are C++,
+            // and Swift does not link libc++ for a static archive reached
+            // through a C module map.
             cSettings: [
                 .unsafeFlags(["-I\(vendorInclude)"]),
             ],
@@ -86,14 +71,12 @@ let package = Package(
             ],
             linkerSettings: [
                 .unsafeFlags([
-                    // Static archives, dependents before dependencies.
+                    "\(vendorLib)/libmynah.a",
                     "\(vendorLib)/libwhisper.a",
                     "\(vendorLib)/libggml.a",
                     "\(vendorLib)/libggml-metal.a",
                     "\(vendorLib)/libggml-cpu.a",
                     "\(vendorLib)/libggml-base.a",
-                    // whisper.cpp and ggml are C++; Swift does not link libc++
-                    // for a static archive reached through a C module map.
                     "-lc++",
                 ]),
                 .linkedFramework("Metal"),
@@ -101,13 +84,6 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("CoreML"),
             ]
-        ),
-        .testTarget(
-            name: "MynahAppTests",
-            dependencies: ["MynahApp"],
-            path: "Tests/MynahAppTests",
-            swiftSettings: [.unsafeFlags(testFrameworkFlags)],
-            linkerSettings: [.unsafeFlags(testFrameworkFlags)]
         ),
     ]
 )

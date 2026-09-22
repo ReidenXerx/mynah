@@ -14,6 +14,7 @@ project(mynah
     LANGUAGES C CXX)
 
 option(MYNAH_BUILD_TESTS "Build the libmynah test suite" ON)
+option(MYNAH_BUILD_LINUX "Build the Linux front end (auto on Linux; off for an app-only build)" ON)
 
 if(MYNAH_BUILD_TESTS)
     enable_testing()
@@ -54,7 +55,9 @@ add_subdirectory(third_party/whisper.cpp)
 # The Linux front end: only where it can build — its socket/injector layer
 # is POSIX and compiles on the dev Mac; PipeWire capture and the `mynah`
 # binary need libpipewire and stay Linux-only (see linux/CMakeLists.txt).
-if(UNIX)
+# MYNAH_BUILD_LINUX=OFF skips it entirely (the macOS app's build-core.sh,
+# which only needs the core).
+if(UNIX AND MYNAH_BUILD_LINUX)
     add_subdirectory(linux)
 endif()
 

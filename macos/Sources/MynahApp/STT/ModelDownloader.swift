@@ -8,8 +8,9 @@ import Observation
 /// by hand, which means installing pipx and the whole package just for two
 /// files.
 ///
-/// Sources match the Python engine's whisper.cpp download (`MODEL_URL` in
-/// `mynah/providers/linux_stt.py`): the same files, from the same place.
+/// Sources are the core's download table (models/table.hpp) — the same
+/// files, from the same place, that the Linux CLI fetches. The core
+/// resolves whatever lands in this directory first.
 @MainActor
 final class ModelDownloader: ObservableObject {
 
@@ -17,7 +18,8 @@ final class ModelDownloader: ObservableObject {
     private static let whisperBase = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
     private static let vadBase = "https://huggingface.co/ggml-org/whisper-vad/resolve/main"
 
-    /// First in `WhisperModel.searchDirectories`, so what lands here resolves.
+    /// Where downloads land: first in the core's model search order
+    /// (`mynah_find_model`), so what Settings fetches, dictation finds.
     static var destination: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/whisper")
     }

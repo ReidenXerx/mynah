@@ -1,12 +1,13 @@
 import AppKit
 import Combine
+import CMynah
 import SwiftUI
 
 @main
 struct MynahApp: App {
 
-    /// Keep in step with `pyproject.toml` and `mynah/__init__.py`.
-    static let version = "0.14.0"
+    /// P9: one version number, from the CMake project, reported by the core.
+    static var version: String { String(cString: mynah_version()) }
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
@@ -94,15 +95,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             Task { @MainActor in self.controller.refreshPermissions() }
         }
 
-        registerHotkey(controller.config.hotkey)
+        registerHotkey(controller.config.hotkey, trigger: controller.config.trigger)
 
-        // Re-register when the hotkey is edited in Settings, so it takes effect
-        // without a restart.
+        // Re-register when the hotkey or the trigger is edited in Settings,
+        // so they take effect without a restart. Push-to-talk needs the
+        // key-up event; toggle does not.
         controller.$config
-            .map(\.hotkey)
+            .map { ConfigTriggerChange(hotkey: $0.hotkey, trigger: $0.trigger) }
             .removeDuplicates()
             .dropFirst()
-            .sink { [weak self] hotkey in self?.registerHotkey(hotkey) }
+            .sink { [weak self] change in
+                self?.registerHotkey(change.hotkey, trigger: change.trigger)
+            }
             .store(in: &cancellables)
     }
 
@@ -110,7 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         controller.endSession()
         hotkeys.unregister()
         permissionTimer?.invalidate()
-        // Must come last: ggml aborts at exit if a model is still loaded.
+        // Must come last: destroy joins the engine's workers and frees the
+        // whisper + VAD contexts — ggml aborts at exit if a Metal context is
+        // still alive.
         controller.shutdownBlocking()
     }
 
@@ -118,9 +124,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         settings.show()
     }
 
-    private func registerHotkey(_ hotkey: String) {
-        if hotkeys.register(hotkey, onTrigger: { [weak self] in self?.handleTrigger() }) {
-            Log.ui.notice("hotkey registered: \(hotkey, privacy: .public)")
+    private func registerHotkey(_ hotkey: String, trigger: String) {
+        // Push-to-talk: hold to dictate, release to stop — the hotkey
+        // manager's key-up event. Toggle semantics are the default.
+        let isPTT = trigger == "ptt"
+        let registered = hotkeys.register(
+            hotkey,
+            onPress: { [weak self] in
+                isPTT ? self?.controller.startSession() : self?.handleToggle()
+            },
+            onRelease: isPTT
+                ? { [weak self] in self?.controller.endSession() }
+                : nil
+        )
+        if registered {
+            Log.ui.notice("hotkey registered: \(hotkey, privacy: .public) (\(trigger, privacy: .public))")
         } else {
             Log.ui.error("hotkey registration FAILED: \(hotkey, privacy: .public)")
             controller.reportError(
@@ -128,7 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
-    private func handleTrigger() {
+    private func handleToggle() {
         Log.ui.notice("hotkey fired")
         controller.toggleSession()
     }
@@ -142,3 +160,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 }
+
+#if DEBUG
+/// A hotkey + trigger pair that can travel through `removeDuplicates()`
+/// (Swift tuples do not conform).
+struct ConfigTriggerChange: Equatable {
+    var hotkey: String
+    var trigger: String
+}
+#endif

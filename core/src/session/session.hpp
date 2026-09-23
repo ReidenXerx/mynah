@@ -168,6 +168,15 @@ private:
         UtteranceQueue queue;
         std::shared_ptr<OwnedThread> audio;
         std::shared_ptr<OwnedThread> transcribe;
+        // Where this session's audio starts in the ring: recorded by start()
+        // when capture was armed, at the press — so what is said while the
+        // model loads is this session's too, and whatever an earlier
+        // session left unread is not.
+        std::size_t capture_from = 0;
+        // The audio workers of earlier sessions still running when this one
+        // activated. The ring is single-consumer: this session's worker
+        // waits for them to exit before it reads or skips anything.
+        std::vector<std::shared_ptr<OwnedThread>> predecessors;
     };
 
     void spawn_loader(int start_generation);
@@ -188,7 +197,10 @@ private:
     std::unique_ptr<vad::VoiceActivity> vad_;
     Events events_;
 
-    audio::RingBuffer ring_{10 * 16000};
+    // 30 s: capture runs from the press, through a cold model load (3 s
+    // for turbo onto a dGPU woken from D3cold, longer on a CPU from a cold
+    // disk), and the ring holds it all until the audio worker exists.
+    audio::RingBuffer ring_{30 * 16000};
     mutable std::mutex events_mutex_; // state() and set_state; const readers lock it
     State state_ = State::Idle;
 
@@ -197,7 +209,8 @@ private:
     std::atomic<bool> active_{false};    // a live session
     std::atomic<bool> start_pending_{false}; // a start still loading the model
     std::atomic<int> start_generation_{0};  // guards which start finishes
-    std::atomic<int> session_generation_{0}; // guards teardown vs restart
+    std::atomic<int> session_generation_{0}; // guards teardown vs restart; advanced at the press
+    std::size_t pending_capture_from_ = 0;   // the ring position start() armed capture at
     std::atomic<int> idle_generation_{0};    // cancels the idle timer
     std::atomic<bool> quitting_{false};
     std::vector<std::shared_ptr<OwnedThread>> threads_;

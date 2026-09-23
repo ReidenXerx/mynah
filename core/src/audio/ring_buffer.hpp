@@ -62,6 +62,24 @@ public:
         return taken;
     }
 
+    // Where the writer is: the index the next pushed sample gets. Any
+    // thread. A session records it when capture is armed, so its reader
+    // can later skip whatever was written before (skip_to).
+    std::size_t written() const { return head_.load(std::memory_order_acquire); }
+
+    // Reader thread only. Discards everything before `position` (a value
+    // written() returned) and nothing after what has been written; a
+    // position already read past is a no-op. Returns how many samples were
+    // discarded. The indices only grow (64-bit), so they compare directly.
+    std::size_t skip_to(std::size_t position) {
+        const std::size_t tail = tail_.load(std::memory_order_relaxed);
+        const std::size_t head = head_.load(std::memory_order_acquire);
+        if (position > head) position = head;
+        if (position <= tail) return 0;
+        tail_.store(position, std::memory_order_release);
+        return position - tail;
+    }
+
     std::size_t readable() const {
         return readable_relaxed(head_.load(std::memory_order_acquire),
                                 tail_.load(std::memory_order_acquire));

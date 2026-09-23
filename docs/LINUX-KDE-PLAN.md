@@ -339,6 +339,18 @@ With the Vulkan build and turbo on the RTX 5070 (2026-09-23):
 - **Toggle to listening, turbo not loaded, dGPU in D3cold: 3.2–3.4 s.**
   Audio before LISTENING is dropped, so after the 45 s unload the first
   ~3 s of speech are lost. This is the open problem (see K7).
+- **K7, done:** capture now starts at the press, not at LISTENING. What is
+  said during a cold load waits in the ring (now 30 s), and nothing is lost.
+  Each session records the ring's write position at the press. Its worker
+  waits for earlier sessions' workers to exit and then skips to that
+  position, so the ring keeps a single reader. The old drain at activation
+  was a second reader racing a stale worker. A press with the model
+  already loaded calls `SpeechToText::wake()`: one encoder pass over 0.1 s
+  of silence, which is a no-op off a discrete GPU. Live on the RTX 5070,
+  with turbo loaded and the dGPU in D3cold, toggle → listening took 9 ms
+  and the dGPU was in D0 0.4 s after the press. This is core code, so
+  macOS gets capture-from-press too, if its capture already runs before
+  LISTENING.
 - **The first transcription in a new binary took 13.5 s**: NVIDIA compiles
   ggml's pipelines and caches them per application. It is paid once per
   install, not per session.
@@ -359,4 +371,4 @@ and an `UnsetEnvironment=` line in the service unit in Stage 4.
 | K4 | CPU level of the packaged binary | **Decided 2026-09-22: x86-64-v3** (AVX2, FMA, F16C, BMI2). That drops Intel Core before Haswell (2013), AMD before Excavator (2015), and the Pentium/Celeron/Atom lines that shipped without AVX until about 2021. Those machines are too slow for `small` anyway |
 | K5 | Use the RTX 5070 at all? | **Revised 2026-09-23: by default** (`gpu = on` is the new default). It wakes for a session and sleeps on its own afterwards, see "The dGPU's sleep" |
 | K6 | The look of `mynah-kde` | **Decided 2026-09-22: follow the macOS app** |
-| K7 | The first ~3 s of speech after the 45 s unload are dropped while turbo reloads | Open. Options: capture during loading (core, helps macOS too); a longer `idle_timeout` on a dGPU (VRAM only, and the GPU sleeps anyway); pre-wake the GPU at toggle |
+| K7 | The first ~3 s of speech after the 45 s unload are dropped while turbo reloads | **Decided 2026-09-23: capture from the press, and wake the GPU at the press**; the 45 s unload stays. See below |

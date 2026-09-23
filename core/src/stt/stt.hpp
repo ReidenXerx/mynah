@@ -41,6 +41,14 @@ public:
     // this after idle_timeout and the engine on destroy.
     virtual void unload() = 0;
 
+    // Get a loaded model's device ready for a transcription that is coming:
+    // a discrete GPU asleep in D3cold takes ~1 s to wake, and the session
+    // calls this at the press so that second passes while the user speaks.
+    // Blocks for the wake (the caller is the loader thread); a no-op where
+    // nothing sleeps — the CPU, an integrated GPU, Metal — and when nothing
+    // is loaded.
+    virtual void wake() = 0;
+
     // Transcribe 16 kHz mono samples. language may be "auto". The prompt
     // biases the decoder — it carries the anti-censorship Russian prompt,
     // which is load-bearing: without it Whisper sanitises slang and

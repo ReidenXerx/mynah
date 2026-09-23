@@ -44,6 +44,8 @@ public:
     // No GPU: the tests never touch Vulkan (nor wake a dGPU).
     bool gpu_available(bool) const override { return false; }
     void unload() override { loaded.store(false); }
+    std::atomic<int> wakes{0};
+    void wake() override { ++wakes; }
     std::optional<std::string> transcribe(const float*, std::size_t count,
                                           const std::string& language,
                                           const std::string& prompt) override {

@@ -155,3 +155,21 @@ TEST_CASE("the spectrum puts a sine's energy in its own band") {
     spectrum.compute(sine.data(), 100, bands);
     for (int i = 0; i < kBands; ++i) CHECK(bands[i] == 0.0f);
 }
+TEST_CASE("skip_to discards up to a recorded write position, never past it") {
+    mynah::audio::RingBuffer ring(8);
+    const float a[] = {1, 2, 3};
+    const float b[] = {4, 5};
+    ring.push(a, 3);
+    const std::size_t mark = ring.written(); // a session armed here
+    ring.push(b, 2);
+    CHECK(ring.skip_to(mark) == 3);
+    float out[4] = {};
+    REQUIRE(ring.pop(out, 4) == 2);
+    CHECK(out[0] == 4);
+    CHECK(out[1] == 5);
+    // Already read past: nothing to skip. Beyond what is written: clamped.
+    CHECK(ring.skip_to(mark) == 0);
+    ring.push(a, 3);
+    CHECK(ring.skip_to(ring.written() + 100) == 3);
+    CHECK(ring.readable() == 0);
+}

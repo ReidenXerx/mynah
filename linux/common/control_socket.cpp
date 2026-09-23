@@ -184,6 +184,7 @@ void Server::start() {
         server_ = -1;
         throw Error("cannot bind " + path_ + ": " + std::strerror(errno));
     }
+    owns_path_ = true; // bound: the path is ours to remove on stop
     ::chmod(path_.c_str(), 0600);
     ::listen(server_, 8);
     // Non-blocking, so a connection that vanishes between poll() and
@@ -268,8 +269,13 @@ void Server::stop() {
         connections_.clear();
         subscribers_.clear();
     }
-    std::error_code ec;
-    std::filesystem::remove(path_, ec);
+    // Only a path this server bound: a server refused because another
+    // mynah owns the socket must leave that one's socket where it is.
+    if (owns_path_) {
+        std::error_code ec;
+        std::filesystem::remove(path_, ec);
+        owns_path_ = false;
+    }
 }
 
 void Server::track_connection(int fd) {

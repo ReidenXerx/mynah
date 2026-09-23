@@ -3,25 +3,14 @@
 # Phase 3: "PKGBUILD for mynah (AUR, -git first)"). Once a release is
 # tagged, the release PKGBUILD takes over and this stays for tracking main.
 
-pkgname=mynah-git
+pkgbase=mynah-git
+pkgname=('mynah-git' 'mynah-kde-git')
 pkgver=0.14.0
 pkgrel=1
 pkgdesc="Say it, and it types where you are — dictation on Wayland, on-device (git build)"
 arch=('x86_64')
 url="https://duduphudu.app/mynah/"
 license=('MIT')
-depends=(
-    'pipewire'           # audio capture, straight through libpipewire
-    'wayland'            # typing on KWin: fake-input + ext-data-control, in-process
-    'curl'               # model downloads
-    'openssl'            # download hash verification
-    'vulkan-icd-loader'  # the ggml Vulkan backend (the gpu tier)
-    'gcc-libs'
-)
-optdepends=(
-    'wtype: typing on Hyprland and other wlroots compositors'
-    'wl-clipboard: pasting on Hyprland into apps that ignore the virtual keyboard'
-)
 makedepends=(
     'cmake' 'git' 'pkgconf'
     'vulkan-headers'     # the ggml Vulkan backend (-DGGML_VULKAN=ON) …
@@ -29,9 +18,12 @@ makedepends=(
     'shaderc'            # … compiles its shaders with glslc at build time
     'wayland-protocols'          # ext-data-control-v1.xml, for the KWin typer
     'plasma-wayland-protocols'   # fake-input.xml, likewise
+    'extra-cmake-modules'        # mynah-kde (Stage 8), and the Qt/KDE it links:
+    'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland'
+    'kirigami' 'kdeclarative' 'qqc2-desktop-style'
+    'kcoreaddons' 'kglobalaccel' 'kstatusnotifieritem' 'kwindowsystem' 'kdbusaddons' 'ki18n'
+    'layer-shell-qt'
 )
-provides=('mynah')
-conflicts=('mynah')
 
 source=("git+https://github.com/ReidenXerx/mynah.git"
         "git+https://github.com/ggml-org/whisper.cpp.git")
@@ -72,7 +64,22 @@ build() {
     cmake --build build -j"$(nproc)"
 }
 
-package() {
+package_mynah-git() {
+    depends=(
+        'pipewire'           # audio capture, straight through libpipewire
+        'wayland'            # typing on KWin: fake-input + ext-data-control, in-process
+        'curl'               # model downloads
+        'openssl'            # download hash verification
+        'vulkan-icd-loader'  # the ggml Vulkan backend (the gpu tier)
+        'gcc-libs'
+    )
+    optdepends=(
+        'wtype: typing on Hyprland and other wlroots compositors'
+        'wl-clipboard: pasting on Hyprland into apps that ignore the virtual keyboard'
+    )
+    provides=('mynah')
+    conflicts=('mynah')
+
     install -Dm755 build/linux/mynah "$pkgdir/usr/bin/mynah"
     install -Dm644 "$srcdir/mynah/linux/packaging/mynah.service" \
         "$pkgdir/usr/lib/systemd/user/mynah.service"
@@ -84,4 +91,25 @@ package() {
     install -Dm644 "$srcdir/mynah/linux/packaging/benchmark.wav" \
         "$pkgdir/usr/share/mynah/benchmark.wav"
     install -Dm644 "$srcdir/mynah/LICENSE" "$pkgdir/usr/share/licenses/mynah-git/LICENSE"
+}
+
+# The Plasma front end (docs/LINUX-KDE-PLAN.md, Stage 8): a tray, the global
+# shortcut, the floating pill and a settings window over the same engine.
+package_mynah-kde-git() {
+    pkgdesc="Dictation for KDE Plasma: tray, shortcut, floating indicator and settings for mynah"
+    depends=(
+        'mynah-git'
+        'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland'
+        'kirigami' 'kdeclarative' 'qqc2-desktop-style'
+        'kcoreaddons' 'kglobalaccel' 'kstatusnotifieritem' 'kwindowsystem' 'kdbusaddons' 'ki18n'
+        'layer-shell-qt'
+    )
+    provides=('mynah-kde')
+    conflicts=('mynah-kde')
+
+    install -Dm755 build/linux/kde/mynah-kde "$pkgdir/usr/bin/mynah-kde"
+    # The launcher, and KWin's permission for the paste chord (see the file).
+    install -Dm644 "$srcdir/mynah/linux/packaging/mynah-kde.desktop" \
+        "$pkgdir/usr/share/applications/mynah-kde.desktop"
+    install -Dm644 "$srcdir/mynah/LICENSE" "$pkgdir/usr/share/licenses/mynah-kde-git/LICENSE"
 }

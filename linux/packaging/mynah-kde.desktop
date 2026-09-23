@@ -1,0 +1,14 @@
+# The Plasma app's launcher, and KWin's permission for it to press the one
+# paste chord it types with (X-KDE-Wayland-Interfaces; see mynah.desktop).
+[Desktop Entry]
+Type=Application
+Name=mynah
+GenericName=Dictation
+Comment=Say it, and it types where you are
+Exec=/usr/bin/mynah-kde
+Icon=audio-input-microphone
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=dictation;speech;voice;whisper;
+StartupNotify=false
+X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input

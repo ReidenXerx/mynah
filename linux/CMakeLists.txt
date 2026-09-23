@@ -79,7 +79,7 @@ if(MYNAH_KWIN)
 endif()
 
 if(PIPEWIRE_FOUND)
-    target_sources(mynah-linux-common PRIVATE common/pipewire_capture.cpp)
+    target_sources(mynah-linux-common PRIVATE common/pipewire_capture.cpp common/runtime.cpp)
     target_link_libraries(mynah-linux-common PUBLIC PkgConfig::PIPEWIRE)
 
     # The target is `mynah-cli` because `mynah` is the library's
@@ -89,6 +89,16 @@ if(PIPEWIRE_FOUND)
     target_link_libraries(mynah-cli PRIVATE mynah-linux-common)
     target_compile_definitions(mynah-cli PRIVATE MYNAH_VERSION="${PROJECT_VERSION}")
     install(TARGETS mynah-cli DESTINATION bin)
+endif()
+
+# mynah-kde, the Plasma front end (Stage 8). On by default on Linux, where
+# the package builds it; -DMYNAH_KDE=OFF for a headless-only build (the
+# Omarchy package). It needs the runtime, so PipeWire too.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND PIPEWIRE_FOUND)
+    option(MYNAH_KDE "Build mynah-kde, the Plasma front end" ON)
+    if(MYNAH_KDE)
+        add_subdirectory(kde)
+    endif()
 endif()
 
 if(MYNAH_BUILD_TESTS)

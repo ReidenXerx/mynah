@@ -129,6 +129,7 @@ private:
     std::string path_;
     std::string version_; // reported as "version" in v2 replies
     int server_ = -1;
+    bool owns_path_ = false; // start() bound path_; stop() may remove it
     // The self-pipe that wakes the accept thread. Neither shutdown() nor
     // close() on a listening socket reliably wakes a blocked accept() on
     // every platform — shutdown does on Linux but not macOS, close does on

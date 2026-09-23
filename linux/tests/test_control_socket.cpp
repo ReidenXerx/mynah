@@ -389,6 +389,24 @@ TEST_CASE("a live socket is not stolen") {
     CHECK(message.find("already running") != std::string::npos);
 }
 
+TEST_CASE("the one that was refused leaves the running one's socket alone") {
+    // Regression: stop() — and so the destructor — removed the socket path
+    // whether or not this server had bound it. A second `mynah` that was
+    // refused deleted the first one's socket on its way out, and every
+    // `mynah toggle` after that said nothing was running.
+    Fixture fixture;
+    {
+        FakeEngine second_engine;
+        mynah::control::Server second(handlers_for(&second_engine), fixture.path(), "test");
+        CHECK_THROWS(second.start());
+        second.stop();
+    } // and its destructor
+    CHECK(std::filesystem::exists(fixture.path()));
+    auto replies = fixture.talk({"{\"cmd\": \"status\"}"});
+    REQUIRE(replies.size() == 1);
+    CHECK(replies[0].find("ok")->boolean == true);
+}
+
 TEST_CASE("stop removes the socket") {
     mynah_test::TmpDir dir;
     FakeEngine engine;

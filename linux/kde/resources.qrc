@@ -1,0 +1,10 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>qml/Pill.qml</file>
+        <file>qml/BirdMark.qml</file>
+        <file>qml/Settings.qml</file>
+        <file>qml/AppliesNote.qml</file>
+        <file alias="mynah-glyph.svg">../../docs/assets/mynah-glyph.svg</file>
+    </qresource>
+</RCC>

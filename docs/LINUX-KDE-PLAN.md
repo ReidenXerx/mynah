@@ -349,7 +349,53 @@ or the regression is understood and written down.
 **Exit:** `pacman -S` of the local package gives working dictation after
 login, and `pacman -R` leaves nothing running.
 
-### Stage 8: `mynah-kde` (Phase 4, large)
+### Stage 8: `mynah-kde` (Phase 4) — built, running; turbo voice test next
+
+**Status, 2026-09-23.** The app is in `linux/kde/`: Qt 6, QML, KF6 and
+LayerShellQt. It is built by default on Linux (`-DMYNAH_KDE=OFF` for a
+headless-only build) and packaged as the split package `mynah-kde`, which
+depends on `mynah`. The spec came from the macOS sources (menu, pill,
+settings, the state tints and every number) and is followed item for item:
+
+- **Engine:** `linux/common/runtime.*` is the running engine (engine,
+  typing, socket, capture, the ordering rules), shared with the headless
+  CLI. So `mynah toggle` and `mynah watch` work against the app too.
+- **Tray:** `KStatusNotifierItem`, one bird in the panel's text colour.
+  The menu, in the macOS order: Start/Stop Dictation (with the shortcut),
+  the state, the last error, "Typing: ready" (KWin's grant, the Linux
+  twin of Accessibility), Start at Login, Settings…, Open Config File, the
+  version and shortcut, and Quit mynah. When the headless service owns
+  the socket, the menu offers "Stop It and Use This One". Checked over
+  DBusMenu.
+- **Shortcut:** KGlobalAccel `toggle-dictation`, default Meta+Alt+D,
+  which can be changed in Settings or in System Settings. With `trigger =
+  ptt`, press starts and release stops.
+- **Pill:** a layer-shell overlay built to the macOS numbers (168×44
+  capsule, 80 px up, the bird and 5 bars, the tints, 0.08 s and 0.18 s),
+  click-through, with blur. Rendered offscreen and checked against the spec.
+- **Settings:** General, Recognition and Sensitivity, with the macOS
+  wording, ranges and "applies" notes. Linux additions: the KDE key
+  recorder, the push-to-talk choice, the Linux models (turbo, small, base
+  and Silero) with verified downloads, "Runs on", and the dGPU preference.
+- **Lifecycle:** one instance per session (`KDBusService`; a second launch
+  opens Settings), Start at Login as an XDG autostart entry, and a clean
+  quit on SIGTERM and SIGINT.
+
+Differences from macOS, on purpose: a left click on the tray icon starts
+and stops dictation (Plasma trays are clicked, and there is no menu-bar
+convention to keep); there is no "Reveal Log…" (the log goes to the
+journal); and "Accessibility/Microphone" became "Typing".
+
+Open:
+- **The NVIDIA opt-in when launched from the menu.** This machine's
+  `VK_LOADER_DRIVERS_DISABLE=*nvidia*` hides the dGPU from every app, and
+  a launcher that wraps `env -u` may break KWin's Exec-path match for
+  the fake-input grant. Until that is settled, run it with
+  `env -u VK_LOADER_DRIVERS_DISABLE build/linux/kde/mynah-kde`.
+- The turbo voice test, and the Stage 3 paste test, through the app.
+
+The original plan for this stage:
+
 
 Starts once Stages 1–5 hold. **The look follows the macOS app**
 (`macos/`): its menu bar menu, settings window and indicator are the

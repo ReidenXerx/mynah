@@ -45,6 +45,7 @@
 #include "stt/stt.hpp"
 #include "systemd.hpp"
 #include "tuning/constants.hpp"
+#include "runtime.hpp"
 #include "typing_queue.hpp"
 
 namespace {
@@ -52,15 +53,6 @@ namespace {
 const char* kVersion = MYNAH_VERSION;
 volatile std::sig_atomic_t g_signal = 0;
 
-const char* state_word(mynah_state state) {
-    switch (state) {
-    case MYNAH_IDLE: return "idle";
-    case MYNAH_LOADING: return "loading";
-    case MYNAH_LISTENING: return "listening";
-    case MYNAH_TRANSCRIBING: return "transcribing";
-    }
-    return "idle";
-}
 
 int fail(const std::string& message) {
     std::fprintf(stderr, "mynah: %s\n", message.c_str());
@@ -447,147 +439,33 @@ int watch_command(double timeout_seconds) {
 
 // --- run: the engine ------------------------------------------------------------------
 
-std::string bands_json(const float* bands) {
-    std::string json;
-    for (int i = 0; i < mynah::constants::spectrum_bands; ++i) {
-        char text[16];
-        std::snprintf(text, sizeof(text), i ? ",%.3f" : "%.3f", double(bands[i]));
-        json += text;
-    }
-    return json;
-}
 
 int run_engine() {
     mynah::config::Config config = mynah::config::load();
     if (auto_benchmark(config))
         config = mynah::config::load(); // the benchmark stored a choice
 
-    // Vulkan starts here, not on the first toggle: it takes ~2 s, more when
-    // it wakes a dGPU from D3cold, and audio before a session is listening
-    // is dropped — it was the start of the first sentence. The dGPU goes
-    // back to sleep on its own ten seconds later.
-    if (std::optional<mynah::stt::GpuChoice> gpu = mynah::stt::pick_gpu(config.gpu))
-        std::fprintf(stderr, "mynah: speech runs on %s\n", gpu->name.c_str());
-    else
-        std::fprintf(stderr, "mynah: speech runs on the CPU\n");
-
-    // Typing first: the engine's TEXT event drives the injector, so it
-    // must exist before the engine's callback fires.
-    mynah::inject::Tools tools = mynah::inject::Tools::discover();
-    std::unique_ptr<mynah::inject::Injector> injector;
-    if (config.injector == "wtype") injector = mynah::inject::make_wtype(tools);
-    else if (config.injector == "clipboard")
-        injector = mynah::inject::make_clipboard(tools);
-    else injector = mynah::inject::make_auto(tools); // KWin's typer on KWin, smart elsewhere
-
-    // Both pointers are set before the socket accepts its first command —
-    // the only thing that can start a session, and so the first event.
-    struct EngineContext {
-        mynah::control::Server* server = nullptr;
-        mynah::inject::TypingQueue* typing = nullptr;
-    };
-    EngineContext context;
-
-    mynah_event_fn on_event = [](const mynah_event* event, void* user) {
-        auto* ctx = static_cast<EngineContext*>(user);
-        switch (mynah_event_get_kind(event)) {
-        case MYNAH_EVENT_STATE:
-            ctx->server->publish("{\"event\":\"state\",\"state\":\"" +
-                                  std::string(state_word(mynah_event_state(event))) +
-                                  "\"}");
-            break;
-        case MYNAH_EVENT_LEVEL:
-            ctx->server->publish_level(double(mynah_event_level(event)),
-                                       bands_json(mynah_event_bands(event)));
-            break;
-        case MYNAH_EVENT_TEXT: {
-            // Typing blocks and this callback must not (mynah.h): queued,
-            // typed on the queue's thread, published there once it landed.
-            if (const char* text = mynah_event_text(event)) ctx->typing->push(text);
-            break;
-        }
-        case MYNAH_EVENT_PROBLEM: {
-            const char* code = mynah_event_problem_code(event);
-            const char* message = mynah_event_problem_message(event);
-            std::fprintf(stderr, "mynah: %s: %s\n", code ? code : "?",
-                         message ? message : "");
-            ctx->server->publish(
-                "{\"event\":\"problem\",\"code\":" + mynah::json::quoted(code ? code : "") +
-                ",\"message\":" + mynah::json::quoted(message ? message : "") + "}");
-            break;
-        }
-        case MYNAH_EVENT_MODEL: {
-            static const char* names[] = {"loading", "loaded", "unloaded"};
-            std::string json = std::string("{\"event\":\"model\",\"status\":\"") +
-                               names[int(mynah_event_model_status(event))] + "\"";
-            if (const char* name = mynah_event_model_name(event))
-                json += ",\"name\":" + mynah::json::quoted(name);
-            json += "}";
-            ctx->server->publish(json);
-            break;
-        }
-        }
-    };
-
-    char* error = nullptr;
-    mynah_engine* engine = mynah_create(nullptr, on_event, &context, &error);
-    if (engine == nullptr) {
-        fail(error ? error : "the engine could not start");
-        std::free(error);
-        return 1;
-    }
-
-    // The engine exists and nothing has started a session yet, so no event
-    // can fire until the socket below accepts a command.
+    // Everything else is the shared runtime (linux/common/runtime.hpp); the
+    // terminal is its listener.
     std::atomic<bool> quit_requested{false};
-    mynah::control::Server::Handlers wired;
-    wired.toggle = [engine] { mynah_toggle(engine); };
-    wired.start = [engine] { mynah_start(engine); };
-    wired.stop = [engine] { mynah_stop(engine); };
-    wired.quit = [&quit_requested] { quit_requested.store(true); };
-    wired.state = [engine] { return std::string(state_word(mynah_get_state(engine))); };
-    mynah::control::Server server(std::move(wired), mynah::control::socket_path(), kVersion);
-    // The `text` event means the text really landed: a failed injection
-    // publishes nothing, same as the Python engine.
-    auto typing = std::make_unique<mynah::inject::TypingQueue>(
-        [&injector](const std::string& text) { return injector->type_text(text); },
-        [&server](const std::string& text) {
-            server.publish("{\"event\":\"text\",\"text\":" + mynah::json::quoted(text) + "}");
-        });
-    context.server = &server;
-    context.typing = typing.get();
-    try {
-        server.start();
-    } catch (const std::exception& e) {
-        mynah_destroy(engine);
-        return fail(e.what());
-    }
-
-    // Capture: PipeWire straight into the engine's ring.
-    mynah::capture::PipeWireCapture capture(engine);
-    if (!capture.start()) {
-        std::fprintf(stderr, "mynah: microphone: %s\n", capture.error().c_str());
-        mynah_destroy(engine);
-        typing.reset();
-        server.stop();
-        return 1;
-    }
+    mynah::runtime::Listener listener;
+    listener.problem = [](const std::string& code, const std::string& message) {
+        std::fprintf(stderr, "mynah: %s: %s\n", code.empty() ? "?" : code.c_str(),
+                     message.c_str());
+    };
+    listener.quit = [&quit_requested] { quit_requested.store(true); };
+    mynah::runtime::Runtime runtime(std::move(listener));
+    std::string error;
+    if (!runtime.start(error)) return fail(error);
+    std::fprintf(stderr, "mynah: speech runs on %s\n", runtime.speech_device().c_str());
 
     std::signal(SIGINT, on_signal);
     std::signal(SIGTERM, on_signal);
-    std::fprintf(stderr, "mynah %s listening on %s\n", kVersion, server.path().c_str());
+    std::fprintf(stderr, "mynah %s listening on %s\n", kVersion, runtime.socket_path().c_str());
     while (!quit_requested.load() && g_signal == 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-
-    // Engine first, so no event arrives after this; then what is still
-    // queued is typed while the socket can still tell subscribers; then the
-    // socket.
-    capture.stop();
-    mynah_stop(engine);
-    mynah_destroy(engine);
-    typing.reset();
-    server.stop();
+    runtime.stop();
     return 0;
 }
 

@@ -23,6 +23,9 @@
 #include <sys/wait.h>
 
 #include "json.hpp"
+#if defined(MYNAH_HAVE_KWIN_TYPER)
+#include "kwin_backend.hpp"
+#endif
 
 namespace mynah::inject {
 
@@ -557,6 +560,13 @@ std::unique_ptr<Injector> make_clipboard(Tools tools) {
 
 std::unique_ptr<Injector> make_smart(Tools tools) {
     return std::make_unique<SmartInjector>(std::move(tools));
+}
+
+std::unique_ptr<Injector> make_auto(Tools tools) {
+#if defined(MYNAH_HAVE_KWIN_TYPER)
+    if (std::unique_ptr<Injector> kwin = make_kwin()) return kwin;
+#endif
+    return make_smart(std::move(tools));
 }
 
 } // namespace mynah::inject

@@ -228,7 +228,7 @@ const SettingInfo kSettings[] = {
     {"gpu", "Prefer a discrete GPU; it sleeps between sentences (off = integrated/CPU only)"},
     {"show_indicator", "The floating mic indicator (the desktop shell's pill)"},
     {"idle_visible", "Keep the indicator dimmed-visible between sessions"},
-    {"injector", "smart, wtype or clipboard (empty = chosen for you)"},
+    {"injector", "smart (KWin: paste; elsewhere: wtype), wtype or clipboard"},
     {"frame_energy", "Per-frame floor for speech (lower = more sensitive)"},
     {"min_energy", "Quietest utterance worth transcribing"},
     {"min_utterance", "Shortest utterance worth transcribing, in seconds"},
@@ -478,7 +478,7 @@ int run_engine() {
     if (config.injector == "wtype") injector = mynah::inject::make_wtype(tools);
     else if (config.injector == "clipboard")
         injector = mynah::inject::make_clipboard(tools);
-    else injector = mynah::inject::make_smart(tools);
+    else injector = mynah::inject::make_auto(tools); // KWin's typer on KWin, smart elsewhere
 
     // Both pointers are set before the socket accepts its first command —
     // the only thing that can start a session, and so the first event.

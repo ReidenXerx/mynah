@@ -77,4 +77,10 @@ std::unique_ptr<Injector> make_clipboard(Tools tools);
 // smart: type, except into the apps where typing does not work.
 std::unique_ptr<Injector> make_smart(Tools tools);
 
+// What the session should use: KWin's paste typer on KWin (kwin_backend.hpp;
+// wtype cannot work there), smart everywhere else. Connects to the Wayland
+// display to find out — so the tests, which must never type into the
+// developer's focused window, use the explicit factories above instead.
+std::unique_ptr<Injector> make_auto(Tools tools);
+
 } // namespace mynah::inject

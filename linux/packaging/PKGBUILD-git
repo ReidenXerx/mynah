@@ -11,19 +11,24 @@ arch=('x86_64')
 url="https://duduphudu.app/mynah/"
 license=('MIT')
 depends=(
-    'pipewire'
-    'wtype'
-    'wl-clipboard'
-    'curl'
-    'openssl'
-    'vulkan-icd-loader'
+    'pipewire'           # audio capture, straight through libpipewire
+    'wayland'            # typing on KWin: fake-input + ext-data-control, in-process
+    'curl'               # model downloads
+    'openssl'            # download hash verification
+    'vulkan-icd-loader'  # the ggml Vulkan backend (the gpu tier)
     'gcc-libs'
+)
+optdepends=(
+    'wtype: typing on Hyprland and other wlroots compositors'
+    'wl-clipboard: pasting on Hyprland into apps that ignore the virtual keyboard'
 )
 makedepends=(
     'cmake' 'git' 'pkgconf'
     'vulkan-headers'     # the ggml Vulkan backend (-DGGML_VULKAN=ON) …
     'spirv-headers'      # … which also needs the SPIR-V headers, and …
     'shaderc'            # … compiles its shaders with glslc at build time
+    'wayland-protocols'          # ext-data-control-v1.xml, for the KWin typer
+    'plasma-wayland-protocols'   # fake-input.xml, likewise
 )
 provides=('mynah')
 conflicts=('mynah')
@@ -71,6 +76,11 @@ package() {
     install -Dm755 build/linux/mynah "$pkgdir/usr/bin/mynah"
     install -Dm644 "$srcdir/mynah/linux/packaging/mynah.service" \
         "$pkgdir/usr/lib/systemd/user/mynah.service"
+
+    # KWin's permission for the paste chord: it grants fake-input only to
+    # the binary a .desktop file names (see the file).
+    install -Dm644 "$srcdir/mynah/linux/packaging/mynah.desktop" \
+        "$pkgdir/usr/share/applications/mynah.desktop"
     install -Dm644 "$srcdir/mynah/linux/packaging/benchmark.wav" \
         "$pkgdir/usr/share/mynah/benchmark.wav"
     install -Dm644 "$srcdir/mynah/LICENSE" "$pkgdir/usr/share/licenses/mynah-git/LICENSE"

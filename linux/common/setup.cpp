@@ -14,6 +14,9 @@
 
 #include "config/config.hpp"
 #include "injector.hpp"
+#if defined(MYNAH_HAVE_KWIN_TYPER)
+#include "kwin_backend.hpp"
+#endif
 #include "json.hpp"
 #include "models/resolve.hpp"
 #include "stt/stt.hpp"
@@ -28,6 +31,18 @@ bool on_hyprland() { return std::getenv("HYPRLAND_INSTANCE_SIGNATURE") != nullpt
 
 Check check_typing() {
     inject::Tools tools = inject::Tools::discover();
+#if defined(MYNAH_HAVE_KWIN_TYPER)
+    // On KWin the session types through its paste typer (make_auto): wtype
+    // and wl-clipboard do not matter there, KWin's permission does.
+    if (std::unique_ptr<inject::Injector> kwin = inject::make_kwin()) {
+        auto [ok, remedy] = kwin->check();
+        if (!ok) return {false, "Typing", remedy.substr(0, remedy.find('\n')),
+                         remedy.find('\n') == std::string::npos ? std::string()
+                                                                 : remedy.substr(remedy.find('\n') + 1)};
+        return {true, "Typing", "KWin: pastes what you say with Shift+Insert, then restores the clipboard",
+                ""};
+    }
+#endif
     auto [ok, remedy] = inject::make_smart(tools)->check();
     if (!ok) return {false, "Typing", remedy.substr(0, remedy.find('\n')),
                      remedy.substr(remedy.find('\n') + 1)};

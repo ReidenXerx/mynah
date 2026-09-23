@@ -288,10 +288,12 @@ ASan; short fuzz runs of `push_audio` and the config parser.
 - Autostart through an XDG autostart entry.
 - Serves the same socket, so `mynah toggle` and scripts work. If the headless
   service already owns the socket, offer to stop and disable it.
-- **Typing on KDE**: `wtype` by default (KWin implements the virtual keyboard).
-  For keymap-deaf apps, spike (a) the active window through KWin scripting over
-  D-Bus and (b) a paste chord through the RemoteDesktop portal. Fallback if the
-  spike fails: put the text on the clipboard and notify "press Ctrl+V".
+- **Typing on KDE** (corrected 2026-09-23; see docs/LINUX-KDE-PLAN.md, Stage 3):
+  KWin has no virtual keyboard, so `wtype` cannot work there. mynah pastes
+  in-process instead: `ext-data-control-v1` for the clipboard and primary
+  selection, KWin's `fake-input` for Shift+Insert, which KWin grants through
+  the package's `.desktop` file with no dialog. Shared with the headless
+  binary (`linux/common/kwin_backend.*`).
 - `PKGBUILD` split package `mynah-kde`: depends `mynah qt6-declarative
   layer-shell-qt kglobalaccel kstatusnotifieritem kirigami`.
 

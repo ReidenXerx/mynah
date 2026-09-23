@@ -1,0 +1,14 @@
+# Not a launcher (NoDisplay): this entry is how KWin decides that
+# /usr/bin/mynah may press keys. KWin hands org_kde_kwin_fake_input only to
+# an executable whose .desktop file lists it here, and mynah presses exactly
+# one chord with it — Shift+Insert, to paste what was dictated
+# (linux/common/kwin_backend.hpp). Exec must be the installed binary's path.
+[Desktop Entry]
+Type=Application
+Name=mynah
+Comment=Dictation engine: say it, and it types where you are
+Exec=/usr/bin/mynah
+Icon=audio-input-microphone
+NoDisplay=true
+Terminal=false
+X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input

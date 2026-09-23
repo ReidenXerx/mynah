@@ -147,14 +147,20 @@ Wayland puts both capabilities where they can be seen: the compositor decides
 whether to honour the virtual keyboard, and the binding is the user's own.
 
 `wtype` needs `virtual-keyboard-v1`, which wlroots compositors (Hyprland, Sway,
-river) implement. GNOME does not, and there `wtype` fails — a `RemoteDesktop`
-portal injector is the way in, and is not written yet. That is the honest state
-of the support matrix:
+river) implement. KWin does not implement it at all, so on Plasma mynah pastes
+instead, in-process: the text goes on the clipboard and the primary selection
+through `ext-data-control-v1`, KWin's `fake-input` presses Shift+Insert, and the
+user's clipboard comes back ~1 s later. No keyboard layout can remap that chord,
+so Russian text lands with a `us` layout active too. KWin grants `fake-input`
+only to a binary whose `.desktop` file asks for it, which the package installs
+(`linux/packaging/mynah.desktop`); `mynah setup` says so when it is missing.
+GNOME has neither, and there typing needs a `RemoteDesktop` portal injector, which
+is not written. That is the honest state of the support matrix:
 
 | Desktop | Hotkey | Typing |
 |---|---|---|
 | Hyprland / Sway / wlroots | your compositor's own binding | ✅ `wtype` |
-| KDE Plasma (Wayland) | its global shortcuts | ✅ `wtype` (KWin implements the protocol) |
+| KDE Plasma (Wayland) | its global shortcuts | ✅ paste via KWin `fake-input` + `ext-data-control` (Plasma 6.3+) |
 | GNOME (Wayland) | its custom shortcuts | ❌ needs a portal injector |
 | X11, any desktop | — | ❌ by decision, see above |
 

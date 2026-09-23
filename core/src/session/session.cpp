@@ -209,6 +209,16 @@ void Engine::start() {
         ++idle_generation_;
         start_pending_.store(true, std::memory_order_release);
         ++start_generation_;
+        // Capture from the press, not from LISTENING: a cold model load is
+        // seconds (turbo onto a dGPU woken from D3cold: 3.2 s), and people
+        // start talking when they press the key. What they say meanwhile
+        // waits in the ring for the session's worker. The session's
+        // generation advances here too, so an earlier session's audio
+        // worker stops reading the ring now; the position is taken before
+        // capture is armed, so every sample after it is this session's.
+        ++session_generation_;
+        pending_capture_from_ = ring_.written();
+        capturing_.store(true, std::memory_order_release);
         spawn_loader(start_generation_.load());
         reap_finished_threads();
     }
@@ -254,8 +264,10 @@ void Engine::loader_body(int start_generation) {
             // the user has spoken a whole sentence into a dead session.
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                if (start_generation_.load() == start_generation)
+                if (start_generation_.load() == start_generation) {
                     start_pending_.store(false, std::memory_order_release);
+                    capturing_.store(false, std::memory_order_release);
+                }
             }
             set_state(State::Idle);
             emit_problem("no_model",
@@ -269,8 +281,10 @@ void Engine::loader_body(int start_generation) {
         if (!stt_->load(model, cfg.gpu)) {
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                if (start_generation_.load() == start_generation)
+                if (start_generation_.load() == start_generation) {
                     start_pending_.store(false, std::memory_order_release);
+                    capturing_.store(false, std::memory_order_release);
+                }
             }
             set_state(State::Idle);
             emit_problem("model_load_failed",
@@ -324,22 +338,22 @@ void Engine::loader_body(int start_generation) {
         // Fresh per-session state: re-measure the ambient noise floor
         // every session (a room that got louder between sessions must be
         // handled), and nothing typed yet, so the first utterance is not
-        // spaced away from whatever the user was already writing.
-        ++session_generation_;
+        // spaced away from whatever the user was already writing. The
+        // generation was taken, and capture armed, by start() — at the
+        // press; a newer start would have failed the check above.
         int generation = session_generation_.load();
         auto session = std::make_shared<Session>();
-        sessions_.push_back(session);
         // Stale audio from a previous session must not reach this one's
-        // detector: drop whatever the capture thread left in the ring.
-        std::vector<float> stale(ring_.readable());
-        ring_.pop(stale.data(), stale.size());
-
-        // Arm capture BEFORE the workers exist: the audio worker's loop
-        // tests capturing_ on entry, and a thread spawned against a false
-        // flag exits before a single sample is consumed. The drain above
-        // happened under the same lock, so no armed-session audio is lost
-        // to it.
-        capturing_.store(true, std::memory_order_release);
+        // detector. Not drained here: that would be a second reader on a
+        // single-consumer ring while an earlier worker may still be
+        // mid-pop. This session's worker skips to capture_from instead,
+        // once those workers are gone.
+        session->capture_from = pending_capture_from_;
+        for (const auto* list : {&sessions_, &stale_sessions_})
+            for (const auto& earlier : *list)
+                if (earlier->audio && !earlier->audio->done.load(std::memory_order_acquire))
+                    session->predecessors.push_back(earlier->audio);
+        sessions_.push_back(session);
 
         auto spawn = [&](void (Engine::*body)(std::shared_ptr<Session>, config::Config, int),
                          std::shared_ptr<OwnedThread>* slot) {
@@ -361,6 +375,14 @@ void Engine::loader_body(int start_generation) {
     }
     set_state(State::Listening);
     push_cv_.notify_all();
+
+    // A model that was already loaded may sit on a GPU that has gone to
+    // sleep since (a dGPU in D3cold ten seconds after its last work): wake
+    // it now, while the user is still on their first sentence, rather than
+    // when that sentence is handed over — ~1 s it would otherwise add to
+    // the first text. A model loaded just now needs nothing: the load woke
+    // the device.
+    if (!need_load) stt_->wake();
 }
 
 void Engine::stop() {
@@ -372,8 +394,10 @@ void Engine::stop() {
             // of the trigger aborts a cold load rather than being ignored
             // (Swift's endSession). The loader sees the cleared flag after
             // its load and never activates; a model it loaded mid-flight
-            // is owned by the idle timer below.
+            // is owned by the idle timer below. Capture was armed at the
+            // press; what it gathered is skipped by the next session.
             start_pending_.store(false, std::memory_order_release);
+            capturing_.store(false, std::memory_order_release);
         } else if (!active_.load(std::memory_order_acquire)) {
             return; // idempotent: stop on an idle engine is a no-op
         } else {
@@ -477,7 +501,22 @@ void Engine::audio_worker(std::shared_ptr<Session> session, config::Config cfg, 
             stop();
     };
 
-    while (still_mine()) {
+    // Become the ring's only reader: the audio workers of earlier sessions
+    // stop on their own now that the generation has moved (within
+    // kWakeInterval), and until they have, this worker neither reads nor
+    // skips. Then drop what was written before this session's press.
+    bool sole_reader = true;
+    for (const auto& earlier : session->predecessors)
+        while (!earlier->done.load(std::memory_order_acquire)) {
+            if (!still_mine()) {
+                sole_reader = false;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+    if (sole_reader) ring_.skip_to(session->capture_from);
+
+    while (sole_reader && still_mine()) {
         std::size_t popped = ring_.pop(scratch.data(), scratch.size());
         if (popped == 0) {
             std::unique_lock<std::mutex> lock(push_mutex_);

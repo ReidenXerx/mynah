@@ -263,6 +263,114 @@ TEST_CASE("a start while a model loads can be cancelled by stop") {
     REQUIRE(harness.tape->await("state:idle"));
 }
 
+namespace {
+
+// Holds the fake model load until open() — a cold load the test controls.
+struct LoadGate {
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool opened = false;
+    void attach(FakeStt* stt) {
+        stt->on_load = [this] {
+            std::unique_lock<std::mutex> lock(mutex);
+            cv.wait(lock, [this] { return opened; });
+        };
+    }
+    void open() {
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            opened = true;
+        }
+        cv.notify_all();
+    }
+};
+
+} // namespace
+
+TEST_CASE("speech during a cold model load is transcribed, not dropped") {
+    // Capture runs from the press: people start talking when they press
+    // the key, and a cold load is seconds (turbo onto a sleeping dGPU:
+    // 3.2 s). Before, everything said before LISTENING was dropped.
+    Harness harness(test_config());
+    LoadGate gate;
+    gate.attach(harness.stt);
+
+    harness.engine->start();
+    REQUIRE(harness.tape->await("model:loading"));
+    CHECK(harness.engine->is_capturing());
+    std::vector<float> clip = utterance_clip();
+    harness.engine->push_audio(clip.data(), clip.size()); // said while loading
+    CHECK(!harness.tape->contains("state:listening"));
+
+    gate.open();
+    REQUIRE(harness.tape->await("state:listening"));
+    REQUIRE(harness.tape->await("text:привет мир"));
+    harness.engine->stop();
+    REQUIRE(harness.tape->await("state:idle"));
+}
+
+TEST_CASE("what a cancelled start captured never reaches the next session") {
+    Harness harness(test_config());
+    LoadGate gate;
+    gate.attach(harness.stt);
+
+    harness.engine->start();
+    REQUIRE(harness.tape->await("model:loading"));
+    std::vector<float> clip = utterance_clip();
+    harness.engine->push_audio(clip.data(), clip.size());
+    harness.engine->stop(); // cancel the start; its audio is orphaned
+    CHECK(!harness.engine->is_capturing());
+    gate.open();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    harness.engine->start(); // the model is loaded now: no gate
+    REQUIRE(harness.tape->await("state:listening"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    CHECK(harness.stt->calls.empty());
+    harness.engine->stop();
+    REQUIRE(harness.tape->await("state:idle"));
+}
+
+TEST_CASE("a quick stop and start hands the ring over, and keeps the new speech") {
+    // The previous session's worker may still be mid-read when the next
+    // press arrives: the new worker waits for it, then skips its leftovers.
+    Harness harness(test_config());
+    harness.engine->start();
+    REQUIRE(harness.tape->await("state:listening"));
+    const std::vector<float> full = utterance_clip();
+    std::vector<float> half(full.begin(), full.begin() + 16000);
+    harness.engine->push_audio(half.data(), half.size());
+    for (int round = 0; round < 20; ++round) { // stop/start as fast as it goes
+        harness.engine->stop();
+        harness.engine->start();
+    }
+    REQUIRE(harness.tape->await_count("state:listening", 2));
+    std::vector<float> clip = utterance_clip();
+    harness.engine->push_audio(clip.data(), clip.size());
+    REQUIRE(harness.tape->await("text:привет мир"));
+    CHECK(harness.stt->calls.size() == 1);
+    harness.engine->stop();
+    REQUIRE(harness.tape->await("state:idle"));
+}
+
+TEST_CASE("a start with the model already loaded wakes its device; a cold load does not") {
+    Harness harness(test_config());
+    harness.engine->start();
+    REQUIRE(harness.tape->await("state:listening"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    CHECK(harness.stt->wakes.load() == 0); // the load itself woke it
+    harness.engine->stop();
+    REQUIRE(harness.tape->await("state:idle"));
+
+    harness.engine->start(); // warm: the loader only activates
+    REQUIRE(harness.tape->await_count("state:listening", 2));
+    for (int i = 0; i < 100 && harness.stt->wakes.load() == 0; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(harness.stt->wakes.load() == 1);
+    harness.engine->stop();
+    REQUIRE(harness.tape->await_count("state:idle", 2));
+}
+
 TEST_CASE("PTT press/release starts and stops; repeats and stray releases are no-ops") {
     Harness harness(test_config());
     harness.engine->ptt_press();

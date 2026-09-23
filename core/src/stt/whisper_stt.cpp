@@ -43,6 +43,9 @@ public:
         params.flash_attn = true;
 
         context_ = whisper_init_from_file_with_params(model.string().c_str(), params);
+#if !defined(__APPLE__)
+        on_discrete_gpu_ = context_ != nullptr && gpu && gpu->kind == GpuKind::Discrete;
+#endif
         return context_ != nullptr;
     }
 
@@ -66,6 +69,20 @@ public:
             whisper_free(context_);
             context_ = nullptr;
         }
+        on_discrete_gpu_ = false;
+    }
+
+    void wake() override {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!context_ || !on_discrete_gpu_) return;
+        // The smallest real work there is: the encoder over 0.1 s of
+        // silence (padded to its 30 s window — ~0.1 s on a woken RTX 5070).
+        // Any submission wakes the device; this one is whisper's own path,
+        // so it also touches the buffers the next transcription will use.
+        // No decoder, no text, nothing kept.
+        std::vector<float> silence(1600, 0.0f);
+        if (whisper_pcm_to_mel(context_, silence.data(), int(silence.size()), 1) == 0)
+            whisper_encode(context_, 0, 1);
     }
 
     std::optional<std::string> transcribe(const float* samples, std::size_t count,
@@ -125,6 +142,7 @@ public:
 private:
     mutable std::mutex mutex_; // is_loaded() is a const reader
     whisper_context* context_ = nullptr;
+    bool on_discrete_gpu_ = false; // the only device that sleeps under us (wake())
     std::string prompt_; // backing store for whisper_full's borrowed pointer
 };
 

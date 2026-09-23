@@ -185,6 +185,76 @@ switched off.
 
 ### Stage 3: Typing on KWin (the real work; starts with a spike)
 
+**Status, 2026-09-23: implemented; the hands-on paste test is still TO DO.**
+
+What landed:
+- **`PasteTyper`** (`linux/common/paste_typer.*`), the policy, is
+  unit-tested over a fake backend. It saves both selections once per
+  burst, sets both, presses the chord, and restores after 0.8 s; each
+  paste pushes the restore back. A selection that cannot be saved is left
+  alone, and an empty one is restored to empty.
+- **`KWinBackend`** (`linux/common/kwin_backend.*`) runs its own Wayland
+  connection and event thread, with `ext-data-control-v1` and
+  `fake-input`. It saves every format of the user's clipboard (up to
+  64 MB), so an image copied before dictating comes back, which
+  `wl-copy` could not do. It answers from memory when it owns the
+  selection itself.
+- **`make_auto`** picks it on KWin, detected by KWin-only globals, since
+  Hyprland serves some `org_kde_*` ones too. `make_smart` (wtype) stays
+  for the rest, and for the tests, so a test run can never paste into the
+  developer's focused window.
+- **`mynah setup`** checks KWin's grant and prints the `.desktop` line for
+  the running binary. The package installs `linux/packaging/mynah.desktop`
+  for `/usr/bin/mynah`; `wtype` and `wl-clipboard` became optdepends.
+- **Checked live, no keys pressed:** save → set a Cyrillic and emoji
+  marker → Klipper reads it → restore → Klipper reads the user's text,
+  which Klipper keeps after mynah exits.
+- **Not yet checked live:** the chord itself, which needs a focused target
+  (the test below). A development binary needs its own grant: `mynah
+  setup` prints the line. This machine has
+  `~/.local/share/applications/mynah-dev.desktop` for `build-cpu/`.
+
+The test below can now also be done with mynah itself: run it, toggle, and
+speak into each app.
+
+**The spike** (below) came first:
+
+What is already settled, from probing KWin 6.7.5 on this machine:
+- `zwp_virtual_keyboard_v1` does not exist in KWin, even when requested, so
+  `wtype` is out on KDE for good.
+- KWin **grants** `org_kde_kwin_fake_input` (v6: `keyboard_key` and
+  `keyboard_keysym`) and `org_kde_plasma_window_management` (v20, the
+  focused window) to an executable whose installed `.desktop` file lists
+  them in `X-KDE-Wayland-Interfaces`. There is no consent dialog, so this
+  beats the RemoteDesktop portal (option b over a).
+- `ext_data_control_manager_v1` is exposed to everyone: the clipboard and
+  the primary selection can be read and set without focus.
+
+The spike tool is `/tmp/kwtype/kwtype`. Its source is `/tmp/kwtype/kwtype.c`,
+and its protocol XML was fetched from plasma-wayland-protocols and
+wayland-protocols. It is registered by
+`~/.local/share/applications/mynah-spike-kwtype.desktop`. (Also left from
+the grant probe: `mynah-spike-waylandinfo.desktop`. Delete both, then run
+`kbuildsycoca6`, when the spike is over.) `/tmp` does not survive a reboot:
+rebuild with `wayland-scanner` + `gcc` as in the source header if needed.
+
+**The test to run** (copy some text first, to check it is restored):
+
+```
+/tmp/kwtype/kwtype paste 5 "Привет, mynah! Hello."   # clipboard + primary, Shift+Insert
+/tmp/kwtype/kwtype keysym 5 "Привет hello"            # keyboard_keysym per character
+```
+
+Run each, then focus the target during the 5 s countdown: Kate, Konsole
+(at a prompt), Brave (a text field), Telegram (the message box; nothing is
+sent), Warp. Run `keysym` once more with the `ru` layout active. Record
+what appeared, and whether Ctrl+V still gives the copied text afterwards.
+The results decide:
+- whether Shift+Insert is the one chord for every app (K2), or terminals
+  need detection through `org_kde_plasma_window_management`;
+- whether `keyboard_keysym` types Cyrillic under `us`, and Latin under
+  `ru`. If it does, text can be typed with no clipboard at all.
+
 The default language is `ru`, so any route that turns text into keysyms breaks
 on Cyrillic whenever the active layout is `us`. **The design is: put the text
 on the clipboard, send a paste chord, restore the clipboard.** That route does

@@ -224,7 +224,10 @@ ApplicationWindow {
                     onToggled: Mynah.setConfig("gpu", checked)
                 }
                 AppliesNote {
-                    detail: "Off: the integrated GPU, or the CPU. The discrete GPU sleeps about ten seconds after each sentence either way. Applies when the model next loads."
+                    when: models.gpuHidden ? "restart" : "next"
+                    detail: models.gpuHidden
+                        ? "Your session hides the NVIDIA GPU from apps; with this on, mynah uses it anyway, for itself only. Off: the integrated GPU, or the CPU. The discrete GPU sleeps about ten seconds after each sentence either way."
+                        : "Off: the integrated GPU, or the CPU. The discrete GPU sleeps about ten seconds after each sentence either way. Applies when the model next loads."
                 }
 
                 Item { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Voice activity detection" }

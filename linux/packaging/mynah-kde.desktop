@@ -1,5 +1,9 @@
-# The Plasma app's launcher, and KWin's permission for it to press the one
-# paste chord it types with (X-KDE-Wayland-Interfaces; see mynah.desktop).
+# The Plasma app's launcher. KWin's permission to press the paste chord is
+# NOT here but in mynah-kde-typing.desktop: an override of this entry (a
+# launcher wrapping the Exec, as GPU-switching tools write) would otherwise
+# shadow it and take typing away — KWin grants only to an entry whose Exec
+# starts with the binary's own path. No GPU wrapping is needed either:
+# mynah lifts a session's NVIDIA hiding itself (gpu = on, gpu_env.hpp).
 [Desktop Entry]
 Type=Application
 Name=mynah
@@ -11,4 +15,3 @@ Terminal=false
 Categories=Utility;Accessibility;
 Keywords=dictation;speech;voice;whisper;
 StartupNotify=false
-X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input

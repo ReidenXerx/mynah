@@ -23,6 +23,9 @@ class ModelManager : public QObject {
     Q_PROPERTY(QVariantList models READ models NOTIFY changed)
     Q_PROPERTY(bool vadOnDisk READ vadOnDisk NOTIFY changed)
     Q_PROPERTY(QString device READ device NOTIFY changed)
+    // The session hides the NVIDIA GPU from apps (gpu_env.hpp): `gpu` then
+    // decides whether mynah lifts that, which takes a restart to change.
+    Q_PROPERTY(bool gpuHidden READ gpuHidden CONSTANT)
     Q_PROPERTY(QString downloading READ downloading NOTIFY progressChanged)
     Q_PROPERTY(double received READ received NOTIFY progressChanged)
     Q_PROPERTY(double total READ total NOTIFY progressChanged)
@@ -35,6 +38,7 @@ public:
     QVariantList models() const;
     bool vadOnDisk() const;
     QString device() const;
+    bool gpuHidden() const;
     QString downloading() const { return downloading_; }
     double received() const { return received_; }
     double total() const { return total_; }

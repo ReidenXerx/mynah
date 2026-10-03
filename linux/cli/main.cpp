@@ -34,6 +34,7 @@
 #include "config/config.hpp"
 #include "control_socket.hpp"
 #include "downloads.hpp"
+#include "gpu_env.hpp"
 #include "injector.hpp"
 #include "json.hpp"
 #include "models/resolve.hpp"
@@ -472,6 +473,11 @@ int run_engine() {
 } // namespace
 
 int main(int argc, char** argv) {
+    // Before anything can start Vulkan — the engine, `setup`, `models
+    // benchmark`: `gpu = on` lifts a session's NVIDIA hiding for mynah alone
+    // (gpu_env.hpp). The loader reads it once, so it has to be first.
+    mynah::gpu_env::apply_configured();
+
     std::vector<std::string> args(argv + 1, argv + argc);
     if (args.empty()) return run_engine();
 

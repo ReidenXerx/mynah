@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "config/config.hpp"
+#include "gpu_env.hpp"
 #include "injector.hpp"
 #if defined(MYNAH_HAVE_KWIN_TYPER)
 #include "kwin_backend.hpp"
@@ -71,30 +72,22 @@ Check check_speech() {
                 "  Or point at one you have:  mynah set model=/path/to/ggml-small.bin"};
 }
 
-// Where speech will run. Informational unless `gpu` is on and the session
-// hides the NVIDIA Vulkan driver (VK_LOADER_DRIVERS_DISABLE — an "iGPU by
-// default, dGPU per app" setup): then mynah falls back without a word, and
-// this is where the word is.
+// Where speech will run. Informational: a session that hides the NVIDIA
+// driver (VK_LOADER_DRIVERS_DISABLE, an "iGPU by default, dGPU per app"
+// setup) no longer leaves mynah on the iGPU without a word — `gpu = on` lifts
+// it for mynah alone (gpu_env.hpp, applied in main) — so this only says
+// which happened.
 Check check_gpu() {
     config::Config config = config::load();
     std::optional<stt::GpuChoice> gpu = stt::pick_gpu(config.gpu);
-    const char* disabled = std::getenv("VK_LOADER_DRIVERS_DISABLE");
-    std::string hidden = disabled ? disabled : "";
-    for (char& c : hidden) c = char(std::tolower(static_cast<unsigned char>(c)));
-    const bool nvidia_hidden = hidden.find("nvidia") != std::string::npos;
-    if (config.gpu && nvidia_hidden && (!gpu || gpu->kind != stt::GpuKind::Discrete))
-        return {false, "GPU",
-                gpu ? "the integrated GPU (" + gpu->name + "): the NVIDIA driver is hidden"
-                    : std::string("the CPU: the NVIDIA driver is hidden"),
-                "VK_LOADER_DRIVERS_DISABLE=" + std::string(disabled) +
-                    " hides the discrete GPU from mynah.\n"
-                    "  Let mynah see it (the dGPU still sleeps between sentences):\n"
-                    "  env -u VK_LOADER_DRIVERS_DISABLE mynah\n"
-                    "  Or keep the integrated GPU:  mynah set gpu=off"};
-    if (!gpu) return {true, "GPU", "none — speech runs on the CPU", ""};
-    return {true, "GPU",
-            gpu->name + (gpu->kind == stt::GpuKind::Discrete ? " (discrete)" : " (integrated)"),
-            ""};
+    std::string where = !gpu ? std::string("none — speech runs on the CPU")
+                             : gpu->name + (gpu->kind == stt::GpuKind::Discrete ? " (discrete)"
+                                                                                : " (integrated)");
+    if (gpu_env::unhidden())
+        where += " — your session hides it from apps; mynah uses it anyway";
+    else if (gpu_env::was_hidden())
+        where += " — gpu = off keeps your session's hiding of the NVIDIA GPU";
+    return {true, "GPU", where, ""};
 }
 
 Check check_microphone() {

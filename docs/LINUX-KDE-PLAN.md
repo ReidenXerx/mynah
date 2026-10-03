@@ -185,7 +185,11 @@ switched off.
 
 ### Stage 3: Typing on KWin (the real work; starts with a spike)
 
-**Status, 2026-09-23: implemented; the hands-on paste test is still TO DO.**
+**Status, 2026-10-03: implemented and smoke-tested.** Through `mynah-kde`,
+dictation pasted correctly into Brave, Telegram, Zed and Kate (the owner's
+test). Konsole (where only the primary selection pastes) and Warp are not
+tried yet. The spike tool and its `.desktop` grants are gone; what follows
+is the record of how the route was chosen.
 
 What landed:
 - **`PasteTyper`** (`linux/common/paste_typer.*`), the policy, is
@@ -387,12 +391,32 @@ convention to keep); there is no "Reveal Log…" (the log goes to the
 journal); and "Accessibility/Microphone" became "Typing".
 
 Open:
-- **The NVIDIA opt-in when launched from the menu.** This machine's
-  `VK_LOADER_DRIVERS_DISABLE=*nvidia*` hides the dGPU from every app, and
-  a launcher that wraps `env -u` may break KWin's Exec-path match for
-  the fake-input grant. Until that is settled, run it with
-  `env -u VK_LOADER_DRIVERS_DISABLE build/linux/kde/mynah-kde`.
-- The turbo voice test, and the Stage 3 paste test, through the app.
+- **The NVIDIA opt-in when launched from the menu: done (K8, 2026-10-03).**
+  KWin's grant rule, measured: it matches the RUNNING executable against
+  `.desktop` files whose `Exec` starts with that exact path. A plain
+  `Exec=/usr/bin/x` grants, however the process was started (even through
+  `env …`). `Exec=env … /usr/bin/x` grants nothing, and a same-id override
+  shadows the packaged entry. So wrapping launchers were rejected (option B),
+  and so was `gpuwho allow` (option C: its override would cost typing and
+  not cover autostart or the service). Instead (option A), `gpu = on` (the
+  default) makes mynah lift the session's hiding for its own process only.
+  `linux/common/gpu_env.*` drops the `VK_LOADER_DRIVERS_DISABLE` patterns
+  that match `nvidia_icd.json`, keeps the rest, and does it before Vulkan
+  starts, in both the CLI and `mynah-kde`. That covers the menu, Start at
+  Login, the systemd unit and a terminal alike. The KWin grant moved into its
+  own hidden `mynah-kde-typing.desktop`, so no launcher override can take
+  typing away. Checked live: launched plainly with `*nvidia*` in its
+  environment, the app ran on the RTX, the tray said "Typing: ready", and
+  the dGPU was in D3cold while idle.
+- **The live-usage reports:** the owner is collecting polish notes from
+  daily use (2026-10-03).
+
+**Future UI (owner's wish, 2026-10-03), for macOS and Linux both:** an
+animated bird in the pill, and a distinct rendering for each state —
+loading (the model is coming up, nothing is listened to yet), listening,
+transcribing, and idle — instead of today's single glyph recoloured by a
+tint. The two pills are meant to stay the same design (K6), so this is one
+design for both: `IndicatorPanel.swift` and `linux/kde/qml/Pill.qml`.
 
 The original plan for this stage:
 
@@ -488,3 +512,4 @@ and an `UnsetEnvironment=` line in the service unit in Stage 4.
 | K5 | Use the RTX 5070 at all? | **Revised 2026-09-23: by default** (`gpu = on` is the new default). It wakes for a session and sleeps on its own afterwards, see "The dGPU's sleep" |
 | K6 | The look of `mynah-kde` | **Decided 2026-09-22: follow the macOS app** |
 | K7 | The first ~3 s of speech after the 45 s unload are dropped while turbo reloads | **Decided 2026-09-23: capture from the press, and wake the GPU at the press**; the 45 s unload stays. See below |
+| K8 | A session that hides the NVIDIA GPU from apps (`VK_LOADER_DRIVERS_DISABLE`) | **Decided 2026-10-03: `gpu = on` (default) lifts it for mynah's own process**, because an iGPU is too slow for turbo. `gpu = off` keeps the session's hiding. Changing it takes a restart, since the Vulkan loader reads the variable once |

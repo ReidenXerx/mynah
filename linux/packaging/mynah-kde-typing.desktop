@@ -1,0 +1,11 @@
+# Not a launcher (NoDisplay): how KWin decides that /usr/bin/mynah-kde may
+# press keys. KWin hands org_kde_kwin_fake_input only to a binary named by
+# the Exec of an installed .desktop file listing it here — matched by path,
+# so this Exec must stay the bare binary. Kept apart from the launcher
+# (mynah-kde.desktop) so nothing that overrides the launcher can remove it.
+[Desktop Entry]
+Type=Application
+Name=mynah typing permission
+Exec=/usr/bin/mynah-kde
+NoDisplay=true
+X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input

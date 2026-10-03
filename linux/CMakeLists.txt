@@ -17,6 +17,7 @@ find_package(OpenSSL REQUIRED)
 add_library(mynah-linux-common STATIC
     common/control_socket.cpp
     common/downloads.cpp
+    common/gpu_env.cpp
     common/injector.cpp
     common/paste_typer.cpp
     common/setup.cpp
@@ -110,6 +111,7 @@ if(MYNAH_BUILD_TESTS)
         tests/test_tiers.cpp
         tests/test_typing_queue.cpp
         tests/test_paste_typer.cpp
+        tests/test_gpu_env.cpp
     )
     target_link_libraries(mynah-linux-tests PRIVATE mynah-linux-common) # carries libmynah
     target_include_directories(mynah-linux-tests PRIVATE

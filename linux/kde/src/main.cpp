@@ -15,6 +15,7 @@
 #include <csignal>
 
 #include "engine_bridge.h"
+#include "gpu_env.hpp"
 #include "pill.h"
 #include "settings_window.h"
 #include "shortcut.h"
@@ -37,6 +38,11 @@ int main(int argc, char** argv) {
         QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 
     KDBusService service(KDBusService::Unique);
+
+    // Before the engine starts Vulkan: `gpu = on` lifts a session's NVIDIA
+    // hiding for this process alone (gpu_env.hpp) — so the menu entry and
+    // Start at Login reach the discrete GPU without a wrapping launcher.
+    mynah::gpu_env::apply_configured();
 
     EngineBridge bridge;
     bridge.start(); // a failure is shown in the tray, which can retry

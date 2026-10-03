@@ -16,6 +16,7 @@
 
 #include "downloads.hpp"
 #include "engine_bridge.h"
+#include "gpu_env.hpp"
 #include "models/table.hpp"
 #include "mynah/mynah.h"
 #include "shortcut.h"
@@ -112,6 +113,8 @@ QString ModelManager::device() const {
     if (auto gpu = mynah::stt::pick_gpu(discrete)) return QString::fromStdString(gpu->name);
     return QStringLiteral("the CPU");
 }
+
+bool ModelManager::gpuHidden() const { return mynah::gpu_env::was_hidden(); }
 
 QString ModelManager::formatBytes(double bytes) {
     return QLocale().formattedDataSize(qint64(bytes), 1, QLocale::DataSizeSIFormat);

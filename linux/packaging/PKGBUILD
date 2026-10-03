@@ -104,8 +104,11 @@ package_mynah-kde() {
     conflicts=('mynah-kde-git')
 
     install -Dm755 build/linux/kde/mynah-kde "$pkgdir/usr/bin/mynah-kde"
-    # The launcher, and KWin's permission for the paste chord (see the file).
+    # The launcher, and — apart from it, so no launcher override can take
+    # it away — KWin's permission for the paste chord (see the files).
     install -Dm644 "$srcdir/mynah/linux/packaging/mynah-kde.desktop" \
         "$pkgdir/usr/share/applications/mynah-kde.desktop"
+    install -Dm644 "$srcdir/mynah/linux/packaging/mynah-kde-typing.desktop" \
+        "$pkgdir/usr/share/applications/mynah-kde-typing.desktop"
     install -Dm644 "$srcdir/mynah/LICENSE" "$pkgdir/usr/share/licenses/mynah-kde/LICENSE"
 }

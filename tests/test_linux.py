@@ -592,14 +592,14 @@ def test_the_clipboard_is_borrowed_and_given_back(monkeypatch):
 
     written: list[str] = []
 
+    def fake_read(argv, limit, deadline):
+        return b"text/plain\n" if "--list-types" in argv else b"what was there before"
+
     def fake_run(argv, **kwargs):
-        if argv[0].endswith("wl-paste") and "--list-types" in argv:
-            return mock.Mock(returncode=0, stdout="text/plain\n")
-        if argv[0].endswith("wl-paste"):
-            return mock.Mock(returncode=0, stdout="what was there before")
         written.append(kwargs.get("input", ""))
         return mock.Mock(returncode=0, stdout="")
 
+    monkeypatch.setattr(clip, "_bounded_output", fake_read)
     with mock.patch("subprocess.run", fake_run):
         injector.type_text("the fee is computed")
         deadline = time.monotonic() + 2
@@ -633,8 +633,25 @@ def test_an_image_on_the_clipboard_is_left_alone():
 
     injector = clip.ClipboardInjector()
     injector._paste = "/usr/bin/wl-paste"
-    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0, stdout="image/png\n")):
+    with mock.patch.object(clip, "_bounded_output", return_value=b"image/png\n"):
         assert injector._read_clipboard() is None
+
+
+def test_a_foreign_clipboard_offer_is_read_within_bounds(tmp_path):
+    """The clipboard's provider is another app: it decides how much it sends
+    and how fast. The read stops at a byte limit and at one deadline for the
+    whole transfer, and either way nothing is put back."""
+    from mynah.providers import linux_clipboard as clip
+
+    assert clip._bounded_output(["/usr/bin/printf", "hello"], 16, 2.0) == b"hello"
+    assert clip._bounded_output(["/usr/bin/head", "-c", "100000", "/dev/zero"], 4096, 2.0) is None
+    started = time.monotonic()
+    assert clip._bounded_output(["/usr/bin/sleep", "10"], 4096, 0.3) is None
+    assert time.monotonic() - started < 2
+    # An endless stream ends at the limit, not when memory runs out.
+    assert clip._bounded_output(["/usr/bin/yes"], 1 << 20, 5.0) is None
+    assert clip._bounded_output(["/usr/bin/false"], 16, 2.0) is None
+    assert clip._bounded_output(["/nonexistent/wl-paste"], 16, 2.0) is None
 
 
 def test_the_chord_goes_through_the_compositor(monkeypatch):

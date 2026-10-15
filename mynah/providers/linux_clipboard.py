@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import selectors
 import shutil
 import subprocess
 import threading
@@ -49,6 +50,55 @@ TERMINAL_CLASSES = (
     "gnome-terminal", "xterm", "urxvt", "terminator", "tilix", "blackbox",
     "org.wezfurlong", "com.mitchellh.ghostty", "st-256color",
 )
+
+
+# What another app's clipboard offer may cost us. The offer is foreign: its
+# provider decides how much it sends and how fast, so it is read against a
+# byte limit and one deadline for the whole transfer. Text bigger than the
+# limit is not put back; dictating over it leaves it replaced, which beats
+# holding an unbounded copy in the engine.
+CLIPBOARD_MAX = 1024 * 1024
+TYPES_MAX = 16 * 1024
+READ_DEADLINE = 2.0
+
+
+def _bounded_output(argv: list[str], limit: int, deadline: float) -> bytes | None:
+    """The command's output, or None when it fails, says more than `limit`
+    bytes, or has not finished within `deadline` seconds in all."""
+    try:
+        proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except OSError:
+        return None
+    end = time.monotonic() + deadline
+    chunks: list[bytes] = []
+    size = 0
+    ok = False
+    try:
+        with selectors.DefaultSelector() as sel:
+            sel.register(proc.stdout, selectors.EVENT_READ)
+            while True:
+                left = end - time.monotonic()
+                if left <= 0 or not sel.select(left):
+                    break
+                chunk = os.read(proc.stdout.fileno(), 65536)
+                if not chunk:
+                    ok = True
+                    break
+                size += len(chunk)
+                if size > limit:
+                    break
+                chunks.append(chunk)
+        if ok:
+            proc.wait(timeout=max(0.0, end - time.monotonic()))
+            ok = proc.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        ok = False
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        proc.stdout.close()
+    return b"".join(chunks) if ok else None
 
 
 def _tool(name: str) -> str | None:
@@ -105,19 +155,16 @@ class ClipboardInjector(TextInjector):
         """
         if self._paste is None:
             return None
-        try:
-            types = subprocess.run(
-                [self._paste, "--list-types"], capture_output=True, text=True, timeout=2, check=False
-            )
-            if types.returncode != 0 or "text/plain" not in types.stdout:
-                return None
-            done = subprocess.run(
-                [self._paste, "--no-newline", "--type", "text/plain"],
-                capture_output=True, text=True, timeout=2, check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
+        types = _bounded_output([self._paste, "--list-types"], TYPES_MAX, READ_DEADLINE)
+        if types is None or b"text/plain" not in types:
             return None
-        return done.stdout if done.returncode == 0 else None
+        data = _bounded_output([self._paste, "--no-newline", "--type", "text/plain"], CLIPBOARD_MAX, READ_DEADLINE)
+        if data is None:
+            return None
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
 
     def _write_clipboard(self, text: str) -> bool:
         """Put the text on the clipboard.

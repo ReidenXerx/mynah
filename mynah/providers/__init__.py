@@ -53,7 +53,13 @@ def _register_linux() -> None:
     _STT_PROVIDERS["whisper-cpp"] = ("linux", lambda: _import_attr(
         "mynah.providers.linux_stt", "WhisperCppProvider"))
     _AVAILABLE["whisper-cpp"] = lambda: _probe("mynah.providers.linux_stt", "find_binary")
-    # Registered first, so auto-detect picks it: types with wtype, and pastes
+    # On Plasma first, since KWin offers no virtual keyboard and wtype cannot
+    # type there at all: the clipboard and a paste chord through the desktop's
+    # RemoteDesktop portal (linux_plasma.py). Unavailable everywhere else.
+    _INJECTORS["plasma"] = ("linux", lambda: _import_attr(
+        "mynah.providers.linux_plasma", "PlasmaInjector"))
+    _AVAILABLE["plasma"] = lambda: _probe("mynah.providers.linux_plasma", "_plasma_ready")
+    # Next, so auto-detect picks it elsewhere: types with wtype, and pastes
     # into the apps that ignore a virtual keyboard's keymap (see
     # linux_clipboard.SmartInjector).
     _INJECTORS["smart"] = ("linux", lambda: _import_attr(

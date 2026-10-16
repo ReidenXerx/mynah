@@ -873,3 +873,46 @@ def test_the_origin_is_only_trusted_when_it_is_a_url(monkeypatch):
 
     monkeypatch.setattr(meta, "Distribution", FakeDistribution)
     assert preflight._origin() == ""
+
+
+# ---------------------------------------------------------------------------
+# Plasma: the clipboard and a paste chord through the RemoteDesktop portal
+# ---------------------------------------------------------------------------
+
+from mynah.providers import linux_plasma  # noqa: E402
+
+
+def test_plasma_is_chosen_only_on_a_plasma_wayland_session(monkeypatch):
+    monkeypatch.setattr(linux_plasma, "_system_gi", lambda: True)
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    for desktop, expected in (("KDE", True), ("Hyprland", False), ("GNOME", False), ("ubuntu:KDE", True)):
+        monkeypatch.setenv("XDG_CURRENT_DESKTOP", desktop)
+        assert linux_plasma._plasma_ready() is expected, desktop
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    monkeypatch.delenv("WAYLAND_DISPLAY")
+    assert linux_plasma._plasma_ready() is False
+
+
+def test_plasma_types_through_the_system_python_with_the_text_on_stdin(tmp_path):
+    calls = []
+
+    def run(argv, **kw):
+        calls.append((argv, kw))
+        return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+    with mock.patch.object(linux_plasma.subprocess, "run", run), \
+         mock.patch.object(linux_plasma.control, "publish") as published:
+        linux_plasma.PlasmaInjector().type_text("сказане слово")
+    argv, kw = calls[0]
+    assert argv == [linux_plasma.SYSTEM_PYTHON, "-I", str(linux_plasma.SCRIPT), "--auto"]
+    assert kw["input"] == "сказане слово".encode("utf-8")
+    assert all("сказане" not in part for part in argv)
+    published.assert_called_once_with({"event": "text", "text": "сказане слово"})
+
+
+def test_a_failed_paste_on_plasma_publishes_nothing():
+    with mock.patch.object(linux_plasma.subprocess, "run",
+                           lambda argv, **kw: subprocess.CompletedProcess(argv, 1, b"", b"plasma-type: denied")), \
+         mock.patch.object(linux_plasma.control, "publish") as published:
+        linux_plasma.PlasmaInjector().type_text("x")
+    published.assert_not_called()

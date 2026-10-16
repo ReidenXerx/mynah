@@ -378,15 +378,15 @@ calibration_speech_floor  = <span class="cmd">0.03</span>   <span class="dim"># 
       <tbody>
         <tr><th scope="row">The engine, segmentation and tuning</th><td class="shared" colspan="2">one implementation, shared — a platform never re-derives it</td></tr>
         <tr><th scope="row">Speech, on your own hardware</th><td>mlx-whisper, Apple GPU</td><td>whisper.cpp</td></tr>
-        <tr><th scope="row">Typing into the focused window</th><td>Accessibility API</td><td>wtype, on wlroots and KDE</td></tr>
-        <tr><th scope="row">The hotkey</th><td>pynput</td><td>your compositor's, bound to mynah toggle</td></tr>
-        <tr><th scope="row">Indicator and menu</th><td>native pill and menu bar</td><td>the shell's, through mynah watch</td></tr>
+        <tr><th scope="row">Typing into the focused window</th><td>Accessibility API</td><td>wtype on wlroots compositors; on KDE Plasma, a paste through the RemoteDesktop portal</td></tr>
+        <tr><th scope="row">The hotkey</th><td>pynput</td><td>your compositor's, bound to mynah toggle; on Plasma, the widget's own shortcut</td></tr>
+        <tr><th scope="row">Indicator and menu</th><td>native pill and menu bar</td><td>the shell's, through mynah watch; on Plasma, the Mynah widget and its pill</td></tr>
         <tr><th scope="row">Runs at login</th><td>SMAppService</td><td>systemd --user</td></tr>
         <tr><th scope="row">Where the face comes from</th><td>Mynah.app, no Python at runtime</td><td>the desktop&rsquo;s own shell</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note" style="margin-top: 16px;">Wayland only on Linux, deliberately: on X11 any client can already read the keyboard and inject keystrokes, so there is nothing to grant and nothing to revoke. The gap is GNOME, which does not implement the virtual-keyboard protocol <code>wtype</code> needs; a portal injector for it is not written yet.</p>
+  <p class="note" style="margin-top: 16px;">Wayland only on Linux, deliberately: on X11 any client can already read the keyboard and inject keystrokes, so there is nothing to grant and nothing to revoke. KDE Plasma does not offer that protocol either, so there Mynah pastes instead: the text goes onto the clipboard through Klipper, paste is pressed through the desktop&rsquo;s RemoteDesktop portal (Plasma asks once and remembers), and your clipboard is put back a moment later; dictated text therefore passes through Plasma&rsquo;s clipboard history. The <a href="https://duduphudu.app/plasma/#mynah">Plasma widget</a> is in testing and needs engine commit <code>45a6a54</code> or later. GNOME is the remaining gap: the same portal route should work there, but it is not tried yet.</p>
 </section>
 
 <section id="install">

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the C++ core and the pinned whisper.cpp, and install them into
+# Build the C++ core, the pinned whisper.cpp and ThorVG, and install them into
 # vendor/install — where the CMynah module map and Package.swift's link line
 # point (Phase 5: the app runs on the core, so this replaces
 # build-whisper.sh, which built only whisper.cpp).
@@ -21,11 +21,13 @@ PREFIX="$ROOT/vendor/install"
 # Must match Package.swift and build-app.sh.
 DEPLOYMENT_TARGET="13.0"
 
-if [ ! -f "$REPO/third_party/whisper.cpp/CMakeLists.txt" ]; then
-  echo "error: the whisper.cpp submodule is missing. Run:" >&2
-  echo "  git submodule update --init --recursive" >&2
-  exit 1
-fi
+for submodule in whisper.cpp/CMakeLists.txt thorvg/inc/thorvg.h; do
+  if [ ! -f "$REPO/third_party/$submodule" ]; then
+    echo "error: the ${submodule%%/*} submodule is missing. Run:" >&2
+    echo "  git submodule update --init --recursive" >&2
+    exit 1
+  fi
+done
 
 # Skip the (slow) rebuild only when nothing that goes into the install tree
 # has changed. Everything the library is built FROM has to be in this list:
@@ -33,14 +35,16 @@ fi
 # a pass. (The sources and headers were checked from the start; the build
 # files and the pinned whisper.cpp were not — and a submodule bump answered
 # by yesterday's libwhisper is exactly the silent version skew M6 exists to
-# prevent.)
-WHISPER_COMMIT="$(git -C "$REPO/third_party/whisper.cpp" rev-parse HEAD 2>/dev/null || echo unknown)"
+# prevent.) The bird's Lottie file is compiled into libmynah, and ThorVG is
+# built from its own list in thorvg.cmake: both are inputs too.
+BUILT_FROM="$(git -C "$REPO/third_party/whisper.cpp" rev-parse HEAD 2>/dev/null || echo unknown) $(git -C "$REPO/third_party/thorvg" rev-parse HEAD 2>/dev/null || echo unknown)"
 STAMP="$PREFIX/.built-from"
 if [ -f "$PREFIX/lib/libmynah.a" ] &&
    [ -z "$(find "$REPO/core/include" "$REPO/core/src" "$REPO/core/CMakeLists.txt" \
-            "$REPO/CMakeLists.txt" "$ROOT/scripts/build-core.sh" \
+            "$REPO/CMakeLists.txt" "$REPO/third_party/thorvg.cmake" "$REPO/assets/bird/bird.json" \
+            "$ROOT/scripts/build-core.sh" \
             -newer "$PREFIX/lib/libmynah.a" 2>/dev/null)" ] &&
-   [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$WHISPER_COMMIT" ]; then
+   [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$BUILT_FROM" ]; then
   echo "core already built at $PREFIX (delete vendor/install to force)"
   exit 0
 fi
@@ -68,7 +72,7 @@ cmake --build "$BUILD" --config Release -j "$(sysctl -n hw.ncpu)"
 cmake --install "$BUILD" > /dev/null
 
 # What this install was built from, for the freshness check above.
-printf '%s' "$WHISPER_COMMIT" > "$STAMP"
+printf '%s' "$BUILT_FROM" > "$STAMP"
 
 echo "installed to $PREFIX"
 find "$PREFIX/lib" -name '*.a' | sed 's|.*/|  |'

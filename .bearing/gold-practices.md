@@ -278,3 +278,16 @@ is not "written" — it is a draft.
 *Scar:* the whole Linux front end (`linux/`) passed 41 tests on a Mac while containing a child-process
 fd leak that hung dictation on the first utterance, a downloader that wrote zero bytes, and a
 `stop()` that would have hung forever on Linux.
+
+**PP-3 — Before vendoring a library, list what it defines outside its own namespace.** A static
+library brings its globals into every binary that pulls in one of its objects, and some globals are
+*replaceable*: `operator new`/`delete`, `malloc`, signal handlers, `atexit` hooks. One of those
+changes the whole process — every allocation in whisper.cpp, Qt and the core — not just the library.
+`nm -C --defined-only lib.a | grep -v ' ns::'` takes a second; read it before the first link.
+
+*Scar:* ThorVG v1.1.3 (the pill's bird renderer) replaces the global `operator new`/`delete` with
+plain `malloc`/`free` in `tvgInitializer.cpp`: its `new` returns nullptr instead of throwing
+`std::bad_alloc`, and it omits the sized delete, so the core's ASan suite failed on whisper.cpp's own
+`std::map` as soon as `mynah_bird_*` linked in — the bird tests themselves had all passed.
+`third_party/thorvg.cmake` now compiles that file from a copy without the four definitions, and
+stops configure if a bump changes them.

@@ -42,6 +42,7 @@
 #define MYNAH_MYNAH_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -158,6 +159,37 @@ int mynah_language_count(void);             /* languages 0..count-1 */
 const char *mynah_language_code(int id);    /* NULL out of range */
 const char *mynah_language_name(int id);    /* full name, NULL out of range */
 int mynah_language_id(const char *code);    /* -1 when unknown */
+
+/* --- the pill's bird (docs/LINUX-KDE-PLAN.md, "Animated bird") ------------- */
+
+/* The animated bird in the pill, rendered by the core from the Lottie file
+ * compiled into it (assets/bird/bird.json). Every front end gets the same
+ * frames AND the same behaviour — which transition a state change plays,
+ * and how a change mid-transition turns back from the pose the bird is in —
+ * because none of it lives in a front end.
+ *
+ * A front end tells the bird the engine's state and renders it at its own
+ * clock: `now` is seconds on any monotonic clock, the same one for every
+ * call. Not thread-safe: use every bird from one thread (the UI thread). */
+typedef struct mynah_bird mynah_bird;
+
+mynah_bird *mynah_bird_create(void);   /* NULL if the renderer could not start */
+void        mynah_bird_destroy(mynah_bird *bird);
+
+/* The engine's state. LOADING and LISTENING are the listening pose — audio
+ * is captured from the press, model loaded or not — IDLE and TRANSCRIBING
+ * the resting one; a change between the two plays the transition. */
+void        mynah_bird_set_state(mynah_bird *bird, mynah_state state, double now);
+
+/* The desktop's reduce-motion setting: transitions jump to their end pose. */
+void        mynah_bird_set_reduced_motion(mynah_bird *bird, int reduced);
+
+/* Render the bird as it is at `now` into width*height pixels of
+ * premultiplied ARGB — 0xAARRGGBB per uint32_t, row-major — fitted and
+ * centred. Returns 1 while it is moving (render again next frame), 0 once
+ * it rests (nothing changes until the next set_state), -1 on error. */
+int         mynah_bird_render(mynah_bird *bird, double now, uint32_t *argb_premultiplied,
+                              int width, int height);
 
 /* --- event accessors (no public layout) ----------------------------------- */
 

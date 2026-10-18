@@ -2,8 +2,8 @@
 //
 // A 168×44 capsule, 80 px above the bottom edge of the screen, centred; a
 // layer-shell overlay, so it floats over everything, takes no focus and
-// lets clicks through. The bird and five bars in the state's tint; blur
-// behind. Fades in and out over 0.18 s. Shown when `show_indicator` is on:
+// lets clicks through. The animated bird (BirdItem, rendered by the core)
+// and five bars in the state's tint; blur behind. Fades in and out over 0.18 s. Shown when `show_indicator` is on:
 // always with `idle_visible`, otherwise while a session is engaged — both
 // read once at launch, as on macOS ("takes effect after you reopen").
 

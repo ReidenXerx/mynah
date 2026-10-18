@@ -85,10 +85,13 @@ final class IndicatorPanel {
     }
 }
 
-/// The pill's contents: vibrancy background, the bird, five waveform bars.
+/// The pill's contents: vibrancy background, the animated bird (40×40,
+/// rendered by the core — `BirdView`), five waveform bars. The KDE pill
+/// (`linux/kde/qml/Pill.qml`) matches it number for number.
 struct IndicatorView: View {
     @ObservedObject var controller: SessionController
 
+    private static let birdSize: CGFloat = 40
     private static let barCount = 5
     private static let barWidth: CGFloat = 4
     private static let barSpacing: CGFloat = 6
@@ -97,7 +100,8 @@ struct IndicatorView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            MynahLogoView(state: controller.state, size: 20)
+            BirdView(state: controller.state)
+                .frame(width: Self.birdSize, height: Self.birdSize)
             HStack(spacing: Self.barSpacing) {
                 ForEach(0..<Self.barCount, id: \.self) { index in
                     Capsule()

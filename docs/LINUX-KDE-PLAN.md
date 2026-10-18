@@ -427,10 +427,30 @@ drawings became a named parts sheet (`assets/bird/tools/group_parts.py` →
 dropped, the drawings differ), imported into Lottie Creator through its
 MCP, tuned with the owner watching, and exported as `assets/bird/bird.json`
 (1024², 60 fps; segments `idle-to-listening` 0–30, `listening` 30–60,
-`listening-to-idle` 60–100, `idle` 100–120). Next: ThorVG as a pinned
-submodule in `third_party/` (not in Arch's repos), one renderer behind the
-C API or a small shared library, the two pills playing the segments on
-state changes, and a static frame under reduced-motion settings.
+`listening-to-idle` 60–100, `idle` 100–120).
+
+Then the renderer, in the core: ThorVG v1.1.3 pinned in `third_party/thorvg`
+and compiled from a list of its sources by `third_party/thorvg.cmake` (it
+builds with Meson; only the CPU raster engine and the Lottie loader, no
+threads). `bird.json` is compiled into libmynah as a byte array, so no
+front end can ship a different bird. The C API is the bird's whole
+behaviour, not a frame server: `mynah_bird_set_state(bird, state, now)` and
+`mynah_bird_render(bird, now, argb, w, h)`, which says whether the bird is
+still moving. LOADING and LISTENING are the listening pose (audio is
+captured from the press, K7), IDLE and TRANSCRIBING the resting one. A
+change that arrives mid-transition plays that transition backwards from
+the frame it is on — starting the other transition at the same fraction
+was measured and jumps (2.7% of the pixels in one frame, more than half of
+the whole idle↔listening change). Reduced motion jumps to the end pose:
+Plasma's animation speed at Instant, macOS's Reduce motion. Tests:
+`core/tests/test_bird.cpp`; frames to look at: `build/core/mynah-bird out/`.
+
+The pills only pass the state and a clock: `BirdItem` (`Bird` in QML) on
+KDE, `BirdView` on macOS, 40×40 — up from the glyph's 20, where the colour
+bird does not read — and in full colour; the bars keep the state's tint.
+The KDE side was checked offscreen (QML import, the state binding, the
+animation, 2× scaling); the macOS side was written without a Mac and is
+unbuilt until the next build there.
 
 The original plan for this stage:
 

@@ -8,7 +8,7 @@ list(APPEND CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 
 find_package(Qt6 6.6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Svg DBus)
 find_package(KF6 6.0 REQUIRED COMPONENTS
-    CoreAddons GlobalAccel StatusNotifierItem WindowSystem DBusAddons I18n)
+    CoreAddons Config GlobalAccel StatusNotifierItem WindowSystem DBusAddons I18n)
 find_package(LayerShellQt REQUIRED)
 
 qt_standard_project_setup()
@@ -19,6 +19,7 @@ add_executable(mynah-kde
     src/tray.cpp
     src/shortcut.cpp
     src/pill.cpp
+    src/bird_item.cpp
     src/autostart.cpp
     src/settings_window.cpp
     resources.qrc
@@ -28,7 +29,7 @@ target_compile_definitions(mynah-kde PRIVATE MYNAH_VERSION="${PROJECT_VERSION}")
 target_link_libraries(mynah-kde PRIVATE
     mynah-linux-common
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg Qt6::DBus
-    KF6::CoreAddons KF6::GlobalAccel KF6::StatusNotifierItem KF6::WindowSystem
+    KF6::CoreAddons KF6::ConfigCore KF6::GlobalAccel KF6::StatusNotifierItem KF6::WindowSystem
     KF6::DBusAddons KF6::I18n
     LayerShellQt::Interface)
 

@@ -1,9 +1,11 @@
 // The floating pill — the macOS app's IndicatorPanel, number for number
 // (macos/Sources/MynahApp/UI/IndicatorPanel.swift): a 168×44 capsule, the
-// bird (20×20) and five 4-wide bars 6 apart in the state's tint, 14 left
-// padding, 12 between; heights 4…22 from the level with a slight fan
-// across the bars, eased over 0.08 s; the whole pill fades over 0.18 s.
+// animated bird (40×40, rendered by the core: BirdItem) and five 4-wide
+// bars 6 apart in the state's tint, 14 left padding, 12 between; heights
+// 4…22 from the level with a slight fan across the bars, eased over
+// 0.08 s; the whole pill fades over 0.18 s.
 import QtQuick
+import org.mynah
 
 Item {
     id: root
@@ -37,10 +39,12 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
 
-        BirdMark {
-            width: 20
-            height: 20
-            color: root.tint
+        // Full colour, not tinted: the state shows in its pose (the wing
+        // up while listening) and in the bars.
+        Bird {
+            width: 40
+            height: 40
+            engineState: Mynah.state
             anchors.verticalCenter: parent.verticalCenter
         }
 

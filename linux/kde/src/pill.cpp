@@ -3,10 +3,12 @@
 #include <KWindowEffects>
 #include <LayerShellQt/Window>
 #include <QQmlContext>
+#include <QQmlEngine>
 #include <QQuickView>
 #include <QRegion>
 #include <QTimer>
 
+#include "bird_item.h"
 #include "engine_bridge.h"
 
 namespace {
@@ -32,6 +34,7 @@ Pill::Pill(EngineBridge* bridge, QObject* parent) : QObject(parent), bridge_(bri
     idle_visible_ = config.value(QStringLiteral("idle_visible"), false).toBool();
     if (!enabled_) return;
 
+    qmlRegisterType<BirdItem>("org.mynah", 1, 0, "Bird");
     view_ = new QQuickView();
     view_->setColor(Qt::transparent);
     view_->setFlags(Qt::FramelessWindowHint | Qt::WindowTransparentForInput |

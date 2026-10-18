@@ -122,6 +122,10 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 add_subdirectory(third_party/whisper.cpp)
 
+# ThorVG, the Lottie renderer for the pill's bird — compiled from its
+# sources by third_party/thorvg.cmake (it builds with Meson, not CMake).
+include(third_party/thorvg.cmake)
+
 # The Linux front end: only where it can build — its socket/injector layer
 # is POSIX and compiles on the dev Mac; PipeWire capture and the `mynah`
 # binary need libpipewire and stay Linux-only (see linux/CMakeLists.txt).

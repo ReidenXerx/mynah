@@ -64,9 +64,10 @@ let package = Package(
             // `vendor/install`, produced by `scripts/build-core.sh`.
             //
             // Link order matters for static archives: dependents before
-            // dependencies — mynah -> whisper -> ggml -> backends -> base.
+            // dependencies — mynah -> whisper -> ggml -> backends -> base,
+            // and ThorVG (the pill's bird, mynah_bird_*) after mynah.
             //
-            // -lc++ is required: the core, whisper.cpp and ggml are C++,
+            // -lc++ is required: the core, whisper.cpp, ggml and ThorVG are C++,
             // and Swift does not link libc++ for a static archive reached
             // through a C module map.
             cSettings: [
@@ -78,6 +79,7 @@ let package = Package(
             linkerSettings: [
                 .unsafeFlags([
                     "\(vendorLib)/libmynah.a",
+                    "\(vendorLib)/libthorvg.a",
                     "\(vendorLib)/libwhisper.a",
                     "\(vendorLib)/libggml.a",
                     "\(vendorLib)/libggml-metal.a",

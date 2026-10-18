@@ -26,8 +26,9 @@ makedepends=(
 )
 
 source=("git+https://github.com/ReidenXerx/mynah.git"
-        "git+https://github.com/ggml-org/whisper.cpp.git")
-sha256sums=('SKIP' 'SKIP')
+        "git+https://github.com/ggml-org/whisper.cpp.git"
+        "git+https://github.com/thorvg/thorvg.git")
+sha256sums=('SKIP' 'SKIP' 'SKIP')
 
 pkgver() {
     cd "$srcdir/mynah"
@@ -43,14 +44,16 @@ pkgver() {
     fi
 }
 
-# third_party/whisper.cpp is a git submodule, and makepkg does not fetch
-# submodules: without this the configure step finds an empty directory.
-# The submodule is pointed at the clone makepkg already made (the second
-# source), and checked out at exactly the commit the repository pins (M6).
+# third_party/whisper.cpp and third_party/thorvg (the bird's renderer) are
+# git submodules, and makepkg does not fetch submodules: without this the
+# configure step finds empty directories. Each is pointed at the clone
+# makepkg already made (the later sources), and checked out at exactly the
+# commit the repository pins (M6).
 prepare() {
     cd "$srcdir/mynah"
     git submodule init
     git config submodule.third_party/whisper.cpp.url "$srcdir/whisper.cpp"
+    git config submodule.third_party/thorvg.url "$srcdir/thorvg"
     git -c protocol.file.allow=always submodule update
 }
 

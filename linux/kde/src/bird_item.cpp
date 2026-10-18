@@ -60,6 +60,37 @@ void BirdItem::setModelStatus(const QString& status) {
     tick();
 }
 
+void BirdItem::setLevel(qreal level) {
+    if (qFuzzyCompare(level + 1.0, level_ + 1.0)) return;
+    level_ = level;
+    passVoice();
+    emit voiceChanged();
+}
+
+void BirdItem::setBands(const QList<qreal>& bands) {
+    if (bands == bands_) return;
+    bands_ = bands;
+    passVoice();
+    emit voiceChanged();
+}
+
+void BirdItem::passVoice() {
+    // Both arrive from the one level event, as two bindings; each passes
+    // the pair, and the second leaves it right.
+    if (!bird_) return;
+    float bands[MYNAH_SPECTRUM_BANDS];
+    const bool full = bands_.size() == MYNAH_SPECTRUM_BANDS;
+    for (int i = 0; full && i < MYNAH_SPECTRUM_BANDS; ++i) bands[i] = float(bands_[i]);
+    mynah_bird_set_voice(bird_, float(level_), full ? bands : nullptr, now());
+}
+
+void BirdItem::setWaves(bool waves) {
+    if (waves == waves_) return;
+    waves_ = waves;
+    emit wavesChanged();
+    tick();
+}
+
 void BirdItem::readReducedMotion() {
     const KConfigGroup group = kdeglobals_->config()->group(QStringLiteral("KDE"));
     const double factor = group.readEntry("AnimationDurationFactor", 1.0);
@@ -78,8 +109,9 @@ void BirdItem::tick() {
     if (image_.size() != size) image_ = QImage(size, QImage::Format_ARGB32_Premultiplied);
     // ARGB32 rows are exactly width * 4 bytes, and Qt keeps the pixels as
     // 0xAARRGGBB words — the layout mynah_bird_render writes.
-    const int moving = mynah_bird_render(bird_, now(), reinterpret_cast<uint32_t*>(image_.bits()),
-                                         size.width(), size.height());
+    auto* pixels = reinterpret_cast<uint32_t*>(image_.bits());
+    const int moving = waves_ ? mynah_bird_render_pill(bird_, now(), pixels, size.width(), size.height())
+                              : mynah_bird_render(bird_, now(), pixels, size.width(), size.height());
     if (moving < 0) image_.fill(Qt::transparent);
     image_.setDevicePixelRatio(ratio);
     update();

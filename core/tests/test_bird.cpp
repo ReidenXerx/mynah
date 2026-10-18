@@ -8,6 +8,7 @@
 #include "vendor/doctest.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
@@ -278,6 +279,170 @@ TEST_CASE("any size: fitted and centred, keeping the aspect") {
     CHECK(body(render(bird.get(), 0.0)) > 0.9);
 }
 
+// --- the pill: the bird in its circle, the voice as its rim pulsing --------
+
+namespace {
+
+constexpr int kSide = 128;
+constexpr double kRadius = kSide * MYNAH_PILL_CIRCLE / 2.0;
+
+Frame pill(mynah_bird* bird, double now) {
+    Frame frame;
+    frame.argb.assign(std::size_t(kSide) * kSide, 0xdeadbeef);
+    frame.moving = mynah_bird_render_pill(bird, now, frame.argb.data(), kSide, kSide);
+    return frame;
+}
+
+// The painted fraction of the ring between `inner` and `outer` (multiples
+// of the circle's radius) around the centre.
+double annulus(const Frame& frame, double inner, double outer, uint32_t min_alpha = 96) {
+    int painted = 0, total = 0;
+    for (int y = 0; y < kSide; ++y)
+        for (int x = 0; x < kSide; ++x) {
+            const double dx = x + 0.5 - kSide / 2.0, dy = y + 0.5 - kSide / 2.0;
+            const double r = std::sqrt(dx * dx + dy * dy) / kRadius;
+            if (r < inner || r >= outer) continue;
+            ++total;
+            if ((frame.argb[std::size_t(y) * kSide + x] >> 24) > min_alpha) ++painted;
+        }
+    return total ? double(painted) / total : 0.0;
+}
+// The rim the rings rest on, and the margin they swell into.
+double rim(const Frame& frame) { return annulus(frame, 0.98, 1.10); }
+double reach(const Frame& frame) { return annulus(frame, 1.16, 1.45); }
+
+// The rings' colour: the mean of their solid pixels around the rim
+// (premultiplied, so compare channels with each other, not with a tint).
+struct Colour {
+    double r = 0, g = 0, b = 0;
+};
+Colour ring_colour(const Frame& frame) {
+    Colour sum;
+    int n = 0;
+    for (int y = 0; y < kSide; ++y)
+        for (int x = 0; x < kSide; ++x) {
+            const double dx = x + 0.5 - kSide / 2.0, dy = y + 0.5 - kSide / 2.0;
+            const double r = std::sqrt(dx * dx + dy * dy) / kRadius;
+            const uint32_t px = frame.argb[std::size_t(y) * kSide + x];
+            if (r < 1.0 || (px >> 24) < 200) continue;
+            sum.r += (px >> 16) & 255;
+            sum.g += (px >> 8) & 255;
+            sum.b += px & 255;
+            ++n;
+        }
+    if (n) sum = {sum.r / n, sum.g / n, sum.b / n};
+    return sum;
+}
+
+// The bird in the middle of the circle.
+double bird_in_circle(const Frame& frame) {
+    int painted = 0, total = 0;
+    for (int y = int(kSide * 0.42); y < int(kSide * 0.58); ++y)
+        for (int x = int(kSide * 0.42); x < int(kSide * 0.58); ++x, ++total)
+            if ((frame.argb[std::size_t(y) * kSide + x] >> 24) > 128) ++painted;
+    return double(painted) / total;
+}
+
+void loud(mynah_bird* bird, double now, float low, float mid, float high) {
+    float bands[MYNAH_SPECTRUM_BANDS] = {};
+    for (int b = 0; b < 4; ++b) {
+        bands[b] = low;
+        bands[4 + b] = mid;
+        bands[8 + b] = high;
+    }
+    mynah_bird_set_voice(bird, 0.9f, bands, now);
+}
+
+} // namespace
+
+TEST_CASE("the pill: the bird in the circle, and while idle a still, round rim") {
+    BirdPtr bird = awake_bird();
+    REQUIRE(bird != nullptr);
+    const Frame idle = pill(bird.get(), 0.0);
+    CHECK(idle.moving == 0); // nothing turns while idle
+    CHECK(bird_in_circle(idle) > 0.9);
+    CHECK(rim(idle) > 0.3);    // the rings lie on the rim
+    CHECK(reach(idle) < 0.01); // and nowhere else
+}
+
+TEST_CASE("listening, a loud voice swells the rim, and silence settles it again") {
+    BirdPtr bird = awake_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
+    CHECK(reach(pill(bird.get(), 0.0)) < 0.02); // listening, no voice yet: calm
+    for (double t = 0.0; t <= 0.5; t += 1.0 / 30) loud(bird.get(), t, 0.6f, 0.9f, 0.6f);
+    const Frame swelled = pill(bird.get(), 0.5);
+    CHECK(swelled.moving == 1);
+    CHECK(reach(swelled) > 0.1);
+    // No more voice: after kVoiceStale it counts as silence, and the rings
+    // settle to the calm swing they keep while the engine listens.
+    const Frame calm = pill(bird.get(), 2.0);
+    CHECK(calm.moving == 1); // still turning: the engine still listens
+    CHECK(reach(calm) < 0.02);
+}
+
+TEST_CASE("each ring follows its own band: the same loudness low or high draws different rims") {
+    BirdPtr low = awake_bird(), high = awake_bird();
+    REQUIRE(low != nullptr);
+    REQUIRE(high != nullptr);
+    for (mynah_bird* bird : {low.get(), high.get()}) {
+        mynah_bird_set_state(bird, MYNAH_LISTENING, 0.0);
+        pill(bird, 0.0);
+    }
+    loud(low.get(), 0.4, 0.9f, 0.0f, 0.0f);
+    loud(high.get(), 0.4, 0.0f, 0.0f, 0.9f);
+    const Frame a = pill(low.get(), 0.5), b = pill(high.get(), 0.5);
+    CHECK(reach(a) > 0.03);
+    CHECK(reach(b) > 0.03);
+    CHECK(difference(a, b) > 0.01); // the same clock and loudness: only the bands differ
+}
+
+TEST_CASE("without bands, the level drives all three rings") {
+    BirdPtr bird = awake_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
+    pill(bird.get(), 0.0);
+    mynah_bird_set_voice(bird.get(), 0.9f, nullptr, 0.4);
+    CHECK(reach(pill(bird.get(), 0.5)) > 0.1);
+}
+
+TEST_CASE("the rings take the state's colour: cyan while listening, amber while transcribing") {
+    BirdPtr bird = awake_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
+    pill(bird.get(), 0.0);
+    loud(bird.get(), 0.9, 0.8f, 0.8f, 0.8f);
+    const Colour listening = ring_colour(pill(bird.get(), 1.0));
+    CHECK(listening.b > listening.r + 60);
+    mynah_bird_set_state(bird.get(), MYNAH_TRANSCRIBING, 1.0);
+    const Colour transcribing = ring_colour(pill(bird.get(), 2.0));
+    CHECK(transcribing.r > transcribing.b + 60);
+    // Back to idle: grey, and the turning stops once everything has settled.
+    mynah_bird_set_state(bird.get(), MYNAH_IDLE, 2.0);
+    pill(bird.get(), 3.0);
+    CHECK(pill(bird.get(), 4.0).moving == 0);
+}
+
+TEST_CASE("the first pill drawn shows the voice as it is, with nothing to animate from") {
+    BirdPtr bird = awake_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
+    loud(bird.get(), 0.5, 0.6f, 0.9f, 0.6f);
+    CHECK(reach(pill(bird.get(), 0.5)) > 0.1);
+}
+
+TEST_CASE("the rings turn while listening, even in silence") {
+    BirdPtr bird = awake_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
+    // Slow on purpose — the slowest ring turns once in 8 s, and in silence
+    // the rim moves about a pixel — so compare a second apart, not a frame.
+    const Frame a = pill(bird.get(), 1.0);
+    const Frame b = pill(bird.get(), 2.0);
+    CHECK(a.moving == 1);
+    CHECK(difference(a, b) > 0.0);
+}
+
 TEST_CASE("bad arguments are refused, not crashed on") {
     BirdPtr bird = make_bird();
     REQUIRE(bird != nullptr);
@@ -287,6 +452,15 @@ TEST_CASE("bad arguments are refused, not crashed on") {
     CHECK(mynah_bird_render(bird.get(), 0.0, &pixel, 0, 1) == -1);
     mynah_bird_set_state(nullptr, MYNAH_LISTENING, 0.0);
     mynah_bird_set_model(nullptr, MYNAH_MODEL_LOADED, 0.0);
+    mynah_bird_set_voice(nullptr, 1.0f, nullptr, 0.0);
+    CHECK(mynah_bird_render_pill(nullptr, 0.0, &pixel, 1, 1) == -1);
+    // A broken voice is silence, not a broken picture.
+    const float nan = std::nanf("");
+    const float bands[MYNAH_SPECTRUM_BANDS] = {nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan};
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
+    mynah_bird_set_voice(bird.get(), nan, bands, 0.0);
+    std::vector<uint32_t> square(std::size_t(kSide) * kSide);
+    CHECK(mynah_bird_render_pill(bird.get(), 0.5, square.data(), kSide, kSide) == 1);
     mynah_bird_set_reduced_motion(nullptr, 1);
     mynah_bird_destroy(nullptr);
 }

@@ -8,23 +8,29 @@
 #include <QRegion>
 #include <QTimer>
 
+#include <cmath>
+
 #include "bird_item.h"
 #include "engine_bridge.h"
+#include "mynah/mynah.h"
 
 namespace {
 
-constexpr int kWidth = 168;
-constexpr int kHeight = 44;
-constexpr int kBottomMargin = 80;
+// The circle is as tall as the macOS pill (44) times kScale — 2 is an
+// experiment (2026-10-18) in making the bird easier to notice. The window
+// is the square around it the core draws the rings in (MYNAH_PILL_CIRCLE:
+// the circle's share of the side); its margin comes off the distance from
+// the screen's edge, so the circle's bottom sits where the pill's was.
+constexpr qreal kScale = 2.0;
+constexpr int kCircle = int(44 * kScale);
+const int kSide = int(std::ceil(kCircle / MYNAH_PILL_CIRCLE));
+const int kRingMargin = (kSide - kCircle) / 2;
+const int kBottomMargin = 80 - kRingMargin;
 constexpr int kFadeMs = 180;
 
-// The capsule, for the blur: a rectangle between two circles.
-QRegion capsule() {
-    const int r = kHeight / 2;
-    return QRegion(r, 0, kWidth - 2 * r, kHeight) +
-           QRegion(0, 0, kHeight, kHeight, QRegion::Ellipse) +
-           QRegion(kWidth - kHeight, 0, kHeight, kHeight, QRegion::Ellipse);
-}
+// The circle behind the bird, in the middle of the window: the only blurred
+// part — the rings around it float over the desktop.
+QRegion blur_region() { return QRegion(kRingMargin, kRingMargin, kCircle, kCircle, QRegion::Ellipse); }
 
 } // namespace
 
@@ -40,7 +46,7 @@ Pill::Pill(EngineBridge* bridge, QObject* parent) : QObject(parent), bridge_(bri
     view_->setFlags(Qt::FramelessWindowHint | Qt::WindowTransparentForInput |
                     Qt::WindowDoesNotAcceptFocus);
     view_->setResizeMode(QQuickView::SizeRootObjectToView);
-    view_->resize(kWidth, kHeight);
+    view_->resize(kSide, kSide);
     view_->rootContext()->setContextProperty(QStringLiteral("Mynah"), bridge_);
     view_->rootContext()->setContextProperty(QStringLiteral("pill"), this);
     view_->setSource(QUrl(QStringLiteral("qrc:/qml/Pill.qml")));
@@ -70,6 +76,10 @@ Pill::Pill(EngineBridge* bridge, QObject* parent) : QObject(parent), bridge_(bri
 
 Pill::~Pill() { delete view_; }
 
+qreal Pill::scale() const { return kScale; }
+int Pill::side() const { return kSide; }
+int Pill::circle() const { return kCircle; }
+
 void Pill::update() {
     if (!view_) return;
     const bool wanted = idle_visible_ || bridge_->engaged();
@@ -79,7 +89,7 @@ void Pill::update() {
         hide_timer_->stop();
         if (!view_->isVisible()) {
             view_->show();
-            KWindowEffects::enableBlurBehind(view_, true, capsule());
+            KWindowEffects::enableBlurBehind(view_, true, blur_region());
         }
     } else {
         hide_timer_->start(); // after the fade

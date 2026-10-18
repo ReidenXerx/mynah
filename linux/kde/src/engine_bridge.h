@@ -30,6 +30,9 @@ class EngineBridge : public QObject {
     Q_PROPERTY(QString modelStatus READ modelStatus NOTIFY modelStatusChanged)
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
     Q_PROPERTY(double level READ level NOTIFY levelChanged)
+    // The MYNAH_SPECTRUM_BANDS bands that came with the level, 0..1, low to
+    // high: the pill's waves follow them.
+    Q_PROPERTY(QList<qreal> bands READ bands NOTIFY levelChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
     Q_PROPERTY(QVariantMap config READ config NOTIFY configChanged)
     Q_PROPERTY(QString version READ version CONSTANT)
@@ -48,6 +51,7 @@ public:
     QString modelStatus() const { return model_status_; }
     bool running() const { return running_; }
     double level() const { return level_; }
+    QList<qreal> bands() const { return bands_; }
     QString lastError() const { return last_error_; }
     QVariantMap config() const { return config_; }
     QString version() const;
@@ -83,6 +87,7 @@ private:
     QString model_status_ = QStringLiteral("unloaded");
     bool running_ = false;
     double level_ = 0.0;
+    QList<qreal> bands_;
     QString last_error_;
     QVariantMap config_;
 };

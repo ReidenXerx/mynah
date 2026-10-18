@@ -41,12 +41,19 @@ bool EngineBridge::start() {
         const QString word = QString::fromLatin1(mynah::runtime::state_word(state));
         post([self, word] { if (self) self->setState(word); });
     };
-    listener.level = [post, self](float level, const float*) {
-        // The macOS pill reads the level alone (five bars from one value);
-        // the twelve bands go to the socket for the Omarchy pill.
-        post([self, level] {
+    listener.level = [post, self](float level, const float* bands) {
+        // The level and the twelve bands, for the pill's waves (and, through
+        // the runtime, the socket's subscribers). Copied: the pointer is only
+        // valid during this callback.
+        QList<qreal> copy;
+        if (bands) {
+            copy.reserve(MYNAH_SPECTRUM_BANDS);
+            for (int i = 0; i < MYNAH_SPECTRUM_BANDS; ++i) copy.append(qreal(bands[i]));
+        }
+        post([self, level, copy] {
             if (!self) return;
             self->level_ = double(level);
+            self->bands_ = copy;
             emit self->levelChanged();
         });
     };

@@ -464,6 +464,28 @@ Every part layer carries a constant time remap (`tm` = 0): the parts' own
 precomps end at frame 120, and without it they vanished from the longer
 timeline.
 
+**The pill's concept, 2026-10-19 (KDE first, an experiment):** the bird in
+a dark circle as tall as the pill was, its rim pulsing with the voice —
+three wavy rings around the circle instead of five bars, one per band
+group of the engine's 12-band spectrum (low 0–3, middle 4–7, high 8–11;
+gains 1.6/1.0/1.6 from speech measured on `jfk.wav`, whose middle bands
+carry most), with 3, 5 and 7 lobes, swelling only outward and turning
+slowly at their own speeds. The owner's choices: from mockups, a waveform
+streaming out to the right first, then "the border itself pulsing when you
+talk, but several waves"; floating over the desktop (only the circle keeps
+the dark blurred backdrop; a faint dark edge under each ring keeps it
+readable on light windows); each ring following its own band. The core
+draws them: `mynah_bird_set_voice` takes the level events,
+`mynah_bird_render_pill` draws the square picture — the circle centred,
+`MYNAH_PILL_CIRCLE` of the side, the rings in the margin — in the state's
+tint (the tints now live in the core). They turn while listening, slower
+while loading or transcribing, with a calm swing of about a pixel in
+silence so a live microphone still shows; idle is a still, round rim.
+Frames from real speech: `build/core/mynah-bird --pill speech.wav out/`.
+The circle is twice the macOS pill's height for now (`kScale` in
+`linux/kde/src/pill.cpp`); the macOS pill keeps the capsule and bars until
+the owner settles the design.
+
 The pills only pass the state, the model status and a clock: `BirdItem`
 (`Bird` in QML, fed `Mynah.state` and `Mynah.modelStatus`) on KDE,
 `BirdView` on macOS, 40×40 — up from the glyph's 20, where the colour bird

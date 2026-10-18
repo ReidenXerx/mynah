@@ -1,74 +1,43 @@
-// The floating pill — the macOS app's IndicatorPanel, number for number
-// (macos/Sources/MynahApp/UI/IndicatorPanel.swift): a 168×44 capsule, the
-// animated bird (40×40, rendered by the core: BirdItem) and five 4-wide
-// bars 6 apart in the state's tint, 14 left padding, 12 between; heights
-// 4…22 from the level with a slight fan across the bars, eased over
-// 0.08 s; the whole pill fades over 0.18 s.
+// The floating indicator (2026-10-19 concept): the bird in a dark circle
+// whose rim pulses with the voice — three wavy rings around it, one each
+// for the low, middle and high bands, swelling out and turning slowly, in
+// the state's tint. The core draws the bird and the rings (BirdItem with
+// `waves`, mynah_bird_render_pill); this draws the circle behind the bird,
+// the one place with a backdrop: the rings float over the desktop, a faint
+// dark edge keeping them readable. The window is the square around the
+// circle (`pill.side`, `pill.circle`; pill.cpp). It fades over 0.18 s.
 import QtQuick
 import org.mynah
 
 Item {
     id: root
-    width: 168
-    height: 44
-
-    // The state tints (DictationState.swift), the same in light and dark.
-    readonly property var tints: ({
-        "idle": Qt.rgba(0.60, 0.60, 0.65, 1),
-        "loading": Qt.rgba(0.45, 0.55, 0.75, 1),
-        "listening": Qt.rgba(0.20, 0.80, 0.95, 1),
-        "transcribing": Qt.rgba(0.95, 0.70, 0.20, 1)
-    })
-    readonly property color tint: tints[Mynah.state] || tints["idle"]
+    width: pill.side
+    height: pill.side
 
     opacity: pill.shown ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 180 } }
 
-    // The HUD material: dark and translucent over the compositor's blur,
-    // with the 0.5-px white hairline at 8%.
+    // The HUD material, as the capsule was: dark and translucent over the
+    // compositor's blur (pill.cpp blurs this circle only), with the 0.5-px
+    // white hairline at 8%.
     Rectangle {
-        anchors.fill: parent
-        radius: height / 2
+        anchors.centerIn: parent
+        width: pill.circle
+        height: pill.circle
+        radius: width / 2
         color: Qt.rgba(0.11, 0.11, 0.12, 0.72)
         border.width: 0.5
         border.color: Qt.rgba(1, 1, 1, 0.08)
     }
 
-    Row {
-        x: 14
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 12
-
-        // Full colour, not tinted: the state shows in its pose — the wing
-        // up while listening, asleep while the model is unloaded — and in
-        // the bars.
-        Bird {
-            width: 40
-            height: 40
-            engineState: Mynah.state
-            modelStatus: Mynah.modelStatus
-            anchors.verticalCenter: parent.verticalCenter
-        }
-
-        Row {
-            spacing: 6
-            anchors.verticalCenter: parent.verticalCenter
-            Repeater {
-                model: 5
-                Rectangle {
-                    required property int index
-                    // IndicatorPanel.swift:126-130
-                    readonly property real phase: (index - 2) * 0.35
-                    readonly property real amp:
-                        Math.max(0, Math.min(1, Mynah.level + phase * 0.15))
-                    width: 4
-                    radius: 2
-                    height: 4 + amp * (22 - 4)
-                    color: root.tint
-                    anchors.verticalCenter: parent.verticalCenter
-                    Behavior on height { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
-                }
-            }
-        }
+    // Full colour, the state in its pose — the wing up while listening,
+    // asleep while the model is unloaded — and in the rings' tint.
+    Bird {
+        anchors.fill: parent
+        waves: true
+        engineState: Mynah.state
+        modelStatus: Mynah.modelStatus
+        level: Mynah.level
+        bands: Mynah.bands
     }
 }

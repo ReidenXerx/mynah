@@ -434,7 +434,7 @@ Run gated scripts from `package.json` when hooks remind you: `bearing.__gate.*` 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mynah** (2914 symbols, 6592 relationships, 202 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mynah** (3018 symbols, 6846 relationships, 221 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -473,25 +473,25 @@ This project is indexed by GitNexus as **mynah** (2914 symbols, 6592 relationshi
 | Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
 | Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| Work in the Mynah area (69 symbols) | `.claude/skills/generated/mynah/SKILL.md` |
 | Work in the Tests area (55 symbols) | `.claude/skills/generated/tests/SKILL.md` |
 | Work in the Session area (52 symbols) | `.claude/skills/generated/session/SKILL.md` |
-| Work in the Mynah area (49 symbols) | `.claude/skills/generated/mynah/SKILL.md` |
 | Work in the Scripts area (49 symbols) | `.claude/skills/generated/scripts/SKILL.md` |
 | Work in the Config area (42 symbols) | `.claude/skills/generated/config/SKILL.md` |
 | Work in the UI area (25 symbols) | `.claude/skills/generated/ui/SKILL.md` |
+| Work in the Bird area (24 symbols) | `.claude/skills/generated/bird/SKILL.md` |
 | Work in the Tools area (23 symbols) | `.claude/skills/generated/tools/SKILL.md` |
 | Work in the Cli area (16 symbols) | `.claude/skills/generated/cli/SKILL.md` |
 | Work in the Models area (15 symbols) | `.claude/skills/generated/models/SKILL.md` |
 | Work in the MynahAppTests area (15 symbols) | `.claude/skills/generated/mynahapptests/SKILL.md` |
-| Work in the Bird area (15 symbols) | `.claude/skills/generated/bird/SKILL.md` |
 | Work in the Golden area (12 symbols) | `.claude/skills/generated/golden/SKILL.md` |
-| Work in the Cluster_104 area (11 symbols) | `.claude/skills/generated/cluster-104/SKILL.md` |
+| Work in the Cluster_110 area (11 symbols) | `.claude/skills/generated/cluster-110/SKILL.md` |
 | Work in the Api area (10 symbols) | `.claude/skills/generated/api/SKILL.md` |
 | Work in the Bearing-teaching area (9 symbols) | `.claude/skills/generated/bearing-teaching/SKILL.md` |
-| Work in the Mynah-bird area (8 symbols) | `.claude/skills/generated/mynah-bird/SKILL.md` |
-| Work in the Cluster_82 area (8 symbols) | `.claude/skills/generated/cluster-82/SKILL.md` |
-| Work in the Cluster_86 area (8 symbols) | `.claude/skills/generated/cluster-86/SKILL.md` |
+| Work in the Cluster_88 area (8 symbols) | `.claude/skills/generated/cluster-88/SKILL.md` |
+| Work in the Cluster_92 area (8 symbols) | `.claude/skills/generated/cluster-92/SKILL.md` |
 | Work in the Audio area (8 symbols) | `.claude/skills/generated/audio/SKILL.md` |
 | Work in the Stt area (8 symbols) | `.claude/skills/generated/stt/SKILL.md` |
+| Work in the Input area (8 symbols) | `.claude/skills/generated/input/SKILL.md` |
 
 <!-- gitnexus:end -->

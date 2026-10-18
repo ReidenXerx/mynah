@@ -189,6 +189,12 @@ void        mynah_bird_set_state(mynah_bird *bird, mynah_state state, double now
  * sleep — and starts asleep: nothing loads before the first dictation. */
 void        mynah_bird_set_model(mynah_bird *bird, mynah_model_status status, double now);
 
+/* The voice, from MYNAH_EVENT_LEVEL: its level and MYNAH_SPECTRUM_BANDS
+ * bands, 0..1, as the engine sends them (about 33 a second). The pill's
+ * rings follow it — one each for the low, middle and high bands — while the
+ * engine listens; bands NULL drives all three from the level. */
+void        mynah_bird_set_voice(mynah_bird *bird, float level, const float *bands, double now);
+
 /* The desktop's reduce-motion setting: transitions jump to their end pose. */
 void        mynah_bird_set_reduced_motion(mynah_bird *bird, int reduced);
 
@@ -199,6 +205,20 @@ void        mynah_bird_set_reduced_motion(mynah_bird *bird, int reduced);
  * error. */
 int         mynah_bird_render(mynah_bird *bird, double now, uint32_t *argb_premultiplied,
                               int width, int height);
+
+/* The pill's picture is square: the bird's circle is centred in it, its
+ * diameter this fraction of the side. A front end draws the circle's
+ * backdrop (dark, blurred) there; the rings pulse in the margin around. */
+#define MYNAH_PILL_CIRCLE 0.625f
+
+/* Render the pill's picture the same way: the bird in the circle and the
+ * voice as its rim pulsing — three wavy rings around the circle that swell
+ * with it and turn slowly, in the colour of the engine's state. The rings
+ * turn while the engine listens, loads or transcribes, so this keeps
+ * returning 1 then; 0 once idle and settled. For a canvas that is not
+ * square, the picture is centred, sized by the shorter side. */
+int         mynah_bird_render_pill(mynah_bird *bird, double now, uint32_t *argb_premultiplied,
+                                   int width, int height);
 
 /* --- event accessors (no public layout) ----------------------------------- */
 

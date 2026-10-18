@@ -418,6 +418,20 @@ transcribing, and idle — instead of today's single glyph recoloured by a
 tint. The two pills are meant to stay the same design (K6), so this is one
 design for both: `IndicatorPanel.swift` and `linux/kde/qml/Pill.qml`.
 
+**Animated bird, status 2026-10-18.** Decided: Lottie, rendered by a shared
+C++ renderer (ThorVG) so both pills draw the same frames; a new bird; for
+now two transitions only, start and stop. Done: the owner's exploded
+drawings became a named parts sheet (`assets/bird/tools/group_parts.py` →
+`parts.svg`), were assembled by geometry (`tools/assemble.py` →
+`assembled.svg`; pixel-matching against the reference PNGs was tried and
+dropped, the drawings differ), imported into Lottie Creator through its
+MCP, tuned with the owner watching, and exported as `assets/bird/bird.json`
+(1024², 60 fps; segments `idle-to-listening` 0–30, `listening` 30–60,
+`listening-to-idle` 60–100, `idle` 100–120). Next: ThorVG as a pinned
+submodule in `third_party/` (not in Arch's repos), one renderer behind the
+C API or a small shared library, the two pills playing the segments on
+state changes, and a static frame under reduced-motion settings.
+
 The original plan for this stage:
 
 

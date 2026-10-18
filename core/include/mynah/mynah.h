@@ -168,18 +168,26 @@ int mynah_language_id(const char *code);    /* -1 when unknown */
  * and how a change mid-transition turns back from the pose the bird is in —
  * because none of it lives in a front end.
  *
- * A front end tells the bird the engine's state and renders it at its own
- * clock: `now` is seconds on any monotonic clock, the same one for every
- * call. Not thread-safe: use every bird from one thread (the UI thread). */
+ * A front end tells the bird the engine's state and model status and
+ * renders it at its own clock: `now` is seconds on any monotonic clock, the
+ * same one for every call. Not thread-safe: use every bird from one thread
+ * (the UI thread). */
 typedef struct mynah_bird mynah_bird;
 
 mynah_bird *mynah_bird_create(void);   /* NULL if the renderer could not start */
 void        mynah_bird_destroy(mynah_bird *bird);
 
-/* The engine's state. LOADING and LISTENING are the listening pose — audio
- * is captured from the press, model loaded or not — IDLE and TRANSCRIBING
- * the resting one; a change between the two plays the transition. */
+/* The engine's state: the wing goes up while it is LISTENING. IDLE,
+ * LOADING and TRANSCRIBING are awake and not listening — or, for IDLE,
+ * asleep while the model is unloaded (below); LOADING from there is the
+ * bird waking up. A change plays the transition, through idle if it has
+ * to: asleep, dictation starting wakes the bird, then raises the wing. */
 void        mynah_bird_set_state(mynah_bird *bird, mynah_state state, double now);
+
+/* The model's status, from MYNAH_EVENT_MODEL. The bird sleeps while the
+ * model is unloaded — the engine's idle unload, which also lets the GPU
+ * sleep — and starts asleep: nothing loads before the first dictation. */
+void        mynah_bird_set_model(mynah_bird *bird, mynah_model_status status, double now);
 
 /* The desktop's reduce-motion setting: transitions jump to their end pose. */
 void        mynah_bird_set_reduced_motion(mynah_bird *bird, int reduced);
@@ -187,7 +195,8 @@ void        mynah_bird_set_reduced_motion(mynah_bird *bird, int reduced);
 /* Render the bird as it is at `now` into width*height pixels of
  * premultiplied ARGB — 0xAARRGGBB per uint32_t, row-major — fitted and
  * centred. Returns 1 while it is moving (render again next frame), 0 once
- * it rests (nothing changes until the next set_state), -1 on error. */
+ * it rests (nothing changes until the next set_state or set_model), -1 on
+ * error. */
 int         mynah_bird_render(mynah_bird *bird, double now, uint32_t *argb_premultiplied,
                               int width, int height);
 

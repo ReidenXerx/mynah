@@ -3,8 +3,9 @@
 //
 // The core renders the bird and decides how it moves (mynah_bird_*, the
 // same frames and behaviour as the macOS pill); this item only hands it the
-// engine's state and a clock, and shows the bitmap. It renders on the GUI
-// thread — the bird's one thread — and paint() just draws the last image.
+// engine's state, its model status and a clock, and shows the bitmap. It
+// renders on the GUI thread — the bird's one thread — and paint() just
+// draws the last image.
 //
 // Plasma's "Animation speed" set to Instant (AnimationDurationFactor=0 in
 // kdeglobals) is reduce-motion: the bird jumps to its end pose.
@@ -25,6 +26,9 @@ class BirdItem : public QQuickPaintedItem {
     // "idle", "loading", "listening", "transcribing". (Not `state`: every
     // QQuickItem already has one, for QML States.)
     Q_PROPERTY(QString engineState READ engineState WRITE setEngineState NOTIFY engineStateChanged)
+    // EngineBridge::modelStatus: "unloaded" (the bird sleeps), "loading",
+    // "loaded".
+    Q_PROPERTY(QString modelStatus READ modelStatus WRITE setModelStatus NOTIFY modelStatusChanged)
 
 public:
     explicit BirdItem(QQuickItem* parent = nullptr);
@@ -32,11 +36,14 @@ public:
 
     QString engineState() const { return engine_state_; }
     void setEngineState(const QString& state);
+    QString modelStatus() const { return model_status_; }
+    void setModelStatus(const QString& status);
 
     void paint(QPainter* painter) override;
 
 signals:
     void engineStateChanged();
+    void modelStatusChanged();
 
 protected:
     void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
@@ -51,6 +58,7 @@ private:
 
     mynah_bird* bird_ = nullptr;
     QString engine_state_ = QStringLiteral("idle");
+    QString model_status_ = QStringLiteral("unloaded"); // as the core's bird starts
     QElapsedTimer clock_;
     QTimer timer_;
     QImage image_;

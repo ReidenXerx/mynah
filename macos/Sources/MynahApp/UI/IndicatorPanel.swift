@@ -100,7 +100,7 @@ struct IndicatorView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            BirdView(state: controller.state)
+            BirdView(state: controller.state, modelStatus: controller.modelStatus)
                 .frame(width: Self.birdSize, height: Self.birdSize)
             HStack(spacing: Self.barSpacing) {
                 ForEach(0..<Self.barCount, id: \.self) { index in

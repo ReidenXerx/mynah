@@ -7,19 +7,24 @@ import SwiftUI
 ///
 /// The core renders it and decides how it moves (`mynah_bird_*` — the same
 /// frames and behaviour as the KDE pill, `linux/kde/src/bird_item.cpp`): this
-/// only hands it the engine's state and a clock, and shows the bitmap. Full
-/// colour, not tinted — the state shows in its pose, the wing up while
-/// listening, and in the bars' tint.
+/// only hands it the engine's state, its model status and a clock, and shows
+/// the bitmap. Full colour, not tinted — the state shows in its pose (the
+/// wing up while listening, asleep while the model is unloaded) and in the
+/// bars' tint.
 struct BirdView: NSViewRepresentable {
     var state: DictationState
+    /// `SessionController.modelStatus`: "unloaded", "loading", "loaded".
+    var modelStatus: String
 
     func makeNSView(context: Context) -> BirdNSView {
         let view = BirdNSView(frame: .zero)
+        view.modelStatus = modelStatus
         view.state = state
         return view
     }
 
     func updateNSView(_ nsView: BirdNSView, context: Context) {
+        nsView.modelStatus = modelStatus
         nsView.state = state
     }
 }
@@ -38,6 +43,15 @@ final class BirdNSView: NSView {
         didSet {
             guard state != oldValue, let pointer = bird.value else { return }
             mynah_bird_set_state(pointer, state.engineState, CACurrentMediaTime())
+            render()
+        }
+    }
+
+    /// Unloaded as the core's bird starts: asleep until the model loads.
+    var modelStatus = "unloaded" {
+        didSet {
+            guard modelStatus != oldValue, let pointer = bird.value else { return }
+            mynah_bird_set_model(pointer, Self.engineModelStatus(modelStatus), CACurrentMediaTime())
             render()
         }
     }
@@ -92,6 +106,14 @@ final class BirdNSView: NSView {
 
     @objc private func tick() {
         render()
+    }
+
+    private static func engineModelStatus(_ word: String) -> mynah_model_status {
+        switch word {
+        case "loading": return MYNAH_MODEL_LOADING
+        case "loaded":  return MYNAH_MODEL_LOADED
+        default:        return MYNAH_MODEL_UNLOADED
+        }
     }
 
     private func applyReducedMotion() {

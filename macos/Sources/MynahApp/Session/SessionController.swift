@@ -49,6 +49,12 @@ final class SessionController: ObservableObject {
     /// (M5). The engine reports the degradation as a `vad_degraded` problem.
     @Published private(set) var isVADDegraded = false
 
+    /// The model as the engine last reported it (MYNAH_EVENT_MODEL):
+    /// "unloaded", "loading" or "loaded". Unloaded until the first
+    /// dictation and again after the idle unload — the pill's bird sleeps
+    /// then.
+    @Published private(set) var modelStatus = "unloaded"
+
     /// The microphone permission as AVFoundation sees it, polled alongside
     /// Accessibility. Surfaced in the menu: a session that cannot hear is
     /// indistinguishable from a broken engine unless THIS is visible (phase
@@ -372,6 +378,7 @@ final class SessionController: ObservableObject {
         case .model:
             Log.stt.notice(
                 "model \(event.modelStatus, privacy: .public) \(event.modelName, privacy: .public)")
+            modelStatus = event.modelStatus
             if event.modelStatus == "loaded" {
                 isVADDegraded = false
                 if lastError?.contains("model") == true { lastError = nil }
@@ -424,12 +431,14 @@ extension SessionController {
     static func preview(
         state: DictationState = .listening,
         level: Double = 0.55,
-        error: String? = nil
+        error: String? = nil,
+        modelStatus: String = "loaded"
     ) -> SessionController {
         let controller = SessionController()
         controller.state = state
         controller.level = level
         controller.lastError = error
+        controller.modelStatus = modelStatus
         return controller
     }
 }

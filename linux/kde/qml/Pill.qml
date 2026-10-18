@@ -39,12 +39,14 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
 
-        // Full colour, not tinted: the state shows in its pose (the wing
-        // up while listening) and in the bars.
+        // Full colour, not tinted: the state shows in its pose — the wing
+        // up while listening, asleep while the model is unloaded — and in
+        // the bars.
         Bird {
             width: 40
             height: 40
             engineState: Mynah.state
+            modelStatus: Mynah.modelStatus
             anchors.verticalCenter: parent.verticalCenter
         }
 

@@ -1,7 +1,9 @@
 // The pill's bird (mynah_bird_*): the embedded Lottie loads, each engine
-// state lands in the right pose, transitions play and then rest, a change
-// mid-transition turns back without a jump, and reduced motion skips the
-// motion. Checked on the pixels: where the raised wing is drawn.
+// state and model status lands in the right pose — asleep, idle, listening
+// — transitions play and then rest, the way from asleep to listening goes
+// through idle, a change mid-transition turns back without a jump, and
+// reduced motion skips the motion. Checked on the pixels: where the raised
+// wing is drawn, and where the big Z is.
 
 #include "vendor/doctest.h"
 
@@ -49,6 +51,15 @@ double coverage(const Frame& frame, double x0, double y0, double x1, double y1) 
 double wing(const Frame& frame) { return coverage(frame, 0.78, 0.30, 0.90, 0.45); }
 // The middle of the body, drawn in every pose.
 double body(const Frame& frame) { return coverage(frame, 0.35, 0.35, 0.65, 0.65); }
+// Where the big Z is drawn while asleep, up and right of the head; empty awake.
+double zzz(const Frame& frame) { return coverage(frame, 0.79, 0.12, 0.88, 0.20); }
+
+// A bird that is awake and idle by t = 0: the model loaded a while ago.
+BirdPtr awake_bird() {
+    BirdPtr bird = make_bird();
+    if (bird) mynah_bird_set_model(bird.get(), MYNAH_MODEL_LOADED, -10.0);
+    return bird;
+}
 
 // Pixels that differ visibly between two renders, as a fraction.
 double difference(const Frame& a, const Frame& b) {
@@ -64,17 +75,86 @@ double difference(const Frame& a, const Frame& b) {
 
 } // namespace
 
-TEST_CASE("the bird starts at rest, in the idle pose") {
+TEST_CASE("the bird starts asleep: nothing is loaded before the first dictation") {
     BirdPtr bird = make_bird();
     REQUIRE(bird != nullptr);
     const Frame frame = render(bird.get(), 0.0);
     CHECK(frame.moving == 0);
     CHECK(body(frame) > 0.9);
     CHECK(wing(frame) < 0.2);
+    CHECK(zzz(frame) > 0.15);
+}
+
+TEST_CASE("a model that has loaded wakes the bird, and the idle unload puts it back to sleep") {
+    BirdPtr bird = make_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_model(bird.get(), MYNAH_MODEL_LOADED, 0.0);
+    CHECK(render(bird.get(), 0.4).moving == 1);
+    const Frame up = render(bird.get(), 1.0); // the wake is 0.8 s
+    CHECK(up.moving == 0);
+    CHECK(zzz(up) < 0.02);
+    CHECK(wing(up) < 0.2); // awake is not listening
+    mynah_bird_set_model(bird.get(), MYNAH_MODEL_UNLOADED, 5.0);
+    CHECK(render(bird.get(), 5.6).moving == 1);
+    const Frame down = render(bird.get(), 6.5); // falling asleep is 1.33 s
+    CHECK(down.moving == 0);
+    CHECK(zzz(down) > 0.15);
+}
+
+TEST_CASE("asleep, dictation starting wakes the bird; the wing goes up only once the engine listens") {
+    BirdPtr bird = make_bird();
+    REQUIRE(bird != nullptr);
+    // The press: the engine loads, and the model with it — the GPU waking.
+    mynah_bird_set_state(bird.get(), MYNAH_LOADING, 0.0);
+    mynah_bird_set_model(bird.get(), MYNAH_MODEL_LOADING, 0.0);
+    CHECK(render(bird.get(), 0.3).moving == 1);
+    const Frame woke = render(bird.get(), 1.0);
+    CHECK(woke.moving == 0); // awake, still loading: not listening yet
+    CHECK(zzz(woke) < 0.02);
+    CHECK(wing(woke) < 0.2);
+    mynah_bird_set_model(bird.get(), MYNAH_MODEL_LOADED, 1.5);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 1.5);
+    CHECK(render(bird.get(), 1.7).moving == 1);
+    const Frame up = render(bird.get(), 2.1);
+    CHECK(up.moving == 0);
+    CHECK(wing(up) > 0.5);
+}
+
+TEST_CASE("a model that loads before the bird is awake: the wing waits for the wake, then goes up") {
+    BirdPtr bird = make_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_state(bird.get(), MYNAH_LOADING, 0.0);
+    mynah_bird_set_model(bird.get(), MYNAH_MODEL_LOADED, 0.1);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.2);
+    const Frame waking = render(bird.get(), 0.5);
+    CHECK(waking.moving == 1);
+    CHECK(wing(waking) < 0.2); // still waking: the wing has not started
+    // The wake ends at 0.8 s and the 0.5 s start follows from then — even
+    // with no render in between to notice the hand-over.
+    CHECK(render(bird.get(), 1.0).moving == 1);
+    const Frame up = render(bird.get(), 1.4);
+    CHECK(up.moving == 0);
+    CHECK(wing(up) > 0.5);
+}
+
+TEST_CASE("a press while the bird falls asleep turns back from the very frame it is on") {
+    BirdPtr bird = awake_bird();
+    REQUIRE(bird != nullptr);
+    mynah_bird_set_model(bird.get(), MYNAH_MODEL_UNLOADED, 0.0);
+    const Frame before = render(bird.get(), 0.4);
+    REQUIRE(before.moving == 1);
+    mynah_bird_set_state(bird.get(), MYNAH_LOADING, 0.4);
+    CHECK(difference(before, render(bird.get(), 0.4)) == 0.0);
+    // Backwards over the 0.4 s it had played: awake again at 0.8 s, with no
+    // Z's — not the whole wake transition after a whole fall.
+    CHECK(render(bird.get(), 0.75).moving == 1);
+    const Frame back = render(bird.get(), 0.81);
+    CHECK(back.moving == 0);
+    CHECK(zzz(back) < 0.02);
 }
 
 TEST_CASE("dictation starting raises the wing, then the bird rests") {
-    BirdPtr bird = make_bird();
+    BirdPtr bird = awake_bird();
     REQUIRE(bird != nullptr);
     mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 10.0);
     CHECK(render(bird.get(), 10.25).moving == 1);
@@ -84,20 +164,22 @@ TEST_CASE("dictation starting raises the wing, then the bird rests") {
     CHECK(wing(up) > 0.5);
 }
 
-TEST_CASE("loading is the listening pose: the press already records") {
-    BirdPtr bird = make_bird();
+TEST_CASE("awake, loading is not listening: the wing waits for LISTENING") {
+    BirdPtr bird = awake_bird();
     REQUIRE(bird != nullptr);
     mynah_bird_set_state(bird.get(), MYNAH_LOADING, 0.0);
-    CHECK(render(bird.get(), 0.25).moving == 1);
-    // The model is up: no second transition, the wing stays where it is.
-    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 2.0);
-    const Frame frame = render(bird.get(), 2.0);
+    const Frame loading = render(bird.get(), 0.25);
+    CHECK(loading.moving == 0); // nothing to play: awake already
+    CHECK(wing(loading) < 0.2);
+    mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.5);
+    CHECK(render(bird.get(), 0.75).moving == 1);
+    const Frame frame = render(bird.get(), 1.1);
     CHECK(frame.moving == 0);
     CHECK(wing(frame) > 0.5);
 }
 
 TEST_CASE("dictation ending lowers the wing; transcribing and idle are both the resting pose") {
-    BirdPtr bird = make_bird();
+    BirdPtr bird = awake_bird();
     REQUIRE(bird != nullptr);
     mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
     REQUIRE(wing(render(bird.get(), 1.0)) > 0.5);
@@ -111,7 +193,7 @@ TEST_CASE("dictation ending lowers the wing; transcribing and idle are both the 
 }
 
 TEST_CASE("a stop halfway through the start turns back from the very frame it is on") {
-    BirdPtr bird = make_bird();
+    BirdPtr bird = awake_bird();
     REQUIRE(bird != nullptr);
     mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
     const Frame before = render(bird.get(), 0.2);
@@ -131,7 +213,7 @@ TEST_CASE("a stop halfway through the start turns back from the very frame it is
 }
 
 TEST_CASE("a start halfway through the stop turns back too, to the listening pose") {
-    BirdPtr bird = make_bird();
+    BirdPtr bird = awake_bird();
     REQUIRE(bird != nullptr);
     mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
     REQUIRE(render(bird.get(), 1.0).moving == 0);
@@ -149,10 +231,12 @@ TEST_CASE("a start halfway through the stop turns back too, to the listening pos
     CHECK(render(bird.get(), 3.7).moving == 0);
 }
 
-TEST_CASE("reduced motion: changes jump to their end pose") {
+TEST_CASE("reduced motion: changes jump to their end pose, through idle if they must") {
     BirdPtr bird = make_bird();
     REQUIRE(bird != nullptr);
     mynah_bird_set_reduced_motion(bird.get(), 1);
+    // Asleep to listening in one go: both hops, no frames between.
+    mynah_bird_set_model(bird.get(), MYNAH_MODEL_LOADED, 0.0);
     mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
     const Frame up = render(bird.get(), 0.0);
     CHECK(up.moving == 0);
@@ -164,7 +248,7 @@ TEST_CASE("reduced motion: changes jump to their end pose") {
 }
 
 TEST_CASE("the pixels are premultiplied ARGB, and every one is written") {
-    BirdPtr bird = make_bird();
+    BirdPtr bird = awake_bird();
     REQUIRE(bird != nullptr);
     mynah_bird_set_state(bird.get(), MYNAH_LISTENING, 0.0);
     const Frame frame = render(bird.get(), 1.0); // filled with 0xdeadbeef first
@@ -202,6 +286,7 @@ TEST_CASE("bad arguments are refused, not crashed on") {
     CHECK(mynah_bird_render(bird.get(), 0.0, nullptr, 1, 1) == -1);
     CHECK(mynah_bird_render(bird.get(), 0.0, &pixel, 0, 1) == -1);
     mynah_bird_set_state(nullptr, MYNAH_LISTENING, 0.0);
+    mynah_bird_set_model(nullptr, MYNAH_MODEL_LOADED, 0.0);
     mynah_bird_set_reduced_motion(nullptr, 1);
     mynah_bird_destroy(nullptr);
 }

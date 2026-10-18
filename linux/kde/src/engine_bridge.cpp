@@ -60,10 +60,15 @@ bool EngineBridge::start() {
         });
     };
     listener.model = [post, self](mynah_model_status status, const std::string&) {
-        if (status != MYNAH_MODEL_LOADED) return;
-        // As on macOS: a model that loaded answers any model complaint.
-        post([self] {
-            if (self && self->last_error_.contains(QLatin1String("model"), Qt::CaseInsensitive))
+        const QString word = status == MYNAH_MODEL_LOADING  ? QStringLiteral("loading")
+                             : status == MYNAH_MODEL_LOADED ? QStringLiteral("loaded")
+                                                            : QStringLiteral("unloaded");
+        post([self, word, status] {
+            if (!self) return;
+            self->setModelStatus(word);
+            // As on macOS: a model that loaded answers any model complaint.
+            if (status == MYNAH_MODEL_LOADED &&
+                self->last_error_.contains(QLatin1String("model"), Qt::CaseInsensitive))
                 self->setLastError(QString());
         });
     };
@@ -92,6 +97,7 @@ void EngineBridge::shutdown() {
     running_ = false;
     emit runningChanged();
     setState(QStringLiteral("idle"));
+    setModelStatus(QStringLiteral("unloaded")); // gone with the engine
 }
 
 void EngineBridge::toggle() {
@@ -139,6 +145,12 @@ void EngineBridge::setState(const QString& state) {
         setLastError(QString()); // a new session starts clean, as on macOS
     }
     emit stateChanged();
+}
+
+void EngineBridge::setModelStatus(const QString& status) {
+    if (status == model_status_) return;
+    model_status_ = status;
+    emit modelStatusChanged();
 }
 
 void EngineBridge::setLastError(const QString& error) {

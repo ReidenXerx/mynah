@@ -2,13 +2,18 @@
 //
 // A dev tool for looking at what the pills will draw, without a pill:
 //
-//   mynah-bird out/ [size]    play dictation starting, then stopping, at
-//                             60 fps and `size` px (default 128), into
-//                             out/start-NNN.ppm and out/stop-NNN.ppm
+//   mynah-bird out/ [size]    play a day in the bird's life at 60 fps and
+//                             `size` px (default 128), into out/:
+//                               wake-NNN.ppm   asleep, dictation starts and
+//                                              the model loads
+//                               start-NNN.ppm  the engine starts listening
+//                               stop-NNN.ppm   dictation ends
+//                               sleep-NNN.ppm  the model is unloaded
 //
-// It drives the bird exactly as a pill does — the engine's state and a
-// clock — so what it writes is what a pill shows. PPM, over the pill's
-// dark grey, because it needs no library: `magick out/start-*.ppm start.gif`.
+// It drives the bird exactly as a pill does — the engine's state, its
+// model status and a clock — so what it writes is what a pill shows. PPM,
+// over the pill's dark grey, because it needs no library:
+// `magick out/wake-*.ppm wake.gif`.
 
 #include <cstdio>
 #include <cstdlib>
@@ -66,16 +71,27 @@ int main(int argc, char** argv) {
     }
     std::vector<uint32_t> argb(std::size_t(size) * size);
     double now = 0;
+    int counts[4] = {-1, -1, -1, -1};
+    // Asleep (the model is not loaded yet); a dictation starts: the engine
+    // loads, the model with it. The wake plays; LISTENING comes after it.
+    mynah_bird_set_state(bird, MYNAH_LOADING, now);
+    mynah_bird_set_model(bird, MYNAH_MODEL_LOADING, now);
+    counts[0] = play(bird, now, dir + "/wake", argb, size);
+    mynah_bird_set_model(bird, MYNAH_MODEL_LOADED, now);
     mynah_bird_set_state(bird, MYNAH_LISTENING, now);
-    const int start = play(bird, now, dir + "/start", argb, size);
+    if (counts[0] > 0) counts[1] = play(bird, now, dir + "/start", argb, size);
     mynah_bird_set_state(bird, MYNAH_TRANSCRIBING, now);
-    const int stop = start < 0 ? -1 : play(bird, now, dir + "/stop", argb, size);
+    if (counts[1] > 0) counts[2] = play(bird, now, dir + "/stop", argb, size);
+    // Idle; the idle timeout unloads the model, and the bird falls asleep.
+    mynah_bird_set_state(bird, MYNAH_IDLE, now);
+    mynah_bird_set_model(bird, MYNAH_MODEL_UNLOADED, now);
+    if (counts[2] > 0) counts[3] = play(bird, now, dir + "/sleep", argb, size);
     mynah_bird_destroy(bird);
-    if (start < 0 || stop < 0) {
+    if (counts[3] < 0) {
         std::fprintf(stderr, "mynah-bird: rendering into %s/ failed\n", dir.c_str());
         return 1;
     }
-    std::printf("%s/: start-*.ppm (%d frames), stop-*.ppm (%d frames), %d px\n", dir.c_str(), start, stop,
-                size);
+    std::printf("%s/: wake (%d frames), start (%d), stop (%d), sleep (%d), %d px\n", dir.c_str(), counts[0],
+                counts[1], counts[2], counts[3], size);
     return 0;
 }

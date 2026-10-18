@@ -434,23 +434,43 @@ and compiled from a list of its sources by `third_party/thorvg.cmake` (it
 builds with Meson; only the CPU raster engine and the Lottie loader, no
 threads). `bird.json` is compiled into libmynah as a byte array, so no
 front end can ship a different bird. The C API is the bird's whole
-behaviour, not a frame server: `mynah_bird_set_state(bird, state, now)` and
+behaviour, not a frame server: `mynah_bird_set_state(bird, state, now)`,
+`mynah_bird_set_model(bird, status, now)` and
 `mynah_bird_render(bird, now, argb, w, h)`, which says whether the bird is
-still moving. LOADING and LISTENING are the listening pose (audio is
-captured from the press, K7), IDLE and TRANSCRIBING the resting one. A
-change that arrives mid-transition plays that transition backwards from
-the frame it is on — starting the other transition at the same fraction
-was measured and jumps (2.7% of the pixels in one frame, more than half of
-the whole idle↔listening change). Reduced motion jumps to the end pose:
-Plasma's animation speed at Instant, macOS's Reduce motion. Tests:
-`core/tests/test_bird.cpp`; frames to look at: `build/core/mynah-bird out/`.
+still moving. Reduced motion jumps to the end pose: Plasma's animation
+speed at Instant, macOS's Reduce motion. Tests:
+`core/tests/test_bird.cpp`; frames of every transition, driven as the
+engine drives them: `build/core/mynah-bird out/`.
 
-The pills only pass the state and a clock: `BirdItem` (`Bird` in QML) on
-KDE, `BirdView` on macOS, 40×40 — up from the glyph's 20, where the colour
-bird does not read — and in full colour; the bars keep the state's tint.
-The KDE side was checked offscreen (QML import, the state binding, the
-animation, 2× scaling); the macOS side was written without a Mac and is
-unbuilt until the next build there.
+**Asleep and awake (2026-10-18, owner's call):** the bird sleeps when the
+GPU does — while the model is unloaded, which is the engine's idle unload
+(`idle_timeout`, 45 s; it lets the dGPU go) and the state at launch, since
+nothing loads before the first dictation. It wakes when dictation starts
+and the model loads (the GPU waking), and raises the wing only once the
+engine is LISTENING: awake is not listening, so LOADING is the idle pose,
+no longer the listening one. The poses sit in a line — listening, idle,
+sleeping — and the file has a transition each way between neighbours
+(`idle-to-listening`, `listening-to-idle`, `idle-to-sleeping`,
+`sleeping-to-idle`; rests `listening`, `idle`, `sleeping`); asleep, a
+dictation plays the wake, then the wing. On the CPU tier there is no GPU,
+but the same unload applies. A change that arrives mid-transition plays
+that transition backwards from the frame it is on, when that is the
+shorter way — starting the other transition at the same fraction was
+measured and jumps (2.7% of the pixels in one frame, more than half of the
+whole idle↔listening change). The sleeping pose reuses the idle rig (the
+owner's suggestion): only the closed eye and the three Z's are new art,
+from `source/mynah-sleeping-parts.svg` via `tools/sleeping_extras.py`.
+Every part layer carries a constant time remap (`tm` = 0): the parts' own
+precomps end at frame 120, and without it they vanished from the longer
+timeline.
+
+The pills only pass the state, the model status and a clock: `BirdItem`
+(`Bird` in QML, fed `Mynah.state` and `Mynah.modelStatus`) on KDE,
+`BirdView` on macOS, 40×40 — up from the glyph's 20, where the colour bird
+does not read — and in full colour; the bars keep the state's tint. The KDE
+side was checked offscreen through a whole cycle (asleep, waking, awake
+while loading, listening, idle, falling asleep); the macOS side was written
+without a Mac and is unbuilt until the next build there.
 
 The original plan for this stage:
 

@@ -24,6 +24,10 @@ class EngineBridge : public QObject {
     // "idle", "loading", "listening", "transcribing" — as the protocol says.
     Q_PROPERTY(QString state READ state NOTIFY stateChanged)
     Q_PROPERTY(bool engaged READ engaged NOTIFY stateChanged)
+    // "unloaded", "loading", "loaded" — MYNAH_EVENT_MODEL. Unloaded until
+    // the first dictation, and again after the idle unload: the pill's
+    // bird sleeps then.
+    Q_PROPERTY(QString modelStatus READ modelStatus NOTIFY modelStatusChanged)
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
     Q_PROPERTY(double level READ level NOTIFY levelChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
@@ -41,6 +45,7 @@ public:
 
     QString state() const { return state_; }
     bool engaged() const { return state_ != QLatin1String("idle"); }
+    QString modelStatus() const { return model_status_; }
     bool running() const { return running_; }
     double level() const { return level_; }
     QString lastError() const { return last_error_; }
@@ -60,6 +65,7 @@ public:
 
 signals:
     void stateChanged();
+    void modelStatusChanged();
     void runningChanged();
     void levelChanged();
     void lastErrorChanged();
@@ -68,11 +74,13 @@ signals:
 
 private:
     void setState(const QString& state);
+    void setModelStatus(const QString& status);
     void setLastError(const QString& error);
     void reloadConfig();
 
     std::unique_ptr<mynah::runtime::Runtime> runtime_;
     QString state_ = QStringLiteral("idle");
+    QString model_status_ = QStringLiteral("unloaded");
     bool running_ = false;
     double level_ = 0.0;
     QString last_error_;

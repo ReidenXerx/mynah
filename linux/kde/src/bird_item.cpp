@@ -17,6 +17,12 @@ mynah_state engine_state(const QString& state) {
     return MYNAH_IDLE;
 }
 
+mynah_model_status model_status(const QString& status) {
+    if (status == QLatin1String("loading")) return MYNAH_MODEL_LOADING;
+    if (status == QLatin1String("loaded")) return MYNAH_MODEL_LOADED;
+    return MYNAH_MODEL_UNLOADED;
+}
+
 } // namespace
 
 BirdItem::BirdItem(QQuickItem* parent) : QQuickPaintedItem(parent), bird_(mynah_bird_create()) {
@@ -43,6 +49,14 @@ void BirdItem::setEngineState(const QString& state) {
     engine_state_ = state;
     if (bird_) mynah_bird_set_state(bird_, engine_state(state), now());
     emit engineStateChanged();
+    tick();
+}
+
+void BirdItem::setModelStatus(const QString& status) {
+    if (status == model_status_) return;
+    model_status_ = status;
+    if (bird_) mynah_bird_set_model(bird_, model_status(status), now());
+    emit modelStatusChanged();
     tick();
 }
 

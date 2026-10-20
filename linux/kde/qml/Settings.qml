@@ -14,10 +14,13 @@ ApplicationWindow {
     id: window
     title: "mynah Settings"
     width: 460
-    height: 340
+    height: 340 + tabsInset
     minimumWidth: 460
-    minimumHeight: 340
+    minimumHeight: 340 + tabsInset
     visible: false
+
+    // Space between the title bar and the tabs (matches the macOS window).
+    readonly property int tabsInset: Kirigami.Units.largeSpacing
 
     readonly property var cfg: Mynah.config
 
@@ -55,11 +58,17 @@ ApplicationWindow {
         }
     }
 
-    header: TabBar {
-        id: tabs
-        TabButton { text: "General"; icon.name: "configure" }
-        TabButton { text: "Recognition"; icon.name: "audio-input-microphone" }
-        TabButton { text: "Sensitivity"; icon.name: "audio-volume-high" }
+    // Wrapped rather than given topPadding: TabBar's padding handling is up to
+    // the style, a plain Item's height is not.
+    header: Item {
+        implicitHeight: tabs.implicitHeight + window.tabsInset
+        TabBar {
+            id: tabs
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            TabButton { text: "General"; icon.name: "configure" }
+            TabButton { text: "Recognition"; icon.name: "audio-input-microphone" }
+            TabButton { text: "Sensitivity"; icon.name: "audio-volume-high" }
+        }
     }
 
     StackLayout {

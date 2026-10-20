@@ -25,8 +25,15 @@ struct SettingsView: View {
             recognition.tabItem { Label("Recognition", systemImage: "waveform") }
             sensitivity.tabItem { Label("Sensitivity", systemImage: "mic") }
         }
-        .frame(width: 460, height: 340)
+        // The tab picker straddles the TabView's top edge; without this it sat
+        // on the title bar's bottom line.
+        .padding(.top, Self.topInset)
+        .frame(width: 460, height: 340 + Self.topInset)
     }
+
+    /// Space between the title bar and the tab picker. SettingsWindow sizes the
+    /// window from it too, so the content area doesn't shrink.
+    static let topInset: CGFloat = 12
 
     // MARK: - General
 
